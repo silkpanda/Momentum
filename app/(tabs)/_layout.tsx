@@ -1,33 +1,29 @@
 import { Tabs } from 'expo-router';
-import React from 'react';
-
-import { HapticTab } from '@/components/haptic-tab';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { Ionicons } from '@expo/vector-icons'; // A standard icon library included with Expo
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
-
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
-        headerShown: false,
-        tabBarButton: HapticTab,
+        headerShown: false, // We'll let each screen manage its own title
+        tabBarActiveTintColor: '#007AFF', // Color for the active tab
+        tabBarStyle: {
+          backgroundColor: '#1C1C1E', // Dark background for the tab bar
+          borderTopColor: '#333',
+        },
       }}>
       <Tabs.Screen
-        name="index"
+        name="index" // This links to index.tsx
         options={{
-          title: 'Home',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
+          title: 'Inbox',
+          tabBarIcon: ({ color }) => <Ionicons name="mail-outline" size={28} color={color} />,
         }}
       />
       <Tabs.Screen
-        name="explore"
+        name="routines" // This links to routines.tsx
         options={{
-          title: 'Explore',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
+          title: 'Routines',
+          tabBarIcon: ({ color }) => <Ionicons name="list-outline" size={28} color={color} />,
         }}
       />
     </Tabs>

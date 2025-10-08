@@ -1,98 +1,261 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
-
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
+import React, { useState, useEffect, useCallback } from 'react';
+import { StyleSheet, View, TextInput, TouchableOpacity, FlatList, Platform, Keyboard, UIManager } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useRouter } from 'expo-router';
+import { GestureHandlerRootView, Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, runOnJS, interpolateColor } from 'react-native-reanimated';
+import 'react-native-get-random-values';
+import { v4 as uuidv4 } from 'uuid';
 
-export default function HomeScreen() {
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
+const STORAGE_KEY = '@momentum_inboxItems';
+interface InboxItemData { id: string; text: string; }
+
+// --- Types for SwipeableListItem Props ---
+interface SwipeableListItemProps {
+  item: InboxItemData;
+  onSwipeRight: (item: InboxItemData) => void;
+  onSwipeLeft: (id: string) => void;
+}
+
+// --- Swipeable List Item Component ---
+const SwipeableListItem = ({ item, onSwipeRight, onSwipeLeft }: SwipeableListItemProps) => {
+  const translateX = useSharedValue(0);
+  const itemOpacity = useSharedValue(1);
+
+  const panGesture = Gesture.Pan()
+    .onUpdate((event) => {
+      translateX.value = event.translationX;
+    })
+    .onEnd((event) => {
+      if (event.translationX > 100) { // Swipe Right Threshold
+        runOnJS(onSwipeRight)(item);
+        translateX.value = withTiming(0); // Reset position after action
+      } else if (event.translationX < -100) { // Swipe Left Threshold
+        itemOpacity.value = withTiming(0, { duration: 300 });
+        translateX.value = withTiming(-500, { duration: 300 }, () => {
+          runOnJS(onSwipeLeft)(item.id);
+        });
+      } else {
+        translateX.value = withTiming(0);
+      }
+    });
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: translateX.value }],
+  }));
+  
+  const backgroundStyle = useAnimatedStyle(() => ({
+    backgroundColor: interpolateColor(
+      translateX.value,
+      [-100, 0, 100],
+      ['#E57373', '#FFFFFF', '#b3cde4']
+    ),
+  }));
+  
+  const rightIconStyle = useAnimatedStyle(() => ({
+    opacity: interpolateColor(translateX.value, [0, 80], [0, 1])
+  }));
+
+  const leftIconStyle = useAnimatedStyle(() => ({
+    opacity: interpolateColor(translateX.value, [-80, 0], [1, 0])
+  }));
+
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+    <View style={styles.swipeableContainer}>
+       <Animated.View style={[styles.backgroundIcons, backgroundStyle]}>
+          <Animated.View style={[styles.icon, { left: 20 }, rightIconStyle]}>
+            <Ionicons name={"arrow-forward-circle"} size={24} color={"#537692"} />
+          </Animated.View>
+          <Animated.View style={[styles.icon, { right: 20 }, leftIconStyle]}>
+            <Ionicons name={"trash"} size={24} color={"#FFF"} />
+          </Animated.View>
+        </Animated.View>
+      <GestureDetector gesture={panGesture}>
+        <Animated.View style={[styles.listItem, animatedStyle, { opacity: itemOpacity }]}>
+          <ThemedText style={styles.listItemText}>{item.text}</ThemedText>
+        </Animated.View>
+      </GestureDetector>
+    </View>
+  );
+};
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
+// --- Main Inbox Screen ---
+export default function InboxScreen() {
+  const [items, setItems] = useState<InboxItemData[]>([]);
+  const [newItemText, setNewItemText] = useState('');
+  const router = useRouter();
+
+  useEffect(() => {
+    const loadItems = async () => {
+      try {
+        const storedItems = await AsyncStorage.getItem(STORAGE_KEY);
+        if (storedItems) {
+          setItems(JSON.parse(storedItems));
+        }
+      } catch (e) {
+        console.error("Failed to load items.", e);
+      }
+    };
+    loadItems();
+  }, []);
+  
+  const saveItems = useCallback(async (newItems: InboxItemData[]) => {
+    try {
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(newItems));
+    } catch (e) {
+      console.error("Failed to save items.", e);
+    }
+  }, []);
+
+  const handleAddItem = useCallback(() => {
+    if (newItemText.trim() === '') return;
+    const newItem: InboxItemData = { id: uuidv4(), text: newItemText.trim() };
+    const updatedItems = [newItem, ...items];
+    setItems(updatedItems);
+    saveItems(updatedItems);
+    setNewItemText('');
+    Keyboard.dismiss();
+  }, [newItemText, items, saveItems]);
+
+  const handleDeleteItem = useCallback((id: string) => {
+    const updatedItems = items.filter(item => item.id !== id);
+    setItems(updatedItems);
+    saveItems(updatedItems);
+  }, [items, saveItems]);
+  
+  const handleFocusItem = useCallback((item: InboxItemData) => {
+     router.push({ pathname: '/focus-mode', params: { task: item.text, id: item.id } });
+  }, [router]);
+
+
+  return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <ThemedView style={styles.container}>
+        <View style={styles.header}>
+          <ThemedText style={styles.headerTitle}>Brain Dump</ThemedText>
+          <ThemedText style={styles.headerSubtitle}>Capture your thoughts</ThemedText>
+        </View>
+        <View style={styles.inputContainer}>
+          <TextInput
+            style={styles.input}
+            placeholder="What's on your mind?"
+            placeholderTextColor="#999"
+            value={newItemText}
+            onChangeText={setNewItemText}
+            onSubmitEditing={handleAddItem}
+          />
+          <TouchableOpacity style={styles.addButton} onPress={handleAddItem}>
+            <Ionicons name="add-circle" size={48} color="#ffdf7c" />
+          </TouchableOpacity>
+        </View>
+        <FlatList
+          data={items}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <SwipeableListItem 
+              item={item} 
+              onSwipeLeft={handleDeleteItem} 
+              onSwipeRight={handleFocusItem}
+            />
+          )}
+          contentContainerStyle={styles.listContainer}
+          ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
+        />
       </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+    </GestureHandlerRootView>
   );
 }
 
+// --- Styles ---
 const styles = StyleSheet.create({
-  titleContainer: {
+  container: {
+    flex: 1,
+    backgroundColor: '#eef3f9', // Very Light Blue
+  },
+  header: {
+    padding: 20,
+    paddingTop: 60,
+    backgroundColor: '#537692', // Muted Blue
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+  },
+  headerTitle: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#FFF',
+  },
+  headerSubtitle: {
+    fontSize: 16,
+    color: '#b3cde4', // Soft Blue
+  },
+  inputContainer: {
     flexDirection: 'row',
+    padding: 20,
     alignItems: 'center',
-    gap: 8,
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  input: {
+    flex: 1,
+    backgroundColor: '#FFF',
+    padding: 15,
+    borderRadius: 15,
+    fontSize: 16,
+    marginRight: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
+  addButton: {
+    // Add button styles
+  },
+  listContainer: {
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+  },
+  swipeableContainer: {
+    justifyContent: 'center',
+    backgroundColor: 'white',
+    borderRadius: 15,
+  },
+  backgroundIcons: {
+    position: 'absolute',
+    top: 0,
     bottom: 0,
     left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderRadius: 15,
+  },
+  icon: {
     position: 'absolute',
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center',
+  },
+  listItem: {
+    backgroundColor: '#FFF',
+    padding: 20,
+    borderRadius: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  listItemText: {
+    fontSize: 16,
+    color: '#333',
   },
 });
+
