@@ -12,49 +12,36 @@ interface InboxItemData { id: string; text: string; }
 export default function FocusModeScreen() {
   const { task, id } = useLocalSearchParams();
   const router = useRouter();
-  
-  // Create a shared value for opacity, starting at 0 (invisible)
   const opacity = useSharedValue(0);
-
-  // Create an animated style that reacts to the opacity value
-  const animatedStyle = useAnimatedStyle(() => {
-    return {
-      opacity: opacity.value,
-    };
-  });
 
   // Animate the screen in when it mounts
   useEffect(() => {
     opacity.value = withTiming(1, { duration: 300 });
-  }, []);
+  }, [opacity]);
 
-  const handleDone = async () => {
-    // 1. Define the cleanup and navigation logic as a separate function
-    const navigateBack = async () => {
-        if (typeof id === 'string') {
-            try {
-                const storedItems = await AsyncStorage.getItem(STORAGE_KEY);
-                if (storedItems) {
-                    let items: InboxItemData[] = JSON.parse(storedItems);
-                    items = items.filter(item => item.id !== id);
-                    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(items));
-                }
-            } catch (e) { 
-                console.error("Failed to delete item from focus mode", e); 
-            }
+  const handleDone = () => {
+    opacity.value = withTiming(0, { duration: 300 }, async () => {
+      if (typeof id === 'string') {
+        try {
+          const storedItems = await AsyncStorage.getItem(STORAGE_KEY);
+          if (storedItems) {
+            let items: InboxItemData[] = JSON.parse(storedItems);
+            items = items.filter(item => item.id !== id);
+            await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+          }
+        } catch (e) {
+          console.error("Failed to delete item from focus mode", e);
         }
-        router.back();
-    };
-
-    // 2. Animate the opacity back to 0
-    // The third argument to withTiming is a callback that runs when the animation is complete
-    opacity.value = withTiming(0, { duration: 300 }, (isFinished) => {
-      if (isFinished) {
-        // 3. Run the navigation logic on the JS thread after the animation is 100% done
-        runOnJS(navigateBack)();
       }
+      runOnJS(router.back)();
     });
   };
+
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      opacity: opacity.value
+    };
+  });
 
   return (
     <Animated.View style={[styles.container, animatedStyle]}>
@@ -71,7 +58,7 @@ export default function FocusModeScreen() {
         </View>
         <TouchableOpacity style={styles.doneButton} onPress={handleDone}>
           <Ionicons name="checkmark-done-circle" size={80} color="#4CAF50" />
-          <ThemedText style={styles.doneButtonText}>I'm Done!</ThemedText>
+          <ThemedText style={styles.doneButtonText}>I&apos;m Done!</ThemedText>
         </TouchableOpacity>
       </SafeAreaView>
     </Animated.View>
@@ -129,4 +116,3 @@ const styles = StyleSheet.create({
     marginTop: 10 
   } 
 });
-

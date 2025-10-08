@@ -15,7 +15,7 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 }
 
 const STORAGE_KEY = '@momentum_inboxItems';
-interface InboxItemData { id: string; text: string; author?: string }
+interface InboxItemData { id: string; text: string; }
 
 // --- Types for SwipeableListItem Props ---
 interface SwipeableListItemProps {
@@ -81,7 +81,6 @@ const SwipeableListItem = ({ item, onSwipeRight, onSwipeLeft }: SwipeableListIte
       <GestureDetector gesture={panGesture}>
         <Animated.View style={[styles.listItem, animatedStyle, { opacity: itemOpacity }]}>
           <ThemedText style={styles.listItemText}>{item.text}</ThemedText>
-          {item.author && <ThemedText style={styles.authorText}>- {item.author}</ThemedText>}
         </Animated.View>
       </GestureDetector>
     </View>
@@ -92,9 +91,7 @@ const SwipeableListItem = ({ item, onSwipeRight, onSwipeLeft }: SwipeableListIte
 export default function InboxScreen() {
   const [items, setItems] = useState<InboxItemData[]>([]);
   const [newItemText, setNewItemText] = useState('');
-  const [currentUser, setCurrentUser] = useState('Mom'); // Add state for current user
   const router = useRouter();
-  const users = ['Mom', 'Dad', 'Kid']; // Predefined users
 
   useEffect(() => {
     const loadItems = async () => {
@@ -120,13 +117,13 @@ export default function InboxScreen() {
 
   const handleAddItem = useCallback(() => {
     if (newItemText.trim() === '') return;
-    const newItem: InboxItemData = { id: uuidv4(), text: newItemText.trim(), author: currentUser };
+    const newItem: InboxItemData = { id: uuidv4(), text: newItemText.trim() };
     const updatedItems = [newItem, ...items];
     setItems(updatedItems);
     saveItems(updatedItems);
     setNewItemText('');
     Keyboard.dismiss();
-  }, [newItemText, items, saveItems, currentUser]);
+  }, [newItemText, items, saveItems]);
 
   const handleDeleteItem = useCallback((id: string) => {
     const updatedItems = items.filter(item => item.id !== id);
@@ -145,20 +142,6 @@ export default function InboxScreen() {
         <View style={styles.header}>
           <ThemedText style={styles.headerTitle}>Brain Dump</ThemedText>
           <ThemedText style={styles.headerSubtitle}>Capture your thoughts</ThemedText>
-          <View style={styles.userSwitcherContainer}>
-            {users.map((user) => (
-              <TouchableOpacity
-                key={user}
-                style={[
-                  styles.userButton,
-                  currentUser === user && styles.activeUserButton,
-                ]}
-                onPress={() => setCurrentUser(user)}
-              >
-                <ThemedText style={[styles.userButtonText, currentUser === user && styles.activeUserButtonText]}>{user}</ThemedText>
-              </TouchableOpacity>
-            ))}
-          </View>
         </View>
         <View style={styles.inputContainer}>
           <TextInput
@@ -212,29 +195,6 @@ const styles = StyleSheet.create({
   headerSubtitle: {
     fontSize: 16,
     color: '#b3cde4', // Soft Blue
-    marginBottom: 15,
-  },
-  userSwitcherContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    paddingBottom: 10,
-  },
-  userButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 15,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    marginHorizontal: 5,
-  },
-  activeUserButton: {
-    backgroundColor: '#ffdf7c', // Vibrant Yellow for active user
-  },
-  userButtonText: {
-    color: '#FFF',
-    fontWeight: 'bold',
-  },
-  activeUserButtonText: {
-    color: '#537692'
   },
   inputContainer: {
     flexDirection: 'row',
@@ -297,11 +257,4 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#333',
   },
-  authorText: {
-    fontSize: 12,
-    color: '#888',
-    marginTop: 4,
-    fontStyle: 'italic',
-  }
 });
-
