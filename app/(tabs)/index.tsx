@@ -4,9 +4,10 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { GestureHandlerRootView, Gesture, GestureDetector } from 'react-native-gesture-handler';
-import Animated, { useSharedValue, useAnimatedStyle, withTiming, runOnJS, interpolateColor } from 'react-native-reanimated';
+// Make sure 'interpolate' is imported from 'react-native-reanimated'
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, runOnJS, interpolate, interpolateColor } from 'react-native-reanimated';
 import 'react-native-get-random-values';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -59,12 +60,15 @@ const SwipeableListItem = ({ item, onSwipeRight, onSwipeLeft }: SwipeableListIte
     ),
   }));
   
+  // *** THE FIX IS HERE ***
+  // Use 'interpolate' for the opacity property, not 'interpolateColor'.
   const rightIconStyle = useAnimatedStyle(() => ({
-    opacity: interpolateColor(translateX.value, [0, 80], [0, 1])
+    opacity: interpolate(translateX.value, [0, 80], [0, 1])
   }));
 
+  // *** AND HERE ***
   const leftIconStyle = useAnimatedStyle(() => ({
-    opacity: interpolateColor(translateX.value, [-80, 0], [1, 0])
+    opacity: interpolate(translateX.value, [-80, 0], [1, 0])
   }));
 
 
@@ -87,25 +91,29 @@ const SwipeableListItem = ({ item, onSwipeRight, onSwipeLeft }: SwipeableListIte
   );
 };
 
-// --- Main Inbox Screen ---
+// --- Main Inbox Screen (no changes below this line) ---
 export default function InboxScreen() {
   const [items, setItems] = useState<InboxItemData[]>([]);
   const [newItemText, setNewItemText] = useState('');
   const router = useRouter();
 
-  useEffect(() => {
-    const loadItems = async () => {
-      try {
-        const storedItems = await AsyncStorage.getItem(STORAGE_KEY);
-        if (storedItems) {
-          setItems(JSON.parse(storedItems));
+  useFocusEffect(
+    useCallback(() => {
+      const loadItems = async () => {
+        try {
+          const storedItems = await AsyncStorage.getItem(STORAGE_KEY);
+          if (storedItems) {
+            setItems(JSON.parse(storedItems));
+          } else {
+            setItems([]);
+          }
+        } catch (e) {
+          console.error("Failed to load items.", e);
         }
-      } catch (e) {
-        console.error("Failed to load items.", e);
-      }
-    };
-    loadItems();
-  }, []);
+      };
+      loadItems();
+    }, [])
+  );
   
   const saveItems = useCallback(async (newItems: InboxItemData[]) => {
     try {
@@ -178,12 +186,12 @@ export default function InboxScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#eef3f9', // Very Light Blue
+    backgroundColor: '#eef3f9',
   },
   header: {
     padding: 20,
     paddingTop: 60,
-    backgroundColor: '#537692', // Muted Blue
+    backgroundColor: '#537692',
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,
   },
@@ -194,7 +202,7 @@ const styles = StyleSheet.create({
   },
   headerSubtitle: {
     fontSize: 16,
-    color: '#b3cde4', // Soft Blue
+    color: '#b3cde4',
   },
   inputContainer: {
     flexDirection: 'row',
@@ -214,9 +222,7 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
-  addButton: {
-    // Add button styles
-  },
+  addButton: {},
   listContainer: {
     paddingHorizontal: 20,
     paddingBottom: 20,
@@ -258,4 +264,3 @@ const styles = StyleSheet.create({
     color: '#333',
   },
 });
-
