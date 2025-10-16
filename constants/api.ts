@@ -1,9 +1,9 @@
-// constants/api.ts
+// This configuration is for local network testing ONLY.
+const LOCAL_IP_ADDRESS = '192.168.86.33'; 
+const PORT = 3001;
 
-// The app, running through the tunnel, will resolve localhost
-// to the machine running the Expo server.
-const API_BASE_URL = 'http://localhost:3001/api';
+const BASE_URL = `http://${LOCAL_IP_ADDRESS}:${PORT}`;
 
 export const API_URLS = {
-  TASKS: `${API_BASE_URL}/tasks`,
+  TASKS: `${BASE_URL}/api/tasks`,
 };
