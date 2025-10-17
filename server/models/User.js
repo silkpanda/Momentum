@@ -15,15 +15,17 @@ const UserSchema = new Schema({
     type: String,
     required: true
   },
-  // --- NEW FIELD ---
-  // This links the user to their family group.
   familyId: {
     type: Schema.Types.ObjectId,
-    ref: 'family',
-    default: null // Will be set during registration
+    ref: 'family' 
   },
-
-  // Gamification fields remain
+  // --- NEW: Add User Role ---
+  role: {
+    type: String,
+    enum: ['Parent', 'Child'], // Defines the possible roles
+    default: 'Child'          // Default new users to 'Child'
+  },
+  // --- END NEW ---
   points: {
     type: Number,
     default: 0

@@ -2,6 +2,13 @@ const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 
 const TaskSchema = new Schema({
+  // --- MODIFICATION: Add familyId for scoping ---
+  familyId: {
+    type: Schema.Types.ObjectId,
+    ref: 'family',
+    required: true
+  },
+  // 'userId' is now 'createdBy'
   userId: {
     type: Schema.Types.ObjectId,
     ref: 'user',
@@ -11,9 +18,6 @@ const TaskSchema = new Schema({
     type: String,
     required: true
   },
-  // --- NEW FIELD ---
-  // Add a field for the point value of a task.
-  // Default to a standard value, e.g., 10 points.
   points: {
     type: Number,
     default: 10

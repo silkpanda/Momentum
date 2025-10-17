@@ -11,5 +11,6 @@ export const API_URLS = {
   TASKS: `${BASE_URL}/api/tasks`,
   // --- CORRECTION: Changed 'user' to 'users' ---
   USER_ME: `${BASE_URL}/api/users/me`, 
+  FAMILY_INVITE: `${BASE_URL}/family/invite`,
   TASK_COMPLETE: (id: string) => `${BASE_URL}/api/tasks/${id}/complete`,
 };
