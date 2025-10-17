@@ -1,22 +1,19 @@
 const jwt = require('jsonwebtoken');
-const dotenv = require('dotenv');
-
-dotenv.config();
+// const dotenv = require('dotenv'); // REMOVE THIS
+// dotenv.config(); // REMOVE THIS
 
 module.exports = function (req, res, next) {
-  // Get token from the header
   const token = req.header('x-auth-token');
 
-  // Check if no token
   if (!token) {
     return res.status(401).json({ msg: 'No token, authorization denied' });
   }
 
-  // Verify token
   try {
+    // process.env.JWT_SECRET is now correctly populated from index.js
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded.user; // Add user payload to the request object
-    next(); // Proceed to the protected route
+    req.user = decoded.user;
+    next();
   } catch (err) {
     res.status(401).json({ msg: 'Token is not valid' });
   }

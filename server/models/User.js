@@ -11,12 +11,19 @@ const UserSchema = new Schema({
     required: true,
     unique: true
   },
-  // --- NEW: Add a secure password field ---
   password: {
     type: String,
     required: true
   },
-  // Gamification fields remain unchanged
+  // --- NEW FIELD ---
+  // This links the user to their family group.
+  familyId: {
+    type: Schema.Types.ObjectId,
+    ref: 'family',
+    default: null // Will be set during registration
+  },
+
+  // Gamification fields remain
   points: {
     type: Number,
     default: 0
@@ -36,7 +43,6 @@ const UserSchema = new Schema({
     type: Number,
     default: 0
   },
-  // Add a timestamp for when the user is created
   date: {
     type: Date,
     default: Date.now
@@ -44,8 +50,6 @@ const UserSchema = new Schema({
 });
 
 const User = mongoose.model('user', UserSchema);
-
-// The getTestUser function is now obsolete and has been removed.
 
 module.exports = {
     User

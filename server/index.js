@@ -1,20 +1,13 @@
+const dotenv = require('dotenv');
+dotenv.config(); // Must be the first line
+
 const express = require('express');
 const connectDB = require('./db');
 const cors = require('cors');
-const dotenv = require('dotenv');
-
-dotenv.config();
 
 const app = express();
 
-// --- DIAGNOSTIC LOGGING MIDDLEWARE ---
-// This will log every incoming request to the console.
-app.use((req, res, next) => {
-  console.log(`[Request Received] Method: ${req.method}, URL: ${req.originalUrl}`);
-  next(); // Pass the request to the next handler
-});
-
-// Standard Middleware
+// Middleware
 app.use(cors());
 app.use(express.json());
 
