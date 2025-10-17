@@ -9,6 +9,7 @@ console.log(`[API] Connecting to server at: ${BASE_URL}`);
 export const API_URLS = {
   BASE_URL: BASE_URL,
   TASKS: `${BASE_URL}/api/tasks`,
-  USER_ME: `${BASE_URL}/api/user/me`,
+  // --- CORRECTION: Changed 'user' to 'users' ---
+  USER_ME: `${BASE_URL}/api/users/me`, 
   TASK_COMPLETE: (id: string) => `${BASE_URL}/api/tasks/${id}/complete`,
 };

@@ -3,7 +3,7 @@ const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const dotenv = require('dotenv');
-
+const auth = require('../middleware/auth'); // Import auth middleware at the top
 const { User } = require('../models/User');
 
 dotenv.config();
@@ -15,45 +15,31 @@ router.post('/register', async (req, res) => {
   const { name, email, password } = req.body;
 
   try {
-    // 1. Check for missing fields
     if (!name || !email || !password) {
       return res.status(400).json({ msg: 'Please enter all fields' });
     }
 
-    // 2. Check if user already exists
     let user = await User.findOne({ email });
     if (user) {
       return res.status(400).json({ msg: 'User already exists' });
     }
 
-    // 3. Create a new user instance
-    user = new User({
-      name,
-      email,
-      password,
-    });
+    user = new User({ name, email, password });
 
-    // 4. Hash the password
     const salt = await bcrypt.genSalt(10);
     user.password = await bcrypt.hash(password, salt);
 
-    // 5. Save the user to the database
     await user.save();
 
-    // 6. Create and sign a JSON Web Token (JWT)
-    const payload = {
-      user: {
-        id: user.id,
-      },
-    };
+    const payload = { user: { id: user.id } };
 
     jwt.sign(
       payload,
       process.env.JWT_SECRET,
-      { expiresIn: 3600 }, // Token expires in 1 hour
+      { expiresIn: 3600 },
       (err, token) => {
         if (err) throw err;
-        res.json({ token }); // Return the token to the client
+        res.json({ token });
       }
     );
   } catch (err) {
@@ -62,39 +48,33 @@ router.post('/register', async (req, res) => {
   }
 });
 
-
+// @route   POST api/users/login
+// @desc    Authenticate user & get token
+// @access  Public
 router.post('/login', async (req, res) => {
   const { email, password } = req.body;
 
   try {
-    // 1. Check for missing fields
     if (!email || !password) {
       return res.status(400).json({ msg: 'Please enter all fields' });
     }
 
-    // 2. Check for existing user
     const user = await User.findOne({ email });
     if (!user) {
       return res.status(400).json({ msg: 'Invalid credentials' });
     }
 
-    // 3. Validate password
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       return res.status(400).json({ msg: 'Invalid credentials' });
     }
 
-    // 4. Create and sign JWT
-    const payload = {
-      user: {
-        id: user.id,
-      },
-    };
+    const payload = { user: { id: user.id } };
 
     jwt.sign(
       payload,
       process.env.JWT_SECRET,
-      { expiresIn: '5h' }, // Changed to 5 hours
+      { expiresIn: '5h' },
       (err, token) => {
         if (err) throw err;
         res.json({ token });
@@ -103,6 +83,20 @@ router.post('/login', async (req, res) => {
   } catch (err) {
     console.error('Error in user login:', err.message);
     res.status(500).send('Server error');
+  }
+});
+
+// @route   GET api/users/me
+// @desc    Get current user data (for stats)
+// @access  Private
+router.get('/me', auth, async (req, res) => {
+  try {
+    // req.user.id is attached by the auth middleware
+    const user = await User.findById(req.user.id).select('-password');
+    res.json(user);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server Error');
   }
 });
 

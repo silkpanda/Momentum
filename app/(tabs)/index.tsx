@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors } from '@/constants/theme';
+import { useAuth } from '@/context/AuthContext'; // Import useAuth
 import { API_URLS } from '../../constants/api';
 
 interface Task {
@@ -17,78 +18,90 @@ interface Task {
 
 const TasksScreen = () => {
   const colorScheme = useColorScheme() ?? 'light';
+  const { token, logout } = useAuth(); // Get token and logout
+  
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
   const [taskName, setTaskName] = useState('');
   const [taskPoints, setTaskPoints] = useState('');
-
   const [isEditModalVisible, setEditModalVisible] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [editedTaskName, setEditedTaskName] = useState('');
   const [editedTaskPoints, setEditedTaskPoints] = useState('');
 
+  // Helper function to create auth headers
+  const getAuthHeaders = () => ({
+    'Content-Type': 'application/json',
+    'x-auth-token': token || '',
+  });
+
+  const handleApiError = (err: any) => {
+    if (err.status === 401) {
+      Alert.alert('Session Expired', 'Please log in again.');
+      logout();
+    }
+    else Alert.alert('Error', err.message || 'An unknown error occurred.');
+  };
+
   const fetchTasks = async () => {
+    if (!token) return;
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch(API_URLS.TASKS);
-      if (!response.ok) throw new Error(`Server returned status ${response.status}`);
+      const response = await fetch(API_URLS.TASKS, { headers: getAuthHeaders() });
+      if (!response.ok) throw { status: response.status, message: 'Failed to fetch tasks' };
       const data = await response.json();
       setTasks(data);
-    } catch (e) {
+    } catch (e: any) {
       console.error('Failed to fetch tasks:', e);
       setError('Failed to load tasks. Please try again.');
+      if(e.status === 401) logout(); // Logout on auth failure
     } finally {
       setLoading(false);
     }
   };
 
   const addTask = async () => {
-    if (taskName.trim() === '') return;
+    if (taskName.trim() === '' || !token) return;
     try {
       const response = await fetch(API_URLS.TASKS, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ name: taskName, points: Number(taskPoints) || 10 }),
       });
-      if (!response.ok) throw new Error('Failed to add task');
+      if (!response.ok) throw { status: response.status, message: 'Failed to add task' };
       setTaskName('');
       setTaskPoints('');
       fetchTasks();
-    } catch (e) {
-      console.error('Failed to add task:', e);
-      Alert.alert('Error', 'Could not add the task.');
-    }
+    } catch (e) { handleApiError(e); }
   };
 
   const completeTask = async (id: string) => {
+    if (!token) return;
     try {
-      const response = await fetch(API_URLS.TASK_COMPLETE(id), { method: 'POST' });
-      if (!response.ok) throw new Error('Failed to complete task');
+      const response = await fetch(API_URLS.TASK_COMPLETE(id), { 
+        method: 'POST', 
+        headers: getAuthHeaders() 
+      });
+      if (!response.ok) throw { status: response.status, message: 'Failed to complete task' };
       fetchTasks();
-    } catch (e) {
-      console.error('Failed to complete task:', e);
-      Alert.alert('Error', 'Could not complete the task.');
-    }
+    } catch (e) { handleApiError(e); }
   };
 
   const deleteTask = async (id: string) => {
-    Alert.alert(
-      "Delete Task",
-      "Are you sure you want to permanently delete this task? This action cannot be undone.",
-      [
+    if (!token) return;
+    Alert.alert("Delete Task", "Are you sure you want to permanently delete this task?", [
         { text: "Cancel", style: "cancel" },
         { text: "Delete", style: "destructive", onPress: async () => {
             try {
-              const response = await fetch(`${API_URLS.TASKS}/${id}`, { method: 'DELETE' });
-              if (!response.ok) throw new Error('Failed to delete task');
+              const response = await fetch(`${API_URLS.TASKS}/${id}`, { 
+                method: 'DELETE', 
+                headers: getAuthHeaders() 
+              });
+              if (!response.ok) throw { status: response.status, message: 'Failed to delete task' };
               fetchTasks();
-            } catch (e) {
-              console.error('Failed to delete task:', e);
-              Alert.alert('Error', 'Could not delete the task.');
-            }
+            } catch (e) { handleApiError(e); }
           }
         }
       ]
@@ -96,20 +109,17 @@ const TasksScreen = () => {
   };
 
   const handleEdit = async () => {
-    if (!editingTask || editedTaskName.trim() === '') return;
+    if (!editingTask || editedTaskName.trim() === '' || !token) return;
     try {
       const response = await fetch(`${API_URLS.TASKS}/${editingTask._id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ name: editedTaskName, points: Number(editedTaskPoints) || 10 }),
       });
-      if (!response.ok) throw new Error('Failed to update task');
+      if (!response.ok) throw { status: response.status, message: 'Failed to update task' };
       closeEditModal();
       fetchTasks();
-    } catch (e) {
-      console.error('Failed to edit task:', e);
-      Alert.alert('Error', 'Could not update the task.');
-    }
+    } catch (e) { handleApiError(e); }
   };
 
   const openEditModal = (task: Task) => {
@@ -126,7 +136,11 @@ const TasksScreen = () => {
     setEditedTaskPoints('');
   };
 
-  useFocusEffect(useCallback(() => { fetchTasks(); }, []));
+  useFocusEffect(useCallback(() => {
+    if(token) { // Only fetch tasks if we have a token
+      fetchTasks();
+    }
+  }, [token])); 
 
   const styles = StyleSheet.create({
     safeArea: { flex: 1, backgroundColor: Colors[colorScheme].background },
@@ -137,7 +151,8 @@ const TasksScreen = () => {
     button: { backgroundColor: Colors[colorScheme].tint, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 20, borderRadius: 8 },
     buttonText: { color: Colors[colorScheme].background, fontSize: 16, fontWeight: 'bold' },
     taskContainer: { paddingVertical: 15, paddingLeft: 15, backgroundColor: Colors[colorScheme].background, borderWidth: 1, borderColor: Colors[colorScheme].icon, borderRadius: 8, marginBottom: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-    taskInfo: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
+    taskInfo: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' }, // Added flexWrap
+    taskName: { flexShrink: 1, fontSize: 16 }, // Allow text to shrink
     taskActions: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 10 },
     actionButton: { padding: 5 },
     pointsBadge: { backgroundColor: Colors[colorScheme].tint, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 4 },
@@ -145,7 +160,7 @@ const TasksScreen = () => {
     centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
     errorText: { color: '#ff453a' },
     modalView: { margin: 20, backgroundColor: Colors[colorScheme].background, borderRadius: 20, padding: 35, alignItems: 'center', borderWidth: 1, borderColor: Colors[colorScheme].icon},
-    modalText: { marginBottom: 15, textAlign: 'center', fontSize: 18 },
+    modalText: { marginBottom: 15, textAlign: 'center', fontSize: 18, color: Colors[colorScheme].text },
     modalInputContainer: { flexDirection: 'row', gap: 10, width: '100%', marginBottom: 20 },
     modalButtonContainer: { flexDirection: 'row', gap: 10 },
   });
@@ -169,7 +184,7 @@ const TasksScreen = () => {
               <View style={styles.taskContainer}>
                 <View style={styles.taskInfo}>
                   <View style={styles.pointsBadge}><Text style={styles.pointsText}>{item.points}</Text></View>
-                  <ThemedText>{item.name}</ThemedText>
+                  <ThemedText style={styles.taskName}>{item.name}</ThemedText>
                 </View>
                 <View style={styles.taskActions}>
                   <TouchableOpacity style={styles.actionButton} onPress={() => openEditModal(item)}><Ionicons name="pencil" size={24} color={Colors[colorScheme].icon} /></TouchableOpacity>

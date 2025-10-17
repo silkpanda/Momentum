@@ -1,20 +1,21 @@
+import { ThemedText } from '@/components/themed-text';
+import { ThemedView } from '@/components/themed-view';
+import { Colors } from '@/constants/theme';
+import { useAuth } from '@/context/AuthContext'; // Import the useAuth hook
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, useColorScheme, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Colors } from '@/constants/theme';
 import { API_URLS } from '../constants/api';
 
 const LoginScreen = () => {
   const router = useRouter();
   const colorScheme = useColorScheme() ?? 'light';
-
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  
+  const { login } = useAuth(); // Get the login function from context
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -35,10 +36,9 @@ const LoginScreen = () => {
         throw new Error(data.msg || 'Failed to log in');
       }
       
-      // For now, we are not storing the token.
-      // We will simply navigate to the main app on success.
-      Alert.alert('Success', 'Login successful!');
-      router.replace('/(tabs)');
+      // --- Use the login function to save the token ---
+      login(data.token);
+      // Navigation is now handled by the AuthContext
 
     } catch (error: any) {
       Alert.alert('Login Error', error.message);
