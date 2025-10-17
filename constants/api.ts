@@ -1,9 +1,14 @@
 // This configuration is for local network testing ONLY.
-const LOCAL_IP_ADDRESS = '192.168.86.33'; 
+const LOCAL_IP_ADDRESS = '192.168.1.130'; 
 const PORT = 3001;
 
-const BASE_URL = `http://${LOCAL_IP_ADDRESS}:${PORT}`;
+export const BASE_URL = `http://${LOCAL_IP_ADDRESS}:${PORT}`;
+
+console.log(`[API] Connecting to server at: ${BASE_URL}`);
 
 export const API_URLS = {
+  BASE_URL: BASE_URL,
   TASKS: `${BASE_URL}/api/tasks`,
+  USER_ME: `${BASE_URL}/api/user/me`,
+  TASK_COMPLETE: (id: string) => `${BASE_URL}/api/tasks/${id}/complete`,
 };

@@ -20,6 +20,7 @@ app.use(express.json());
 
 // API Routes
 app.use('/api/tasks', require('./routes/tasks'));
+app.use('/api/users', require('./routes/users'));
 
 const PORT = process.env.PORT || 3001;
 
