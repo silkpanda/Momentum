@@ -1,5 +1,18 @@
+import { Ionicons } from '@expo/vector-icons'; // <-- Import Ionicons
+import { useRouter } from 'expo-router'; // <-- Import useRouter
 import React, { useState } from 'react';
-import { ActivityIndicator, Alert, Button, StyleSheet, Text, TextInput, TouchableOpacity, useColorScheme, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Button,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  useColorScheme,
+  View,
+} from 'react-native';
+
 import { ThemedText } from '../../components/themed-text';
 import { ThemedView } from '../../components/themed-view';
 import { API_URLS } from '../../constants/api';
@@ -9,6 +22,7 @@ import { useAuth } from '../../context/AuthContext';
 type Mode = 'invite' | 'addChild';
 
 export default function FamilyScreen() {
+  const router = useRouter(); // <-- Add router hook
   const [mode, setMode] = useState<Mode>('invite');
   const [isLoading, setIsLoading] = useState(false);
   const { token } = useAuth();
@@ -48,7 +62,6 @@ export default function FamilyScreen() {
     }
   };
 
-  // --- NEW: Add Child Handler ---
   const handleAddChild = async () => {
     if (!childName || !childPassword) {
       Alert.alert('Error', 'Please enter a name and password for the child.');
@@ -130,7 +143,7 @@ export default function FamilyScreen() {
     <ThemedView style={styles.container}>
       <ThemedText type="title" style={styles.title}>Manage Family</ThemedText>
       
-      {/* --- NEW: Segmented Control --- */}
+      {/* Segmented Control */}
       <View style={styles.segmentContainer}>
         <TouchableOpacity
           style={[styles.segmentButton, mode === 'invite' && styles.segmentButtonActive]}
@@ -153,6 +166,17 @@ export default function FamilyScreen() {
       ) : (
         renderForm()
       )}
+
+      {/* --- NEW: Redemption Log Button --- */}
+      <TouchableOpacity 
+        style={styles.logButton} 
+        onPress={() => router.push('/redemption-log')}
+      >
+        <Ionicons name="receipt-outline" size={20} color={Colors.light.tint} />
+        <Text style={styles.logButtonText}>View Redemption Log</Text>
+      </TouchableOpacity>
+      {/* --- END NEW --- */}
+
     </ThemedView>
   );
 }
@@ -182,7 +206,6 @@ const getStyles = (colorScheme: 'light' | 'dark') => StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors[colorScheme].border,
   },
-  // --- NEW STYLES ---
   segmentContainer: {
     flexDirection: 'row',
     backgroundColor: Colors[colorScheme].backgroundMuted,
@@ -208,6 +231,23 @@ const getStyles = (colorScheme: 'light' | 'dark') => StyleSheet.create({
   },
   segmentTextActive: {
     color: '#fff',
+  },
+  // --- NEW STYLES ---
+  logButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    marginTop: 30, // Add space above the button
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: Colors.light.tint,
+    borderRadius: 8,
+  },
+  logButtonText: {
+    color: Colors.light.tint,
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   // --- END NEW STYLES ---
 });

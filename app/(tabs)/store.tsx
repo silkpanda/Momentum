@@ -28,22 +28,31 @@ interface Reward {
   pointCost: number;
 }
 
+// Helper to parse JSON error messages
+const getError = async (response: Response, defaultMessage: string) => {
+  try {
+    const data = await response.json();
+    return data.msg || defaultMessage;
+  } catch (e) {
+    return defaultMessage;
+  }
+};
+
+
 export default function StoreScreen() {
   const colorScheme = useColorScheme() ?? 'light';
   const styles = getStyles(colorScheme);
-  // Use viewingAs to check role and display points
   const { token, viewingAs, refreshUserData } = useAuth(); 
 
   const [rewards, setRewards] = useState<Reward[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // --- NEW: State for Admin Modal ---
+  // State for Admin Modal
   const [isModalVisible, setModalVisible] = useState(false);
   const [editingReward, setEditingReward] = useState<Reward | null>(null);
   const [rewardName, setRewardName] = useState('');
   const [rewardCost, setRewardCost] = useState('');
 
-  // Check if the current view is a Parent view
   const isParentView = viewingAs?.role === 'Parent';
 
   const getAuthHeaders = () => ({
@@ -58,7 +67,10 @@ export default function StoreScreen() {
       const response = await fetch(API_URLS.REWARDS, {
         headers: getAuthHeaders(),
       });
-      if (!response.ok) throw new Error('Failed to fetch rewards');
+      if (!response.ok) {
+        const errorMsg = await getError(response, 'Failed to fetch rewards');
+        throw new Error(errorMsg);
+      }
       const data = await response.json();
       setRewards(data);
     } catch (error: any) {
@@ -74,13 +86,16 @@ export default function StoreScreen() {
     }, [])
   );
 
-  // --- REWARD REDEMPTION (No change) ---
+  // --- MODIFIED: REWARD REDEMPTION ---
   const handleRedeem = async (reward: Reward) => {
     if (!token || !viewingAs) return;
+
+    // Client-side check remains the same
     if (viewingAs.points < reward.pointCost) {
       Alert.alert('Not enough points', 'Complete more tasks to earn this reward!');
       return;
     }
+
     Alert.alert(
       'Redeem Reward',
       `Spend ${reward.pointCost} points on "${reward.name}"?`,
@@ -93,9 +108,15 @@ export default function StoreScreen() {
               const response = await fetch(API_URLS.REWARD_REDEEM(reward._id), {
                 method: 'POST',
                 headers: getAuthHeaders(),
+                // --- Send the ID of the user redeeming ---
+                body: JSON.stringify({ userId: viewingAs._id }),
               });
+              
+              if (!response.ok) {
+                const errorMsg = await getError(response, 'Failed to redeem');
+                throw new Error(errorMsg);
+              }
               const data = await response.json();
-              if (!response.ok) throw new Error(data.msg || 'Failed to redeem');
               Alert.alert('Success!', data.msg);
               await refreshUserData(); // Refresh points display
             } catch (error: any) {
@@ -106,9 +127,11 @@ export default function StoreScreen() {
       ]
     );
   };
+  // --- END MODIFICATION ---
 
-  // --- NEW: ADMIN FUNCTIONS ---
+  // --- ADMIN FUNCTIONS (No change) ---
   const openModal = (reward: Reward | null = null) => {
+    // ... existing code ...
     if (reward) {
       setEditingReward(reward);
       setRewardName(reward.name);
@@ -122,6 +145,7 @@ export default function StoreScreen() {
   };
 
   const closeModal = () => {
+    // ... existing code ...
     setModalVisible(false);
     setEditingReward(null);
     setRewardName('');
@@ -129,6 +153,7 @@ export default function StoreScreen() {
   };
 
   const handleSaveReward = async () => {
+    // ... existing code ...
     if (!token || !rewardName || !rewardCost) {
       Alert.alert('Error', 'Please enter a name and point cost.');
       return;
@@ -149,8 +174,12 @@ export default function StoreScreen() {
           pointCost: Number(rewardCost),
         }),
       });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.msg || 'Failed to save reward');
+      
+      if (!response.ok) {
+         const errorMsg = await getError(response, 'Failed to save reward');
+         throw new Error(errorMsg);
+      }
+      const data = await response.json(); // May not be needed if just refreshing
 
       closeModal();
       fetchRewards(); // Refresh the list
@@ -160,6 +189,7 @@ export default function StoreScreen() {
   };
 
   const handleDeleteReward = (reward: Reward) => {
+    // ... existing code ...
     Alert.alert(
       'Delete Reward',
       `Are you sure you want to delete "${reward.name}"? This cannot be undone.`,
@@ -174,8 +204,12 @@ export default function StoreScreen() {
                 method: 'DELETE',
                 headers: getAuthHeaders(),
               });
-              const data = await response.json();
-              if (!response.ok) throw new Error(data.msg || 'Failed to delete');
+             
+              if (!response.ok) {
+                 const errorMsg = await getError(response, 'Failed to delete');
+                 throw new Error(errorMsg);
+              }
+               const data = await response.json();
               Alert.alert('Success', data.msg);
               fetchRewards(); // Refresh list
             } catch (error: any) {
@@ -186,9 +220,10 @@ export default function StoreScreen() {
       ]
     );
   };
-  // --- END NEW ADMIN FUNCTIONS ---
 
+  // --- UI RENDERING (No changes) ---
   const renderHeader = () => (
+    // ... existing code ...
     <View style={styles.headerContainer}>
       <ThemedText type="title">Reward Store</ThemedText>
       <View style={styles.pointsContainer}>
@@ -197,7 +232,6 @@ export default function StoreScreen() {
           {viewingAs ? viewingAs.points : 0} Points Available
         </ThemedText>
       </View>
-      {/* --- NEW: Admin Add Button --- */}
       {isParentView && (
         <TouchableOpacity style={styles.adminAddButton} onPress={() => openModal()}>
           <Ionicons name="add-circle" size={24} color={Colors.light.tint} />
@@ -208,12 +242,12 @@ export default function StoreScreen() {
   );
 
   const renderRewardItem = ({ item }: { item: Reward }) => {
+    // ... existing code ...
     const canAfford = viewingAs ? viewingAs.points >= item.pointCost : false;
     return (
       <View style={[styles.rewardItem, !canAfford && styles.rewardItemDisabled]}>
         <View style={styles.rewardInfo}>
           <ThemedText style={styles.rewardName}>{item.name}</ThemedText>
-          {/* --- NEW: Admin Edit/Delete Buttons --- */}
           {isParentView && (
             <View style={styles.adminActions}>
               <TouchableOpacity onPress={() => openModal(item)}>
@@ -258,7 +292,7 @@ export default function StoreScreen() {
         )}
       </ThemedView>
 
-      {/* --- NEW: Admin Modal --- */}
+      {/* Admin Modal (No changes) */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -296,6 +330,7 @@ export default function StoreScreen() {
   );
 }
 
+// Styles (No changes)
 const getStyles = (colorScheme: 'light' | 'dark') =>
   StyleSheet.create({
     safeArea: { flex: 1, backgroundColor: Colors[colorScheme].background },

@@ -1,13 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth'); 
-const isParent = require('../middleware/isParent'); // Import Parent middleware
+const isParent = require('../middleware/isParent');
 const { Task } = require('../models/Task');
 const { User } = require('../models/User');
 
-// --- Helper & Gamification Logic ---
+// --- Helper & Gamification Logic (No changes) ---
 const isSameDay = (d1, d2) => !d1 || !d2 ? false : d1.getFullYear() === d2.getFullYear() && d1.getMonth() === d2.getMonth() && d1.getDate() === d2.getDate();
-
 const isYesterday = (d1, d2) => {
     if (!d1 || !d2) return false;
     const yesterday = new Date(d1);
@@ -47,12 +46,12 @@ router.post('/', [auth, isParent], async (req, res) => {
     
     const newTask = new Task({
       familyId: req.user.familyId,
-      userId: req.user.id, // User who CREATED the task
-      assignedTo: assignedTo || null, // User assigned to the task
+      userId: req.user.id, 
+      assignedTo: assignedTo || null, 
       name: name,
       points: points || 10,
       dueDate: dueDate || null,
-      status: 'incomplete' // Default status
+      status: 'incomplete'
     });
     
     const task = await newTask.save();
@@ -85,17 +84,22 @@ router.put('/:id', [auth, isParent], async (req, res) => {
 });
 
 // @route   PUT api/tasks/:id/request-approval
-// @desc    Submit a task for approval (Child)
+// @desc    Submit a task for approval (Parent on behalf of Child)
 // @access  Private (Auth)
 router.put('/:id/request-approval', auth, async (req, res) => {
   try {
+    const { childId } = req.body;
+    if (!childId) {
+      return res.status(400).json({ msg: 'Child ID is required' });
+    }
+
     const task = await Task.findOne({
       _id: req.params.id,
-      familyId: req.user.familyId,
-      assignedTo: req.user.id // Child can only submit their own task
+      familyId: req.user.familyId, // Ensures Parent is in the same family
+      assignedTo: childId          // Ensures task is assigned to the correct child
     });
     
-    if (!task) return res.status(404).json({ msg: 'Task not found or not assigned to you' });
+    if (!task) return res.status(404).json({ msg: 'Task not found or not assigned to this user' });
 
     if (task.status !== 'incomplete') {
       return res.status(400).json({ msg: 'Task has already been submitted' });
@@ -134,6 +138,7 @@ router.post('/:id/complete', [auth, isParent], async (req, res) => {
     const now = new Date();
     if (!isSameDay(now, userToReward.lastCompletedDate)) {
       userToReward.currentStreak = (userToReward.lastCompletedDate && isYesterday(now, userToReward.lastCompletedDate)) ? userToReward.currentStreak + 1 : 1;
+      // --- CORRECTION: Removed extraneous '.' ---
       userToReward.lastCompletedDate = now;
     }
     userToReward.points += task.points;
@@ -160,12 +165,35 @@ router.delete('/:id', [auth, isParent], async (req, res) => {
 
     await task.deleteOne();
     res.json({ msg: 'Task permanently deleted.' });
-  // --- MODIFICATION: Added missing brace ---
   } catch (err) { 
     console.error(err.message);
     res.status(500).json({ msg: 'Server Error' });
   }
-  // --- END MODIFICATION ---
+});
+
+// @route   GET api/tasks/:id
+// @desc    Get a single task by its ID
+// @access  Private (Auth)
+router.get('/:id', auth, async (req, res) => {
+  try {
+    const task = await Task.findOne({
+      _id: req.params.id,
+      familyId: req.user.familyId
+    });
+
+    if (!task) {
+      // --- CORRECTION: Changed 44 to 404 ---
+      return res.status(404).json({ msg: 'Task not found' });
+    }
+    
+    res.json(task);
+  } catch (err) {
+    console.error(err.message);
+    if (err.kind === 'ObjectId') {
+       return res.status(404).json({ msg: 'Task not found' });
+    }
+    res.status(500).send('Server Error');
+  }
 });
 
 module.exports = router;

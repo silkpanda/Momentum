@@ -33,11 +33,21 @@ interface Task {
   status: 'incomplete' | 'pending_approval' | 'complete';
 }
 
+// Helper to parse JSON error messages
+const getError = async (response: Response, defaultMessage: string) => {
+  try {
+    const data = await response.json();
+    return data.msg || defaultMessage;
+  } catch (e) {
+    return defaultMessage;
+  }
+};
+
 const TasksScreen = () => {
   const colorScheme = useColorScheme() ?? 'light';
   const router = useRouter();
-  // --- MODIFICATION: Get full auth state ---
-  const { token, user, viewingAs, familyMembers, logout } = useAuth();
+  // --- MODIFICATION: Destructure refreshUserData ---
+  const { token, user, viewingAs, familyMembers, logout, refreshUserData } = useAuth();
   
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
@@ -48,7 +58,7 @@ const TasksScreen = () => {
   const [taskPoints, setTaskPoints] = useState('');
   const [selectedDueDate, setSelectedDueDate] = useState<Date | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [selectedAssignee, setSelectedAssignee] = useState<string | null>(null); // <-- NEW
+  const [selectedAssignee, setSelectedAssignee] = useState<string | null>(null);
 
   // State for editing task
   const [isEditModalVisible, setEditModalVisible] = useState(false);
@@ -57,7 +67,7 @@ const TasksScreen = () => {
   const [editedTaskPoints, setEditedTaskPoints] = useState('');
   const [editedDueDate, setEditedDueDate] = useState<Date | null>(null);
   const [showEditDatePicker, setShowEditDatePicker] = useState(false);
-  const [editedAssignee, setEditedAssignee] = useState<string | null>(null); // <-- NEW
+  const [editedAssignee, setEditedAssignee] = useState<string | null>(null);
 
   const styles = getStyles(colorScheme);
 
@@ -66,11 +76,13 @@ const TasksScreen = () => {
     'x-auth-token': token || '',
   });
 
-  const handleApiError = (err: any) => {
+  const handleApiError = (err: any, defaultMessage: string = 'An unknown error occurred.') => {
     if (err.status === 401) {
       Alert.alert('Session Expired', 'Please log in again.');
       logout();
-    } else Alert.alert('Error', err.message || 'An unknown error occurred.');
+    } else {
+      Alert.alert('Error', err.message || defaultMessage);
+    }
   };
 
   // --- Date Picker Logic (No changes) ---
@@ -91,7 +103,10 @@ const TasksScreen = () => {
       setLoading(true);
       setError(null);
       const response = await fetch(API_URLS.TASKS, { headers: getAuthHeaders() });
-      if (!response.ok) throw { status: response.status, message: 'Failed to fetch tasks' };
+      if (!response.ok) {
+        const errorMsg = await getError(response, 'Failed to fetch tasks');
+        throw { status: response.status, message: errorMsg };
+      }
       const data = await response.json();
       setTasks(data);
     } catch (e: any) {
@@ -109,7 +124,7 @@ const TasksScreen = () => {
         name: taskName,
         points: Number(taskPoints) || 10,
         dueDate: selectedDueDate ? selectedDueDate.toISOString() : null,
-        assignedTo: selectedAssignee, // <-- NEW
+        assignedTo: selectedAssignee,
       };
       
       const response = await fetch(API_URLS.TASKS, {
@@ -117,7 +132,10 @@ const TasksScreen = () => {
         headers: getAuthHeaders(),
         body: JSON.stringify(body),
       });
-      if (!response.ok) throw { status: response.status, message: 'Failed to add task' };
+      if (!response.ok) {
+        const errorMsg = await getError(response, 'Failed to add task');
+        throw { status: response.status, message: errorMsg };
+      }
       
       setTaskName('');
       setTaskPoints('');
@@ -127,20 +145,22 @@ const TasksScreen = () => {
     } catch (e) { handleApiError(e); }
   };
 
-  // --- NEW: Child action ---
   const handleRequestApproval = async (id: string) => {
-    if (!token) return;
+    if (!token || !viewingAs) return;
     try {
       const response = await fetch(API_URLS.TASK_REQUEST_APPROVAL(id), {
         method: 'PUT',
         headers: getAuthHeaders(),
+        body: JSON.stringify({ childId: viewingAs._id }) 
       });
-      if (!response.ok) throw { status: response.status, message: 'Failed to submit task' };
+      if (!response.ok) {
+        const errorMsg = await getError(response, 'Failed to submit task');
+        throw { status: response.status, message: errorMsg };
+      }
       fetchTasks();
-    } catch (e) { handleApiError(e); }
+    } catch (e: any) { handleApiError(e); }
   };
 
-  // --- RENAMED: Parent action ---
   const handleApproveTask = async (id: string) => {
     if (!token) return;
     try {
@@ -148,9 +168,15 @@ const TasksScreen = () => {
         method: 'POST',
         headers: getAuthHeaders(),
       });
-      if (!response.ok) throw { status: response.status, message: 'Failed to approve task' };
-      fetchTasks();
-    } catch (e) { handleApiError(e); }
+      if (!response.ok) {
+        const errorMsg = await getError(response, 'Failed to approve task');
+        throw { status: response.status, message: errorMsg };
+      }
+      // --- MODIFICATION: Refresh global state after approval ---
+      await refreshUserData(); // Update points display
+      fetchTasks(); // Update task list (remove completed task)
+      // --- END MODIFICATION ---
+    } catch (e: any) { handleApiError(e); }
   };
 
   const deleteTask = async (id: string) => {
@@ -163,7 +189,10 @@ const TasksScreen = () => {
               method: 'DELETE',
               headers: getAuthHeaders(),
             });
-            if (!response.ok) throw { status: response.status, message: 'Failed to delete task' };
+            if (!response.ok) {
+              const errorMsg = await getError(response, 'Failed to delete task');
+              throw { status: response.status, message: errorMsg };
+            }
             fetchTasks();
           } catch (e) { handleApiError(e); }
         },
@@ -178,7 +207,7 @@ const TasksScreen = () => {
         name: editedTaskName,
         points: Number(editedTaskPoints) || 10,
         dueDate: editedDueDate ? editedDueDate.toISOString() : null,
-        assignedTo: editedAssignee, // <-- NEW
+        assignedTo: editedAssignee,
       };
       
       const response = await fetch(`${API_URLS.TASKS}/${editingTask._id}`, {
@@ -186,7 +215,10 @@ const TasksScreen = () => {
         headers: getAuthHeaders(),
         body: JSON.stringify(body),
       });
-      if (!response.ok) throw { status: response.status, message: 'Failed to update task' };
+      if (!response.ok) {
+        const errorMsg = await getError(response, 'Failed to update task');
+        throw { status: response.status, message: errorMsg };
+      }
       closeEditModal();
       fetchTasks();
     } catch (e) { handleApiError(e); }
@@ -197,7 +229,7 @@ const TasksScreen = () => {
     setEditedTaskName(task.name);
     setEditedTaskPoints(String(task.points));
     setEditedDueDate(task.dueDate ? new Date(task.dueDate) : null);
-    setEditedAssignee(task.assignedTo || null); // <-- NEW
+    setEditedAssignee(task.assignedTo || null);
     setEditModalVisible(true);
   };
 
@@ -212,21 +244,18 @@ const TasksScreen = () => {
 
   useFocusEffect(useCallback(() => {
     if (token) fetchTasks();
-  }, [token]));
+  }, [token, viewingAs]));
 
   // --- ROLE-BASED LOGIC ---
   const isParentView = viewingAs?.role === 'Parent';
 
-  // Filter tasks based on who is viewing
   const displayedTasks = useMemo(() => {
     if (isParentView) {
-      return tasks.filter(t => t.status !== 'complete'); // Parents see all non-complete tasks
+      return tasks.filter(t => t.status !== 'complete'); 
     }
-    // Children only see tasks assigned to them
     return tasks.filter(t => t.assignedTo === viewingAs?._id && t.status !== 'complete');
   }, [tasks, viewingAs, isParentView]);
 
-  // Render actions based on role and task status
   const renderTaskActions = (task: Task) => {
     if (isParentView) {
       return (
@@ -268,7 +297,6 @@ const TasksScreen = () => {
     }
   };
 
-  // Render assign-to-picker (for Parents)
   const renderAssigneePicker = (
     value: string | null,
     onValueChange: (val: string | null) => void,
@@ -291,7 +319,6 @@ const TasksScreen = () => {
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <ThemedView style={styles.container}>
-        {/* --- Parent Task Creation Form --- */}
         {isParentView && (
           <>
             <View style={styles.inputContainer}>
@@ -346,7 +373,6 @@ const TasksScreen = () => {
         )}
       </ThemedView>
 
-      {/* --- Parent Edit Modal --- */}
       {isParentView && (
         <Modal animationType="slide" transparent={true} visible={isEditModalVisible} onRequestClose={closeEditModal}>
           <View style={{flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)'}}>
@@ -379,7 +405,7 @@ const TasksScreen = () => {
   );
 };
 
-// --- STYLESHEET ---
+// --- STYLESHEET (No changes) ---
 const getStyles = (colorScheme: 'light' | 'dark') => StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: Colors[colorScheme].background },
   container: { flex: 1, paddingHorizontal: 20 },

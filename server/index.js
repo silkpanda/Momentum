@@ -32,6 +32,7 @@ try {
   console.log('[AXIOM_LOG] SUCCESS: /api/family mounted.');
 
   app.use('/api/rewards', require('./routes/rewards'));
+  app.use('/api/redemptions', require('./routes/redemptions'));
   
   console.log('[AXIOM_LOG] All routes mounted successfully.');
 } catch (err) {
