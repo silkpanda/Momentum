@@ -1,7 +1,7 @@
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors } from '@/constants/theme';
-import { useAuth } from '@/context/AuthContext'; // Import the useAuth hook
+import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, useColorScheme, View } from 'react-native';
@@ -15,7 +15,7 @@ const LoginScreen = () => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   
-  const { login } = useAuth(); // Get the login function from context
+  const { login } = useAuth(); 
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -23,8 +23,14 @@ const LoginScreen = () => {
       return;
     }
     setLoading(true);
+    
+    // --- MODIFICATION: Add logging ---
+    const targetUrl = API_URLS.LOGIN;
+    console.log(`[AXIOM_LOG_CLIENT] Attempting login to: ${targetUrl}`);
+    // --- END MODIFICATION ---
+
     try {
-      const response = await fetch(`${API_URLS.BASE_URL}/api/users/login`, {
+      const response = await fetch(targetUrl, { // <-- Use targetUrl
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
@@ -36,12 +42,13 @@ const LoginScreen = () => {
         throw new Error(data.msg || 'Failed to log in');
       }
       
-      // --- Use the login function to save the token ---
       login(data.token);
-      // Navigation is now handled by the AuthContext
 
     } catch (error: any) {
-      Alert.alert('Login Error', error.message);
+      // --- MODIFICATION: Add logging ---
+      console.error('[AXIOM_LOG_CLIENT] LOGIN FAILED:', error);
+      Alert.alert('Login Error', `[AXIOM_LOG] ${error.message}. Is the server running and reachable?`);
+      // --- END MODIFICATION ---
     } finally {
       setLoading(false);
     }

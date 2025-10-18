@@ -2,14 +2,12 @@ const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 
 const TaskSchema = new Schema({
-  // --- MODIFICATION: Add familyId for scoping ---
   familyId: {
     type: Schema.Types.ObjectId,
     ref: 'family',
     required: true
   },
-  // 'userId' is now 'createdBy'
-  userId: {
+  userId: { // User who created the task
     type: Schema.Types.ObjectId,
     ref: 'user',
     required: true
@@ -22,6 +20,12 @@ const TaskSchema = new Schema({
     type: Number,
     default: 10
   },
+  // --- NEW: Add Due Date ---
+  dueDate: {
+    type: Date,
+    required: false // Optional field
+  },
+  // --- END NEW ---
   createdAt: {
     type: Date,
     default: Date.now

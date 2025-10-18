@@ -1,16 +1,14 @@
-// This configuration is for local network testing ONLY.
-const LOCAL_IP_ADDRESS = '192.168.1.130'; 
-const PORT = 3001;
+const YOUR_IP_ADDRESS = '192.168.1.130'; 
 
-export const BASE_URL = `http://${LOCAL_IP_ADDRESS}:${PORT}`;
-
-console.log(`[API] Connecting to server at: ${BASE_URL}`);
+// --- MODIFICATION: Added /api to the end of the URL ---
+const BASE_URL = `http://${YOUR_IP_ADDRESS}:3001/api`;
 
 export const API_URLS = {
-  BASE_URL: BASE_URL,
-  TASKS: `${BASE_URL}/api/tasks`,
-  // --- CORRECTION: Changed 'user' to 'users' ---
-  USER_ME: `${BASE_URL}/api/users/me`, 
+  REGISTER: `${BASE_URL}/users/register`,
+  LOGIN: `${BASE_URL}/users/login`,
+  USER_ME: `${BASE_URL}/users/me`,
+  TASKS: `${BASE_URL}/tasks`,
+  // Family Endpoints
   FAMILY_INVITE: `${BASE_URL}/family/invite`,
-  TASK_COMPLETE: (id: string) => `${BASE_URL}/api/tasks/${id}/complete`,
+  FAMILY_ADD_CHILD: `${BASE_URL}/family/add-child`,
 };

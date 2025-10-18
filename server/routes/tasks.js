@@ -28,7 +28,6 @@ const handleLeveling = (user, pointsGained) => {
 // @access  Private
 router.get('/', auth, async (req, res) => {
   try {
-    // --- MODIFICATION: Find by familyId ---
     const tasks = await Task.find({ familyId: req.user.familyId }).sort({ createdAt: -1 });
     res.json(tasks);
   } catch (err) {
@@ -42,14 +41,17 @@ router.get('/', auth, async (req, res) => {
 // @access  Private
 router.post('/', auth, async (req, res) => {
   try {
-    const { name, points } = req.body;
+    // --- MODIFICATION: Destructure dueDate ---
+    const { name, points, dueDate } = req.body;
+    
     const newTask = new Task({
-      // --- MODIFICATION: Add familyId and userId ---
-      familyId: req.user.familyId, // From auth middleware
-      userId: req.user.id,        // User who created the task
+      familyId: req.user.familyId,
+      userId: req.user.id,
       name: name,
       points: points || 10,
+      dueDate: dueDate || null // <-- Add dueDate
     });
+    
     const task = await newTask.save();
     res.json(task);
   } catch (err) {
@@ -63,13 +65,15 @@ router.post('/', auth, async (req, res) => {
 // @access  Private
 router.put('/:id', auth, async (req, res) => {
   try {
-    const { name, points } = req.body;
-    // --- MODIFICATION: Find by _id AND familyId for security ---
+    // --- MODIFICATION: Destructure dueDate ---
+    const { name, points, dueDate } = req.body;
+    
     const task = await Task.findOneAndUpdate(
       { _id: req.params.id, familyId: req.user.familyId },
-      { name, points },
+      { name, points, dueDate }, // <-- Add dueDate
       { new: true }
     );
+    
     if (!task) return res.status(404).json({ msg: 'Task not found' });
     res.json(task);
   } catch (err) {
@@ -83,11 +87,9 @@ router.put('/:id', auth, async (req, res) => {
 // @access  Private
 router.post('/:id/complete', auth, async (req, res) => {
   try {
-    // --- MODIFICATION: Find by _id AND familyId for security ---
     const task = await Task.findOne({ _id: req.params.id, familyId: req.user.familyId });
     if (!task) return res.status(404).json({ msg: 'Task not found' });
 
-    // --- MODIFICATION: Award points to the USER WHO COMPLETED THE TASK ---
     const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ msg: 'User not found' });
 
@@ -100,7 +102,6 @@ router.post('/:id/complete', auth, async (req, res) => {
     handleLeveling(user, task.points);
     await user.save();
     
-    // Task is complete, remove it
     await task.deleteOne(); 
 
     res.json({ msg: `Task completed! ${user.name} earned ${task.points} points!` });
@@ -115,7 +116,6 @@ router.post('/:id/complete', auth, async (req, res) => {
 // @access  Private
 router.delete('/:id', auth, async (req, res) => {
   try {
-    // --- MODIFICATION: Find by _id AND familyId for security ---
     const task = await Task.findOne({ _id: req.params.id, familyId: req.user.familyId });
     if (!task) return res.status(404).json({ msg: 'Task not found' });
 
