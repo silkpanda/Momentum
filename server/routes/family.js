@@ -1,9 +1,30 @@
 const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
-const auth =require('../middleware/auth');
+const auth = require('../middleware/auth');
 const isParent = require('../middleware/isParent');
 const { User } = require('../models/User');
+
+// --- NEW ENDPOINT ---
+// @route   GET api/family/members
+// @desc    Get all users in the logged-in user's family
+// @access  Private (Auth)
+router.get('/members', auth, async (req, res) => {
+  try {
+    if (!req.user.familyId) {
+      return res.status(400).json({ msg: 'User is not part of a family' });
+    }
+    // Find all users with the same familyId, select only public-safe fields
+    const members = await User.find({ familyId: req.user.familyId })
+                              .select('-password')
+                              .sort({ role: 1, name: 1 }); // Parents first, then by name
+    res.json(members);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server Error');
+  }
+});
+// --- END NEW ENDPOINT ---
 
 // @route   POST api/family/invite
 // @desc    Invite an existing user (by email) to your family
@@ -41,7 +62,6 @@ router.post('/invite', [auth, isParent], async (req, res) => {
   }
 });
 
-// --- NEW ENDPOINT ---
 // @route   POST api/family/add-child
 // @desc    Create a new 'Child' user within the parent's family
 // @access  Private (Parent-only)
@@ -54,16 +74,13 @@ router.post('/add-child', [auth, isParent], async (req, res) => {
   }
 
   try {
-    // 1. Generate a unique, internal-only email
     const internalEmail = `${name.toLowerCase().replace(/\s+/g, '-')}.${parentFamilyId}@momentum.internal`;
 
-    // 2. Check if this internal email (or a real one) is already taken
     let user = await User.findOne({ email: internalEmail });
     if (user) {
       return res.status(400).json({ msg: 'A user with this name already exists in the family' });
     }
 
-    // 3. Create new Child user
     user = new User({
       name,
       email: internalEmail,
@@ -72,11 +89,9 @@ router.post('/add-child', [auth, isParent], async (req, res) => {
       role: 'Child'
     });
 
-    // 4. Hash password
     const salt = await bcrypt.genSalt(10);
     user.password = await bcrypt.hash(password, salt);
 
-    // 5. Save the new user
     await user.save();
 
     res.json({ msg: `${name} has been added to the family as a 'Child'.` });

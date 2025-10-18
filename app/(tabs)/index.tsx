@@ -1,8 +1,21 @@
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
-import { useFocusEffect, useRouter } from 'expo-router'; // <-- Import useRouter
-import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Modal, Platform, StyleSheet, Text, TextInput, TouchableOpacity, useColorScheme, View } from 'react-native';
+import { Picker } from '@react-native-picker/picker';
+import { useFocusEffect, useRouter } from 'expo-router';
+import React, { useCallback, useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Modal,
+  Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  useColorScheme,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '../../components/themed-text';
@@ -16,29 +29,37 @@ interface Task {
   name: string;
   points: number;
   dueDate?: string;
+  assignedTo?: string; // User ID
+  status: 'incomplete' | 'pending_approval' | 'complete';
 }
 
 const TasksScreen = () => {
   const colorScheme = useColorScheme() ?? 'light';
-  const { token, logout } = useAuth(); 
-  const router = useRouter(); // <-- Add router hook
-
-  // ... (all existing state declarations) ...
+  const router = useRouter();
+  // --- MODIFICATION: Get full auth state ---
+  const { token, user, viewingAs, familyMembers, logout } = useAuth();
+  
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // State for new task
   const [taskName, setTaskName] = useState('');
   const [taskPoints, setTaskPoints] = useState('');
   const [selectedDueDate, setSelectedDueDate] = useState<Date | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [selectedAssignee, setSelectedAssignee] = useState<string | null>(null); // <-- NEW
+
+  // State for editing task
   const [isEditModalVisible, setEditModalVisible] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [editedTaskName, setEditedTaskName] = useState('');
   const [editedTaskPoints, setEditedTaskPoints] = useState('');
   const [editedDueDate, setEditedDueDate] = useState<Date | null>(null);
   const [showEditDatePicker, setShowEditDatePicker] = useState(false);
+  const [editedAssignee, setEditedAssignee] = useState<string | null>(null); // <-- NEW
 
-  // ... (getAuthHeaders, handleApiError, DatePicker logic, fetchTasks, addTask) ...
+  const styles = getStyles(colorScheme);
 
   const getAuthHeaders = () => ({
     'Content-Type': 'application/json',
@@ -49,28 +70,21 @@ const TasksScreen = () => {
     if (err.status === 401) {
       Alert.alert('Session Expired', 'Please log in again.');
       logout();
-    }
-    else Alert.alert('Error', err.message || 'An unknown error occurred.');
+    } else Alert.alert('Error', err.message || 'An unknown error occurred.');
   };
 
+  // --- Date Picker Logic (No changes) ---
   const onDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
     setShowDatePicker(Platform.OS === 'ios');
-    if (selectedDate) {
-      setSelectedDueDate(selectedDate);
-    }
+    if (selectedDate) setSelectedDueDate(selectedDate);
   };
-  
   const onEditDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
     setShowEditDatePicker(Platform.OS === 'ios');
-    if (selectedDate) {
-      setEditedDueDate(selectedDate);
-    }
+    if (selectedDate) setEditedDueDate(selectedDate);
   };
+  const formatDate = (date: Date | null) => date ? date.toLocaleDateString() : null;
 
-  const formatDate = (date: Date | null) => {
-    return date ? date.toLocaleDateString() : null;
-  };
-
+  // --- API CALLS ---
   const fetchTasks = async () => {
     if (!token) return;
     try {
@@ -81,9 +95,8 @@ const TasksScreen = () => {
       const data = await response.json();
       setTasks(data);
     } catch (e: any) {
-      console.error('Failed to fetch tasks:', e);
       setError('Failed to load tasks. Please try again.');
-      if(e.status === 401) logout(); 
+      if (e.status === 401) logout();
     } finally {
       setLoading(false);
     }
@@ -96,6 +109,7 @@ const TasksScreen = () => {
         name: taskName,
         points: Number(taskPoints) || 10,
         dueDate: selectedDueDate ? selectedDueDate.toISOString() : null,
+        assignedTo: selectedAssignee, // <-- NEW
       };
       
       const response = await fetch(API_URLS.TASKS, {
@@ -103,46 +117,58 @@ const TasksScreen = () => {
         headers: getAuthHeaders(),
         body: JSON.stringify(body),
       });
-      
       if (!response.ok) throw { status: response.status, message: 'Failed to add task' };
       
       setTaskName('');
       setTaskPoints('');
       setSelectedDueDate(null);
-      
+      setSelectedAssignee(null);
       fetchTasks();
     } catch (e) { handleApiError(e); }
   };
 
-  const completeTask = async (id: string) => {
+  // --- NEW: Child action ---
+  const handleRequestApproval = async (id: string) => {
     if (!token) return;
     try {
-      const response = await fetch(`${API_URLS.TASKS}/${id}/complete`, { 
-        method: 'POST', 
-        headers: getAuthHeaders() 
+      const response = await fetch(API_URLS.TASK_REQUEST_APPROVAL(id), {
+        method: 'PUT',
+        headers: getAuthHeaders(),
       });
-      if (!response.ok) throw { status: response.status, message: 'Failed to complete task' };
+      if (!response.ok) throw { status: response.status, message: 'Failed to submit task' };
+      fetchTasks();
+    } catch (e) { handleApiError(e); }
+  };
+
+  // --- RENAMED: Parent action ---
+  const handleApproveTask = async (id: string) => {
+    if (!token) return;
+    try {
+      const response = await fetch(API_URLS.TASK_COMPLETE(id), {
+        method: 'POST',
+        headers: getAuthHeaders(),
+      });
+      if (!response.ok) throw { status: response.status, message: 'Failed to approve task' };
       fetchTasks();
     } catch (e) { handleApiError(e); }
   };
 
   const deleteTask = async (id: string) => {
     if (!token) return;
-    Alert.alert("Delete Task", "Are you sure you want to permanently delete this task?", [
-        { text: "Cancel", style: "cancel" },
-        { text: "Delete", style: "destructive", onPress: async () => {
-            try {
-              const response = await fetch(`${API_URLS.TASKS}/${id}`, { 
-                method: 'DELETE', 
-                headers: getAuthHeaders() 
-              });
-              if (!response.ok) throw { status: response.status, message: 'Failed to delete task' };
-              fetchTasks();
-            } catch (e) { handleApiError(e); }
-          }
-        }
-      ]
-    );
+    Alert.alert("Delete Task", "Are you sure?", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Delete", style: "destructive", onPress: async () => {
+          try {
+            const response = await fetch(`${API_URLS.TASKS}/${id}`, {
+              method: 'DELETE',
+              headers: getAuthHeaders(),
+            });
+            if (!response.ok) throw { status: response.status, message: 'Failed to delete task' };
+            fetchTasks();
+          } catch (e) { handleApiError(e); }
+        },
+      },
+    ]);
   };
 
   const handleEdit = async () => {
@@ -152,6 +178,7 @@ const TasksScreen = () => {
         name: editedTaskName,
         points: Number(editedTaskPoints) || 10,
         dueDate: editedDueDate ? editedDueDate.toISOString() : null,
+        assignedTo: editedAssignee, // <-- NEW
       };
       
       const response = await fetch(`${API_URLS.TASKS}/${editingTask._id}`, {
@@ -170,15 +197,13 @@ const TasksScreen = () => {
     setEditedTaskName(task.name);
     setEditedTaskPoints(String(task.points));
     setEditedDueDate(task.dueDate ? new Date(task.dueDate) : null);
+    setEditedAssignee(task.assignedTo || null); // <-- NEW
     setEditModalVisible(true);
   };
 
   const closeEditModal = () => {
     setEditModalVisible(false);
     setEditingTask(null);
-    setEditedTaskName('');
-    setEditedTaskPoints('');
-    setEditedDueDate(null);
   };
 
   const sendToFocus = (id: string) => {
@@ -186,70 +211,111 @@ const TasksScreen = () => {
   };
 
   useFocusEffect(useCallback(() => {
-    if(token) { 
-      fetchTasks();
-    }
-  }, [token])); 
+    if (token) fetchTasks();
+  }, [token]));
 
-  const styles = StyleSheet.create({
-    safeArea: { flex: 1, backgroundColor: Colors[colorScheme].background },
-    container: { flex: 1, paddingHorizontal: 20 },
-    inputContainer: { flexDirection: 'row', marginTop: 20, marginBottom: 20, gap: 10, flexWrap: 'wrap' },
-    inputName: { flex: 1, minWidth: '40%', borderColor: Colors[colorScheme].border, color: Colors[colorScheme].text, borderWidth: 1, paddingVertical: 10, paddingHorizontal: 15, borderRadius: 8, fontSize: 16 },
-    inputPoints: { width: 70, borderColor: Colors[colorScheme].border, color: Colors[colorScheme].text, borderWidth: 1, paddingVertical: 10, paddingHorizontal: 15, borderRadius: 8, fontSize: 16, textAlign: 'center' },
-    button: { backgroundColor: Colors.light.tint, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 20, borderRadius: 8, height: 44 },
-    buttonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
-    dateButton: { borderColor: Colors[colorScheme].border, borderWidth: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 15, borderRadius: 8, height: 44 },
-    dateButtonText: { color: Colors[colorScheme].textSecondary },
-    dateButtonTextSelected: { color: Colors.light.tint, fontWeight: 'bold' },
-    taskContainer: { paddingVertical: 15, paddingLeft: 15, backgroundColor: Colors[colorScheme].backgroundMuted, borderWidth: 1, borderColor: Colors[colorScheme].border, borderRadius: 8, marginBottom: 10 },
-    taskRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-    taskInfo: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' },
-    taskNameContainer: { flexShrink: 1, marginRight: 10 },
-    taskName: { fontSize: 16, color: Colors[colorScheme].text },
-    taskDueDate: { fontSize: 12, color: Colors[colorScheme].textSecondary },
-    taskActions: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10 }, // Reduced gap
-    actionButton: { padding: 5 },
-    pointsBadge: { backgroundColor: Colors[colorScheme].tint, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 4 },
-    pointsText: { color: Colors[colorScheme].background, fontWeight: 'bold' },
-    centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-    errorText: { color: '#ff453a' },
-    modalView: { margin: 20, backgroundColor: Colors[colorScheme].background, borderRadius: 20, padding: 35, alignItems: 'center', borderWidth: 1, borderColor: Colors[colorScheme].border},
-    modalText: { marginBottom: 15, textAlign: 'center', fontSize: 18, color: Colors[colorScheme].text },
-    modalInputContainer: { gap: 10, width: '100%', marginBottom: 20 },
-    modalInputRow: { flexDirection: 'row', gap: 10 },
-    modalButtonContainer: { flexDirection: 'row', gap: 10, marginTop: 10 },
-  });
+  // --- ROLE-BASED LOGIC ---
+  const isParentView = viewingAs?.role === 'Parent';
+
+  // Filter tasks based on who is viewing
+  const displayedTasks = useMemo(() => {
+    if (isParentView) {
+      return tasks.filter(t => t.status !== 'complete'); // Parents see all non-complete tasks
+    }
+    // Children only see tasks assigned to them
+    return tasks.filter(t => t.assignedTo === viewingAs?._id && t.status !== 'complete');
+  }, [tasks, viewingAs, isParentView]);
+
+  // Render actions based on role and task status
+  const renderTaskActions = (task: Task) => {
+    if (isParentView) {
+      return (
+        <View style={styles.taskActions}>
+          {task.status === 'pending_approval' && (
+            <TouchableOpacity style={styles.actionButton} onPress={() => handleApproveTask(task._id)}>
+              <Ionicons name="checkmark-circle-outline" size={28} color={'#34c759'} />
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity style={styles.actionButton} onPress={() => sendToFocus(task._id)}>
+            <Ionicons name="eye-outline" size={24} color={Colors.light.tint} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.actionButton} onPress={() => openEditModal(task)}>
+            <Ionicons name="pencil" size={24} color={Colors[colorScheme].textSecondary} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.actionButton} onPress={() => deleteTask(task._id)}>
+            <Ionicons name="trash-outline" size={24} color={'#ff453a'} />
+          </TouchableOpacity>
+        </View>
+      );
+    } else {
+      // Child View
+      if (task.status === 'incomplete') {
+        return (
+          <View style={styles.taskActions}>
+            <TouchableOpacity style={styles.actionButton} onPress={() => sendToFocus(task._id)}>
+              <Ionicons name="eye-outline" size={24} color={Colors.light.tint} />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.actionButton} onPress={() => handleRequestApproval(task._id)}>
+              <Ionicons name="checkmark-circle-outline" size={28} color={'#34c759'} />
+            </TouchableOpacity>
+          </View>
+        );
+      }
+      if (task.status === 'pending_approval') {
+        return <ThemedText style={styles.statusText}>Pending Approval</ThemedText>;
+      }
+      return null;
+    }
+  };
+
+  // Render assign-to-picker (for Parents)
+  const renderAssigneePicker = (
+    value: string | null,
+    onValueChange: (val: string | null) => void,
+    isModal = false
+  ) => (
+    <View style={isModal ? styles.modalPickerContainer : styles.pickerContainer}>
+      <Picker
+        selectedValue={value}
+        onValueChange={(itemValue) => onValueChange(itemValue === "null" ? null : itemValue)}
+        style={styles.picker}
+      >
+        <Picker.Item label="Assign to..." value="null" />
+        {familyMembers.map((member) => (
+          <Picker.Item key={member._id} label={member.name} value={member._id} />
+        ))}
+      </Picker>
+    </View>
+  );
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <ThemedView style={styles.container}>
-        {/* ... (Input Container and DatePicker) ... */}
-        <View style={styles.inputContainer}>
-          <TextInput style={styles.inputName} placeholder="New task name..." placeholderTextColor={Colors[colorScheme].textSecondary} value={taskName} onChangeText={setTaskName}/>
-          <TextInput style={styles.inputPoints} placeholder="Pts" placeholderTextColor={Colors[colorScheme].textSecondary} value={taskPoints} onChangeText={setTaskPoints} keyboardType="number-pad" />
-          <TouchableOpacity style={styles.dateButton} onPress={() => setShowDatePicker(true)}>
-            <Text style={selectedDueDate ? styles.dateButtonTextSelected : styles.dateButtonText}>
-              {selectedDueDate ? formatDate(selectedDueDate) : 'Due Date'}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.button} onPress={addTask}><Text style={styles.buttonText}>Add</Text></TouchableOpacity>
-        </View>
-        
-        {showDatePicker && (
-          <DateTimePicker
-            value={selectedDueDate || new Date()}
-            mode="date"
-            display="default"
-            onChange={onDateChange}
-          />
+        {/* --- Parent Task Creation Form --- */}
+        {isParentView && (
+          <>
+            <View style={styles.inputContainer}>
+              <TextInput style={styles.inputName} placeholder="New task name..." placeholderTextColor={Colors[colorScheme].textSecondary} value={taskName} onChangeText={setTaskName} />
+              <TextInput style={styles.inputPoints} placeholder="Pts" placeholderTextColor={Colors[colorScheme].textSecondary} value={taskPoints} onChangeText={setTaskPoints} keyboardType="number-pad" />
+              <TouchableOpacity style={styles.dateButton} onPress={() => setShowDatePicker(true)}>
+                <Text style={selectedDueDate ? styles.dateButtonTextSelected : styles.dateButtonText}>
+                  {selectedDueDate ? formatDate(selectedDueDate) : 'Due Date'}
+                </Text>
+              </TouchableOpacity>
+              {renderAssigneePicker(selectedAssignee, setSelectedAssignee)}
+              <TouchableOpacity style={styles.button} onPress={addTask}><Text style={styles.buttonText}>Add</Text></TouchableOpacity>
+            </View>
+            {showDatePicker && (
+              <DateTimePicker value={selectedDueDate || new Date()} mode="date" display="default" onChange={onDateChange} />
+            )}
+          </>
         )}
         
         {loading ? ( <View style={styles.centered}><ActivityIndicator size="large" color={Colors.light.tint} /><ThemedText>Loading tasks...</ThemedText></View>
         ) : error ? ( <View style={styles.centered}><ThemedText style={styles.errorText}>{error}</ThemedText></View>
         ) : (
           <FlatList
-            data={tasks}
+            data={displayedTasks}
             keyExtractor={(item) => item._id}
             renderItem={({ item }) => (
               <View style={styles.taskContainer}>
@@ -265,58 +331,104 @@ const TasksScreen = () => {
                       )}
                     </View>
                   </View>
-                  {/* --- MODIFIED TASK ACTIONS --- */}
-                  <View style={styles.taskActions}>
-                    <TouchableOpacity style={styles.actionButton} onPress={() => sendToFocus(item._id)}>
-                      <Ionicons name="eye-outline" size={24} color={Colors.light.tint} />
-                    </TouchableOpacity>
-                    {/* --- CORRECTION: Typo fixed --- */}
-                    <TouchableOpacity style={styles.actionButton} onPress={() => openEditModal(item)}><Ionicons name="pencil" size={24} color={Colors[colorScheme].textSecondary} /></TouchableOpacity>
-                    <TouchableOpacity style={styles.actionButton} onPress={() => deleteTask(item._id)}><Ionicons name="trash-outline" size={24} color={'#ff453a'} /></TouchableOpacity>
-                    <TouchableOpacity style={styles.actionButton} onPress={() => completeTask(item._id)}><Ionicons name="checkmark-circle-outline" size={28} color={'#34c759'} /></TouchableOpacity>
-                  </View>
-                  {/* --- END MODIFICATION --- */}
+                  {renderTaskActions(item)}
                 </View>
               </View>
             )}
-            ListEmptyComponent={<View style={styles.centered}><ThemedText>No tasks yet. Add one!</ThemedText></View>}
+            ListEmptyComponent={
+              <View style={styles.centered}>
+                <ThemedText>
+                  {isParentView ? "No tasks pending." : "No tasks assigned to you."}
+                </ThemedText>
+              </View>
+            }
           />
         )}
       </ThemedView>
 
-      {/* ... (Edit Modal) ... */}
-      <Modal animationType="slide" transparent={true} visible={isEditModalVisible} onRequestClose={closeEditModal}>
-        <View style={{flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)'}}>
+      {/* --- Parent Edit Modal --- */}
+      {isParentView && (
+        <Modal animationType="slide" transparent={true} visible={isEditModalVisible} onRequestClose={closeEditModal}>
+          <View style={{flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)'}}>
             <View style={styles.modalView}>
-                <ThemedText style={styles.modalText}>Edit Task</ThemedText>
-                <View style={styles.modalInputContainer}>
-                    <View style={styles.modalInputRow}>
-                      <TextInput style={styles.inputName} value={editedTaskName} onChangeText={setEditedTaskName} />
-                      <TextInput style={styles.inputPoints} value={editedTaskPoints} onChangeText={setEditedTaskPoints} keyboardType="number-pad"/>
-                    </View>
-                    <TouchableOpacity style={[styles.dateButton, {width: '100%'}]} onPress={() => setShowEditDatePicker(true)}>
-                      <Text style={editedDueDate ? styles.dateButtonTextSelected : styles.dateButtonText}>
-                        {editedDueDate ? formatDate(editedDueDate) : 'Set Due Date'}
-                      </Text>
-                    </TouchableOpacity>
-                    {showEditDatePicker && (
-                      <DateTimePicker
-                        value={editedDueDate || new Date()}
-                        mode="date"
-                        display="default"
-                        onChange={onEditDateChange}
-                      />
-                    )}
+              <ThemedText style={styles.modalText}>Edit Task</ThemedText>
+              <View style={styles.modalInputContainer}>
+                <View style={styles.modalInputRow}>
+                  <TextInput style={styles.inputName} value={editedTaskName} onChangeText={setEditedTaskName} />
+                  <TextInput style={styles.inputPoints} value={editedTaskPoints} onChangeText={setEditedTaskPoints} keyboardType="number-pad"/>
                 </View>
-                <View style={styles.modalButtonContainer}>
-                    <TouchableOpacity style={[styles.button, {backgroundColor: Colors[colorScheme].textSecondary}]} onPress={closeEditModal}><Text style={styles.buttonText}>Cancel</Text></TouchableOpacity>
-                    <TouchableOpacity style={styles.button} onPress={handleEdit}><Text style={styles.buttonText}>Save</Text></TouchableOpacity>
-                </View>
+                <TouchableOpacity style={[styles.dateButton, {width: '100%'}]} onPress={() => setShowEditDatePicker(true)}>
+                  <Text style={editedDueDate ? styles.dateButtonTextSelected : styles.dateButtonText}>
+                    {editedDueDate ? formatDate(editedDueDate) : 'Set Due Date'}
+                  </Text>
+                </TouchableOpacity>
+                {renderAssigneePicker(editedAssignee, setEditedAssignee, true)}
+                {showEditDatePicker && (
+                  <DateTimePicker value={editedDueDate || new Date()} mode="date" display="default" onChange={onEditDateChange} />
+                )}
+              </View>
+              <View style={styles.modalButtonContainer}>
+                <TouchableOpacity style={[styles.button, {backgroundColor: Colors[colorScheme].textSecondary}]} onPress={closeEditModal}><Text style={styles.buttonText}>Cancel</Text></TouchableOpacity>
+                <TouchableOpacity style={styles.button} onPress={handleEdit}><Text style={styles.buttonText}>Save</Text></TouchableOpacity>
+              </View>
             </View>
-        </View>
-      </Modal>
+          </View>
+        </Modal>
+      )}
     </SafeAreaView>
   );
 };
+
+// --- STYLESHEET ---
+const getStyles = (colorScheme: 'light' | 'dark') => StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: Colors[colorScheme].background },
+  container: { flex: 1, paddingHorizontal: 20 },
+  inputContainer: { flexDirection: 'row', marginTop: 20, marginBottom: 20, gap: 10, flexWrap: 'wrap' },
+  inputName: { flex: 1, minWidth: '40%', height: 44, borderColor: Colors[colorScheme].border, color: Colors[colorScheme].text, borderWidth: 1, paddingVertical: 10, paddingHorizontal: 15, borderRadius: 8, fontSize: 16 },
+  inputPoints: { width: 70, height: 44, borderColor: Colors[colorScheme].border, color: Colors[colorScheme].text, borderWidth: 1, paddingVertical: 10, paddingHorizontal: 15, borderRadius: 8, fontSize: 16, textAlign: 'center' },
+  button: { backgroundColor: Colors.light.tint, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 20, borderRadius: 8, height: 44 },
+  buttonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+  dateButton: { borderColor: Colors[colorScheme].border, borderWidth: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 15, borderRadius: 8, height: 44 },
+  dateButtonText: { color: Colors[colorScheme].textSecondary },
+  dateButtonTextSelected: { color: Colors.light.tint, fontWeight: 'bold' },
+  pickerContainer: {
+    height: 44,
+    width: 150,
+    borderColor: Colors[colorScheme].border,
+    borderWidth: 1,
+    borderRadius: 8,
+    justifyContent: 'center',
+  },
+  modalPickerContainer: {
+    height: 50,
+    width: '100%',
+    borderColor: Colors[colorScheme].border,
+    borderWidth: 1,
+    borderRadius: 8,
+    justifyContent: 'center',
+    marginTop: 10,
+  },
+  picker: {
+    color: Colors[colorScheme].text,
+  },
+  taskContainer: { paddingVertical: 15, paddingLeft: 15, backgroundColor: Colors[colorScheme].backgroundMuted, borderWidth: 1, borderColor: Colors[colorScheme].border, borderRadius: 8, marginBottom: 10 },
+  taskRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  taskInfo: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' },
+  taskNameContainer: { flexShrink: 1, marginRight: 10 },
+  taskName: { fontSize: 16, color: Colors[colorScheme].text },
+  taskDueDate: { fontSize: 12, color: Colors[colorScheme].textSecondary },
+  taskActions: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10 },
+  actionButton: { padding: 5 },
+  statusText: { color: Colors[colorScheme].textSecondary, fontStyle: 'italic', marginRight: 15 },
+  pointsBadge: { backgroundColor: Colors[colorScheme].tint, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 4 },
+  pointsText: { color: Colors[colorScheme].background, fontWeight: 'bold' },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 50 },
+  errorText: { color: '#ff453a' },
+  modalView: { margin: 20, backgroundColor: Colors[colorScheme].background, borderRadius: 20, padding: 35, alignItems: 'center', borderWidth: 1, borderColor: Colors[colorScheme].border, width: '90%' },
+  modalText: { marginBottom: 15, textAlign: 'center', fontSize: 18, color: Colors[colorScheme].text },
+  modalInputContainer: { gap: 10, width: '100%', marginBottom: 20 },
+  modalInputRow: { flexDirection: 'row', gap: 10 },
+  modalButtonContainer: { flexDirection: 'row', gap: 10, marginTop: 10 },
+});
 
 export default TasksScreen;

@@ -7,10 +7,16 @@ const TaskSchema = new Schema({
     ref: 'family',
     required: true
   },
-  userId: { // User who created the task
+  userId: { // User who CREATED the task
     type: Schema.Types.ObjectId,
     ref: 'user',
     required: true
+  },
+  // --- NEW: Assigned user ---
+  assignedTo: {
+    type: Schema.Types.ObjectId,
+    ref: 'user',
+    required: false // Tasks can be unassigned in the inbox
   },
   name: {
     type: String,
@@ -20,12 +26,16 @@ const TaskSchema = new Schema({
     type: Number,
     default: 10
   },
-  // --- NEW: Add Due Date ---
   dueDate: {
     type: Date,
-    required: false // Optional field
+    required: false 
   },
-  // --- END NEW ---
+  // --- NEW: Task Status ---
+  status: {
+    type: String,
+    enum: ['incomplete', 'pending_approval', 'complete'],
+    default: 'incomplete'
+  },
   createdAt: {
     type: Date,
     default: Date.now
