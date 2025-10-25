@@ -1,35 +1,57 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+// /src/App.jsx
 
-function App() {
-  const [count, setCount] = useState(0)
+import React from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import { useAuth } from './context/AuthContext';
 
-  return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.jsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+// We'll create these three components next!
+// import Dashboard from './views/Dashboard';
+// import SignUp from './views/SignUp';
+// import Login from './views/Login';
+
+// --- Placeholder Components (so the app doesn't crash) ---
+// We can delete these once we build the real files.
+const Dashboard = () => <h1>Dashboard (Protected)</h1>;
+const SignUp = () => <h1>Sign Up Page</h1>;
+const Login = () => <h1>Login Page</h1>;
+// --- End Placeholders ---
+
+
+// This component checks if a user is logged in.
+// If not, it redirects them to the /login page.
+function ProtectedRoute({ children }) {
+  const { currentUser } = useAuth();
+  
+  if (!currentUser) {
+    // User not authenticated
+    return <Navigate to="/login" replace />;
+  }
+  
+  return children;
 }
 
-export default App
+function App() {
+  const { currentUser } = useAuth();
+
+  return (
+    <Routes>
+      <Route path="/" element={
+        <ProtectedRoute>
+          <Dashboard />
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/signup" element={
+        // If user is *already* logged in, send them to dashboard
+        !currentUser ? <SignUp /> : <Navigate to="/" replace />
+      } />
+      
+      <Route path="/login" element={
+        // If user is *already* logged in, send them to dashboard
+        !currentUser ? <Login /> : <Navigate to="/" replace />
+      } />
+    </Routes>
+  );
+}
+
+export default App;
