@@ -1,4 +1,4 @@
-// firestore.rules
+// firestore.rules (v11 - THE REAL FIX for Dashboard Query)
 
 rules_version = '2';
 
@@ -24,7 +24,6 @@ service cloud.firestore {
 
   // === Rules ===
   // Each collection is defined from the root.
-
   // --- Users Collection ---
   match /databases/{database}/documents/users/{userId} {
     allow create: if request.auth.uid == userId
@@ -38,7 +37,7 @@ service cloud.firestore {
   // --- Members Collection ---
   match /databases/{database}/documents/members/{memberId} {
     
-    // Helper functions (defined inside 'match' are fine)
+    // Helper functions
     function isDataConsistent(data) {
       return memberId == data.userId + '_' + data.householdId;
     }
@@ -58,12 +57,18 @@ service cloud.firestore {
                       isInvitedByAdmin(request.resource.data, request.auth.uid)
                     );
     
-    // READ: (FIXED)
-    // Removed the 'let' and put the function call inline.
-    allow get, list: if isHouseholdMember(database, request.auth.uid + '_' + getHouseholdIdFromMemberId(memberId));
+    // --- READ (THE FIX) ---
     
-    // UPDATE/DELETE: (FIXED)
-    // Removed the 'let' and put the function call inline.
+    // 'get' lets a user get a *specific* membership doc
+    allow get: if isHouseholdMember(database, request.auth.uid + '_' + getHouseholdIdFromMemberId(memberId));
+    
+    // 'list' lets the dashboard query for *all* docs where their userId matches.
+    // THIS IS THE CORRECTED RULE.
+    // It works because your Dashboard query *includes* the 'where("userId", "==", ...)' clause,
+    // which satisfies this rule.
+    allow list: if request.auth.uid == resource.data.userId;
+    
+    // --- UPDATE/DELETE ---
     allow update, delete: if isHouseholdAdmin(database, request.auth.uid + '_' + getHouseholdIdFromMemberId(memberId));
   }
 
@@ -72,28 +77,20 @@ service cloud.firestore {
     
     // READ:
     allow get, list: if isHouseholdMember(database, request.auth.uid + '_' + householdId);
-    
     // UPDATE/DELETE:
     allow update, delete: if isHouseholdAdmin(database, request.auth.uid + '_' + householdId);
-    
     // CREATE:
     allow create: if request.auth != null;
-
+        
     // --- Tasks Subcollection ---
-    // (This nesting is correct)
     match /tasks/{taskId} {
       
       // CREATE/DELETE:
       allow create, delete: if isHouseholdAdmin(database, request.auth.uid + '_' + householdId);
-
+      
       // READ:
-    // 'get' lets a user get a *specific* membership doc if they know the household
-    allow get: if isHouseholdMember(database, request.auth.uid + '_' + getHouseholdIdFromMemberId(memberId));
-    
-    // 'list' lets a user query for *all* docs where their userId matches.
-    // This is the key to our dashboard "do I have any households?" check.
-    allow list: if request.auth.uid == request.query.where.userId;
-
+      allow get, list: if isHouseholdMember(database, request.auth.uid + '_' + householdId);
+      
       // UPDATE:
       allow update: if 
         isHouseholdAdmin(database, request.auth.uid + '_' + householdId) ||

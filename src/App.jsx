@@ -1,52 +1,54 @@
-// /src/App.jsx
+// src/App.jsx (Fixed)
 
 import React from 'react';
+// --- (1) REMOVE BrowserRouter from this import ---
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { useAuth } from './context/AuthContext';
-
-// --- Import our real views ---
-import Dashboard from './views/Dashboard'; // <-- IMPORT THIS
-import SignUp from './views/SignUp';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import Login from './views/Login';
+import SignUp from './views/SignUp';
+import Dashboard from './views/Dashboard';
+import HouseholdDashboard from './views/HouseholdDashboard';
 
-// --- Placeholder Components ---
-// const Dashboard = () => <h1>Dashboard (Protected)</h1>; // <-- DELETE THIS
-// --- End Placeholders ---
+function App() {
+  return (
+    <AuthProvider>
+      {/* --- (2) REMOVE <BrowserRouter> from here --- */}
+      <Routes>
+        {/* Public Routes */}
+        <Route path="/login" element={<Login />} />
+        <Route path="/signup" element={<SignUp />} />
 
+        {/* Protected Routes */}
+        <Route
+          path="/dashboard"
+          element={<ProtectedRoute><Dashboard /></ProtectedRoute>}
+        />
+        <Route
+          path="/household/:householdId"
+          element={<ProtectedRoute><HouseholdDashboard /></ProtectedRoute>}
+        />
 
-// ... (ProtectedRoute function remains the same) ...
+        {/* Fallback route */}
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      </Routes>
+      {/* --- (3) REMOVE </BrowserRouter> from here --- */}
+    </AuthProvider>
+  );
+}
+
+// ... (ProtectedRoute component is the same)
 function ProtectedRoute({ children }) {
-  const { currentUser } = useAuth();
-  
+  const { currentUser, loading } = useAuth();
+
+  if (loading) {
+    return <div>Loading...</div>; // Or a proper spinner component
+  }
+
   if (!currentUser) {
     return <Navigate to="/login" replace />;
   }
-  
+
   return children;
-}
-
-
-function App() {
-  const { currentUser } = useAuth();
-
-  return (
-    <Routes>
-      <Route path="/" element={
-        <ProtectedRoute>
-          <Dashboard /> {/* <-- This now uses our real component */}
-        </ProtectedRoute>
-      } />
-      
-      {/* ... (signup and login routes remain the same) ... */}
-      <Route path="/signup" element={
-        !currentUser ? <SignUp /> : <Navigate to="/" replace />
-      } />
-      
-      <Route path="/login" element={
-        !currentUser ? <Login /> : <Navigate to="/" replace />
-      } />
-    </Routes>
-  );
 }
 
 export default App;

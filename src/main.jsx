@@ -1,20 +1,20 @@
-// /src/main.jsx
+// src/main.jsx (Corrected)
 
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import { AuthProvider } from './context/AuthContext';
-
-// 1. Import the router
 import { BrowserRouter } from 'react-router-dom';
 
+// --- STYLING IMPORTS ---
+// 1. Import the new Tailwind base styles
+import './index.css'; 
+// 2. Import our app's custom theme
 import './styles/theme.css';
-//import './styles/global.css';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <AuthProvider>
-      {/* 2. Wrap the app in the router */}
       <BrowserRouter>
         <App />
       </BrowserRouter>

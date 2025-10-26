@@ -1,42 +1,36 @@
-// Import the functions you need from the SDKs you need
+// src/firebase.js (Updated to use Emulators)
 
 import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { getAuth, connectAuthEmulator } from "firebase/auth"; // --- (1) IMPORT ---
 import { getFirestore } from "firebase/firestore";
-import { getAnalytics } from "firebase/analytics";
-
-// TODO: Add SDKs for Firebase products that you want to use
-
-// https://firebase.google.com/docs/web/setup#available-libraries
-
+import { getFunctions, connectFunctionsEmulator } from "firebase/functions"; // --- (2) IMPORT ---
 
 // Your web app's Firebase configuration
-
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
-
 const firebaseConfig = {
-
-  apiKey: "AIzaSyCfmFfAeh5nkDsUEbdGCjNdO_fDqF2ZACw",
-
+  apiKey: "YOUR_API_KEY", // (Keep your actual keys)
   authDomain: "momentum-9b492.firebaseapp.com",
-
   projectId: "momentum-9b492",
-
-  storageBucket: "momentum-9b492.firebasestorage.app",
-
-  messagingSenderId: "586333342003",
-
-  appId: "1:586333342003:web:89901ec7ae9787055cd646",
-
-  measurementId: "G-EXB4DVVZ8J"
-
+  storageBucket: "momentum-9b492.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId: "YOUR_APP_ID"
 };
 
-
+// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// Initialize and export our services
+// Export the services
 export const auth = getAuth(app);
 export const db = getFirestore(app);
+export const functions = getFunctions(app, 'us-central1');
 
-export default app;
+// --- (3) THIS IS THE MAGIC ---
+// This checks if we are running the app locally
+if (window.location.hostname === 'localhost') {
+  console.log('Connecting to local emulators...');
+  
+  // Connect to the local Auth emulator
+  connectAuthEmulator(auth, 'http://localhost:9099');
+  
+  // Connect to the local Functions emulator
+  connectFunctionsEmulator(functions, 'localhost', 5001);
+}
