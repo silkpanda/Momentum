@@ -1,80 +1,75 @@
-// functions/index.js
+// functions/index.js (Updated with MORE non-crashing logs)
 
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 
-// Initialize our app so the function can access database/auth
 admin.initializeApp();
 
-/**
- * --- inviteUserToHousehold (Cloud Function) ---
- *
- * This is an "onCall" function. It means our React app can call it directly
- * and securely.
- *
- * @param {object} data - The data sent from our React app.
- * {
- * email: "invitee@example.com",
- * householdId: "h-12345"
- * }
- * @param {object} context - Auth info about the user *calling* the function.
- * {
- * auth: { uid: "caller-user-id" }
- * }
- *
- * @returns {object} - A JSON object indicating success or failure.
- */
 exports.inviteUserToHousehold = functions.https.onCall(async (data, context) => {
-  // --- 1. Authentication & Validation ---
+  
+  // --- (1) FIXED DEBUG LOGS (AGAIN) ---
+  console.log("--- inviteUserToHousehold function triggered ---");
 
-  // Check 1: Is the user calling this function even logged in?
+  // THIS IS THE FIX. We just log the properties we expect.
+  console.log("Data received (brief):", {
+    email: data.email,
+    householdId: data.householdId,
+  });
+  
+  // This one was already fixed.
+  console.log("Auth context received (brief):", { 
+    uid: context.auth ? context.auth.uid : null 
+  });
+  // --- (END FIX) ---
+
+  // --- 1. Authentication & Validation ---
   if (!context.auth) {
+    console.error("Auth context is missing! Throwing 'unauthenticated' error.");
     throw new functions.https.HttpsError(
         "unauthenticated",
         "You must be logged in to invite users.",
     );
   }
 
+  // ... (rest of the function is the same)
+  console.log(`Auth check passed. Caller UID: ${context.auth.uid}`);
+  
   const {email, householdId} = data;
   const callerUid = context.auth.uid;
 
-  // Check 2: Did they send the email and householdId?
   if (!email || !householdId) {
+    console.error("Invalid arguments. Email or HouseholdID missing.");
     throw new functions.https.HttpsError(
         "invalid-argument",
         "Please provide an email and household ID.",
     );
   }
 
-  // Get our "god mode" access to the database
   const db = admin.firestore();
 
   try {
-    // --- 2. Permission Check ---
-
-    // Check 3: Is the *caller* an admin of this household?
+    console.log(`Checking admin status for: ${callerUid} in household ${householdId}`);
     const callerMemberDocRef = db
         .collection("members")
         .doc(`${callerUid}_${householdId}`);
-
     const callerMemberDoc = await callerMemberDocRef.get();
 
     if (!callerMemberDoc.exists || callerMemberDoc.data().role !== "admin") {
+      console.error("Permission check failed. User is not an admin.");
       throw new functions.https.HttpsError(
           "permission-denied",
           "You must be an admin of this household to invite users.",
       );
     }
-
-    // --- 3. Find the Invitee ---
-
-    // Check 4: Does a user with this email even exist?
+    
+    console.log("Permission check passed. User is an admin.");
+    console.log(`Looking up user by email: ${email}`);
+    
     let inviteeUser;
     try {
-      // This is the secure part we can't do in the browser
       inviteeUser = await admin.auth().getUserByEmail(email);
     } catch (error) {
-      // 'auth/user-not-found' is the error code
+      console.error(`User lookup failed. Email ${email} not found.`);
       throw new functions.https.HttpsError(
           "not-found",
           `No user found with the email: ${email}. Please ask them to sign up first.`,
@@ -82,48 +77,43 @@ exports.inviteUserToHousehold = functions.https.onCall(async (data, context) => 
     }
 
     const inviteeUid = inviteeUser.uid;
+    console.log(`Found user. Invitee UID: ${inviteeUid}`);
 
-    // Check 5: Is this user already in the household?
     const inviteeMemberDocRef = db
         .collection("members")
         .doc(`${inviteeUid}_${householdId}`);
-
     const inviteeMemberDoc = await inviteeMemberDocRef.get();
 
     if (inviteeMemberDoc.exists) {
+      console.error("User is. already a member of this household.");
       throw new functions.https.HttpsError(
           "already-exists",
           `This user is already a member of this household.`,
       );
     }
 
-    // --- 4. Create the New Member ---
-    
-    // If we get here, all checks passed!
+    console.log("All checks passed. Creating new member document...");
     const newMemberData = {
       userId: inviteeUid,
       householdId: householdId,
-      role: "member", // New users are always "member" by default
+      role: "member", 
       joinedAt: admin.firestore.FieldValue.serverTimestamp(),
       points: 0,
     };
 
-    // Create the new member document
     await inviteeMemberDocRef.set(newMemberData);
 
-    // --- 5. Success! ---
+    console.log("Successfully created new member. Sending success response.");
     return {
       status: "success",
       message: `Successfully invited ${email} to the household.`,
     };
+
   } catch (error) {
-    // This catches any errors we threw on purpose (like "not-found")
-    // and any other unexpected errors
-    console.error("Error inviting user:", error);
+    console.error("--- Function failed ---", error.message);
     if (error instanceof functions.https.HttpsError) {
-      throw error; // Re-throw our custom errors
+      throw error;
     }
-    // Throw a generic error for everything else
     throw new functions.https.HttpsError(
         "internal",
         "An unexpected error occurred. Please try again.",
