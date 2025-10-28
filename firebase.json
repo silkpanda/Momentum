@@ -1,5 +1,7 @@
 {
   "firestore": {
+    "database": "(default)",
+    "location": "nam5",
     "rules": "firestore.rules",
     "indexes": "firestore.indexes.json"
   },
@@ -32,21 +34,24 @@
   ],
   "emulators": {
     "auth": {
-      "port": 9099,
-      "host": "0.0.0.0"
+      "port": 9099
     },
     "functions": {
       "port": 5001,
-      "host": "0.0.0.0"
+      "vars": {
+        "FIREBASE_AUTH_EMULATOR_HOST": "127.0.0.1:9099"
+      }
     },
     "firestore": {
-      "port": 8081,
-      "host": "0.0.0.0"
+      "port": 8080
+    },
+    "hosting": {
+      "port": 5000
     },
     "ui": {
       "enabled": true,
-      "port": 4000,
-      "host": "0.0.0.0"
-    }
+      "port": 4000
+    },
+    "singleProjectMode": true
   }
 }
