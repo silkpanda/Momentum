@@ -1,41 +1,49 @@
-// src/main.jsx (Updated to be async)
+// src/main.jsx (Corrected with BrowserRouter)
 
-import React from 'react'
-import ReactDOM from 'react-dom/client'
-import { BrowserRouter } from 'react-router-dom'
-import App from './App.jsx'
-import './index.css'
-import './styles/theme.css'
-import { AuthProvider } from './context/AuthContext.jsx'
-import { initializeServices } from './firebase.js' // --- 1. IMPORT ---
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+// --- 1. Import BrowserRouter ---
+import { BrowserRouter } from 'react-router-dom';
+// --- END ---
+import App from './App.jsx';
+import './index.css';
+import { AuthProvider } from './context/AuthContext.jsx';
+import { initializeServices } from './firebase.js'; // Use the async initializer
 
 console.log('main.jsx: Top-level loading...');
 
-// --- 2. CREATE AN ASYNC FUNCTION TO START THE APP ---
 async function startApp() {
+  console.log('main.jsx: Calling initializeServices() and awaiting...');
   try {
-    console.log('main.jsx: Calling initializeServices() and awaiting...');
-    
-    // --- 3. THIS IS THE FIX ---
-    await initializeServices(); // This will PAUSE until the firebase.js ping is done
-    
-    console.log('main.jsx: All services initialized. Rendering React app...');
+    // Await the initialization (now points to LIVE Firebase)
+    await initializeServices();
+    console.log('main.jsx: All LIVE services initialized. Rendering React app...');
 
-    // --- 4. RENDER THE APP *AFTER* THE AWAIT ---
     ReactDOM.createRoot(document.getElementById('root')).render(
       <React.StrictMode>
-        <AuthProvider>
-          <BrowserRouter>
+        {/* --- 2. Wrap AuthProvider and App with BrowserRouter --- */}
+        <BrowserRouter>
+          <AuthProvider>
             <App />
-          </BrowserRouter>
-        </AuthProvider>
+          </AuthProvider>
+        </BrowserRouter>
+        {/* --- END --- */}
       </React.StrictMode>,
     );
   } catch (error) {
-    console.error("main.jsx: Fatal error initializing app:", error);
-    document.getElementById('root').innerHTML = 'Error initializing app. Please refresh.';
+    console.error("main.jsx: CRITICAL - Failed to initialize Firebase. App cannot start.", error);
+    const rootElement = document.getElementById('root');
+    if (rootElement) {
+      rootElement.innerHTML = `
+        <div style="padding: 20px; text-align: center; color: red;">
+          <h1>Application Error</h1>
+          <p>Could not connect to essential services. Please try again later.</p>
+          <p><i>${error.message}</i></p>
+        </div>
+      `;
+    }
   }
 }
 
-// --- 5. CALL THE ASYNC FUNCTION ---
+// Start the app
 startApp();

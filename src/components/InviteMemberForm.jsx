@@ -1,15 +1,12 @@
-// src/components/InviteMemberForm.jsx (Fixed with Getter)
+// src/components/InviteMemberForm.jsx (Corrected)
 
 import React, { useState } from 'react';
-// --- 1. IMPORT GETTER ---
-import { getFunctionsInstance } from '../firebase'; 
+// --- FIX ---
+// Import the *correct* getter function name from firebase.js
+import { getFunctionsInstance } from '../firebase';
+// --- END FIX ---
 import { httpsCallable } from 'firebase/functions';
 
-/**
- * A form for inviting a new member to a specific household.
- * @param {object} props
- * @param {string} props.householdId - The ID of the household to invite to.
- */
 function InviteMemberForm({ householdId }) {
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
@@ -28,26 +25,31 @@ function InviteMemberForm({ householdId }) {
     setSuccess('');
 
     try {
-      // --- 2. GET FUNCTIONS INSTANCE ---
+      // --- FIX ---
+      // Get the functions instance using the correct getter
+      console.log("InviteMemberForm: Getting functions instance...");
       const functionsInstance = getFunctionsInstance();
-      if (!functionsInstance) throw new Error("Functions not initialized");
+      // --- END FIX ---
+      
+      if (!functionsInstance) {
+        console.error("InviteMemberForm: Functions not initialized");
+        throw new Error("Functions not initialized");
+      }
+      console.log("InviteMemberForm: Functions instance OK. Calling 'inviteUserToHousehold'...");
 
-      // 3. Get a reference to our cloud function
       const inviteUser = httpsCallable(functionsInstance, 'inviteUserToHousehold');
       
-      // 4. Call it with the data it needs
       const result = await inviteUser({
         email: email,
         householdId: householdId,
       });
 
-      // 5. Show the success message from the server
+      console.log("InviteMemberForm: Function returned success:", result.data.message);
       setSuccess(result.data.message);
-      setEmail(''); // Clear the form
+      setEmail(''); 
 
     } catch (err) {
       console.error('Error inviting user:', err);
-      // 'err.message' will be the clean error we wrote in the function
       setError(err.message); 
     } finally {
       setIsSubmitting(false);
@@ -56,7 +58,7 @@ function InviteMemberForm({ householdId }) {
 
   return (
     <div className="max-w-md bg-bg-primary p-6 rounded-lg shadow-md mt-8">
-      <h3 className="text-lg font-semibold mb-4">Invite New Member</h3>
+      <h3 className="text-lg font-semibold mb-4">Invite New Member (Parent)</h3>
       <form onSubmit={handleSubmit}>
         <label htmlFor="email" className="block text-sm font-medium text-text-primary mb-2">
           User's Email

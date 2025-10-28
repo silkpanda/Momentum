@@ -1,4 +1,4 @@
-// src/context/AuthContext.jsx (Updated with Getter)
+// src/context/AuthContext.jsx (With Extra Logging)
 
 import React, { useContext, useState, useEffect } from 'react';
 import { 
@@ -7,8 +7,7 @@ import {
   signInWithEmailAndPassword, 
   signOut 
 } from 'firebase/auth';
-// --- 1. IMPORT THE GETTER, NOT 'auth' ---
-import { getFirebaseAuth } from '../firebase'; 
+import { getFirebaseAuth } from '../firebase'; // <-- CORRECT IMPORT
 
 const AuthContext = React.createContext();
 
@@ -23,31 +22,46 @@ export function AuthProvider({ children }) {
   console.log('AuthContext: Provider rendering, initial loading: true');
 
   function signup(email, password) {
-    // --- 2. USE THE GETTER FUNCTION ---
-    return createUserWithEmailAndPassword(getFirebaseAuth(), email, password);
+    console.log('AuthContext: signup() function called.');
+    const authInstance = getFirebaseAuth(); // <-- Get instance
+    if (!authInstance) {
+      console.error("AuthContext: signup() FAILED - Auth not initialized.");
+      return Promise.reject(new Error("Auth service not ready."));
+    }
+    return createUserWithEmailAndPassword(authInstance, email, password);
   }
 
   function login(email, password) {
     console.log('AuthContext: login() function called.');
-    // --- 3. USE THE GETTER FUNCTION ---
-    return signInWithEmailAndPassword(getFirebaseAuth(), email, password);
+    const authInstance = getFirebaseAuth(); // <-- Get instance
+    if (!authInstance) {
+      console.error("AuthContext: login() FAILED - Auth not initialized.");
+      return Promise.reject(new Error("Auth service not ready."));
+    }
+    return signInWithEmailAndPassword(authInstance, email, password);
   }
 
   function logout() {
-    // --- 4. USE THE GETTER FUNCTION ---
-    return signOut(getFirebaseAuth());
+    console.log('AuthContext: logout() function called.');
+    const authInstance = getFirebaseAuth(); // <-- Get instance
+    if (!authInstance) {
+      console.error("AuthContext: logout() FAILED - Auth not initialized.");
+      return Promise.reject(new Error("Auth service not ready."));
+    }
+    return signOut(authInstance);
   }
 
   useEffect(() => {
-    console.log('AuthContext: useEffect subscribing to onAuthStateChanged');
-    // --- 5. USE THE GETTER FUNCTION ---
-    const authInstance = getFirebaseAuth(); 
+    console.log('AuthContext: useEffect subscribing to onAuthStateChanged...');
+    const authInstance = getFirebaseAuth(); // <-- Get instance
+    
     if (!authInstance) {
-      console.error("AuthContext: Auth service not initialized!");
+      console.error("AuthContext: useEffect FAILED - Auth not initialized!");
       setLoading(false);
       return;
     }
 
+    console.log("AuthContext: ...auth instance found. Attaching listener.");
     const unsubscribe = onAuthStateChanged(authInstance, (user) => {
       if (user) {
         console.log(`AuthContext: onAuthStateChanged - USER FOUND. UID: ${user.uid}`);
