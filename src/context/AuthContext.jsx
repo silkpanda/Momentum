@@ -1,78 +1,82 @@
-import React, { useContext, useState, useEffect } from 'react';
-import {
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  signOut,
-  onAuthStateChanged
-} from 'firebase/auth';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { auth, db } from '../firebase'; // Import our services
+// src/context/AuthContext.jsx (Updated with Getter)
 
-// Create the context
+import React, { useContext, useState, useEffect } from 'react';
+import { 
+  onAuthStateChanged, 
+  createUserWithEmailAndPassword, 
+  signInWithEmailAndPassword, 
+  signOut 
+} from 'firebase/auth';
+// --- 1. IMPORT THE GETTER, NOT 'auth' ---
+import { getFirebaseAuth } from '../firebase'; 
+
 const AuthContext = React.createContext();
 
-// Hook for child components to consume the context
 export function useAuth() {
   return useContext(AuthContext);
 }
 
-// The Provider component that will wrap our app
 export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null);
-  const [loading, setLoading] = useState(true); // Loading state
+  const [loading, setLoading] = useState(true);
 
-  // --- SIGNUP (AUTH-01) ---
-  // This does TWO things:
-  // 1. Creates the user in Firebase Auth
-  // 2. Creates the user document in our 'users' Firestore collection
-  async function signup(email, password, firstName) {
-    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-    const user = userCredential.user;
-    
-    // Create the user doc in Firestore
-    // This satisfies the security rule we wrote (must have 'createdAt')
-    return setDoc(doc(db, 'users', user.uid), {
-      email: user.email,
-      firstName: firstName,
-      createdAt: serverTimestamp()
-    });
+  console.log('AuthContext: Provider rendering, initial loading: true');
+
+  function signup(email, password) {
+    // --- 2. USE THE GETTER FUNCTION ---
+    return createUserWithEmailAndPassword(getFirebaseAuth(), email, password);
   }
 
-  // --- LOGIN (AUTH-02) ---
   function login(email, password) {
-    return signInWithEmailAndPassword(auth, email, password);
+    console.log('AuthContext: login() function called.');
+    // --- 3. USE THE GETTER FUNCTION ---
+    return signInWithEmailAndPassword(getFirebaseAuth(), email, password);
   }
 
-  // --- LOGOUT ---
   function logout() {
-    return signOut(auth);
+    // --- 4. USE THE GETTER FUNCTION ---
+    return signOut(getFirebaseAuth());
   }
 
-  // --- AUTH LISTENER ---
-  // This is the magic. It listens to Firebase for auth changes
-  // and updates our app's state.
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, user => {
-      setCurrentUser(user);
-      setLoading(false); // Auth state is now confirmed
+    console.log('AuthContext: useEffect subscribing to onAuthStateChanged');
+    // --- 5. USE THE GETTER FUNCTION ---
+    const authInstance = getFirebaseAuth(); 
+    if (!authInstance) {
+      console.error("AuthContext: Auth service not initialized!");
+      setLoading(false);
+      return;
+    }
+
+    const unsubscribe = onAuthStateChanged(authInstance, (user) => {
+      if (user) {
+        console.log(`AuthContext: onAuthStateChanged - USER FOUND. UID: ${user.uid}`);
+        setCurrentUser(user);
+      } else {
+        console.log('AuthContext: onAuthStateChanged - USER IS NULL.');
+        setCurrentUser(null);
+      }
+      console.log('AuthContext: onAuthStateChanged - SETTING LOADING = FALSE');
+      setLoading(false);
     });
 
-    // Cleanup function to unsubscribe when component unmounts
-    return unsubscribe;
-  }, []);
+    return () => {
+      console.log('AuthContext: useEffect cleanup, unsubscribing');
+      unsubscribe();
+    };
+  }, []); 
 
-  // The value we pass down to all children
   const value = {
     currentUser,
+    loading, 
     signup,
     login,
-    logout
+    logout,
   };
 
-  // Don't render the app until we've confirmed the auth state
   return (
     <AuthContext.Provider value={value}>
-      {!loading && children}
+      {children}
     </AuthContext.Provider>
   );
 }

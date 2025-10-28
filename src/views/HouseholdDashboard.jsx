@@ -1,14 +1,14 @@
-// src/views/HouseholdDashboard.jsx (NEW FILE)
+// src/views/HouseholdDashboard.jsx (Fixed with Getter)
 
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { db } from '../firebase';
+import { getDb } from '../firebase'; // --- 1. IMPORT GETTER ---
 import { doc, getDoc } from 'firebase/firestore';
 import InviteMemberForm from '../components/InviteMemberForm';
 
 function HouseholdDashboard() {
-  const { householdId } = useParams(); // Gets the ID from the URL
+  const { householdId } = useParams();
   const { currentUser } = useAuth();
   const [household, setHousehold] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -20,10 +20,13 @@ function HouseholdDashboard() {
       setIsLoading(true);
       
       try {
+        const dbInstance = getDb(); // --- 2. GET DB INSTANCE ---
+        if (!dbInstance) throw new Error("Database not initialized");
+
         // TODO: Check if user is actually a member of this household (for security)
         // For now, just fetch the household's public data
 
-        const householdRef = doc(db, 'households', householdId);
+        const householdRef = doc(dbInstance, 'households', householdId); // --- 3. USE IT ---
         const householdSnap = await getDoc(householdRef);
 
         if (householdSnap.exists()) {
@@ -53,7 +56,8 @@ function HouseholdDashboard() {
   return (
     <div className="w-full min-h-screen p-8 bg-bg-canvas text-text-primary">
       <header className="mb-12">
-        <Link to="/dashboard" className="text-sm text-action-primary hover:underline">
+        {/* --- 4. FIXED LINK TO GO TO '/' (Your main dashboard) --- */}
+        <Link to="/" className="text-sm text-action-primary hover:underline">
           &larr; Back to All Households
         </Link>
         <h1 className="text-3xl font-semibold mt-2">

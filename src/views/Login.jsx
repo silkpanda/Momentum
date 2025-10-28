@@ -1,4 +1,4 @@
-// src/views/Login.jsx (Fixed typo)
+// src/views/Login.jsx (Fixed navigation path)
 
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -27,7 +27,11 @@ function Login() {
       setLoading(true);
       await login(email, password);
       console.log('Login successful, navigating to dashboard...');
-      navigate('/dashboard');
+      
+      // --- THIS IS THE FIX ---
+      // Your App.jsx routes the dashboard to "/", not "/dashboard"
+      navigate('/'); // Was '/dashboard'
+
     } catch (err) {
       console.error('Login failed in component:', err.message);
       setError(err.message);
@@ -65,8 +69,6 @@ function Login() {
               Password
             </label>
             <input
-              // --- THIS IS THE FIX ---
-              // The extra typeS="password" line is gone.
               type="password"
               id="password"
               value={password}

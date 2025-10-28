@@ -1,7 +1,8 @@
-// src/components/InviteMemberForm.jsx (NEW FILE)
+// src/components/InviteMemberForm.jsx (Fixed with Getter)
 
 import React, { useState } from 'react';
-import { functions } from '../firebase'; // Import our new functions service
+// --- 1. IMPORT GETTER ---
+import { getFunctionsInstance } from '../firebase'; 
 import { httpsCallable } from 'firebase/functions';
 
 /**
@@ -27,16 +28,20 @@ function InviteMemberForm({ householdId }) {
     setSuccess('');
 
     try {
-      // 1. Get a reference to our cloud function
-      const inviteUser = httpsCallable(functions, 'inviteUserToHousehold');
+      // --- 2. GET FUNCTIONS INSTANCE ---
+      const functionsInstance = getFunctionsInstance();
+      if (!functionsInstance) throw new Error("Functions not initialized");
+
+      // 3. Get a reference to our cloud function
+      const inviteUser = httpsCallable(functionsInstance, 'inviteUserToHousehold');
       
-      // 2. Call it with the data it needs
+      // 4. Call it with the data it needs
       const result = await inviteUser({
         email: email,
         householdId: householdId,
       });
 
-      // 3. Show the success message from the server
+      // 5. Show the success message from the server
       setSuccess(result.data.message);
       setEmail(''); // Clear the form
 

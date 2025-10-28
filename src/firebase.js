@@ -1,47 +1,73 @@
-// src/firebase.js (Updated to BYPASS Emulators)
+// src/firebase.js (Updated with Getters)
 
 import { initializeApp } from "firebase/app";
-import { getAuth, connectAuthEmulator } from "firebase/auth";
-import { getFirestore, connectFirestoreEmulator } from "firebase/firestore";
-import { getFunctions, connectFunctionsEmulator } from "firebase/functions";
+import { 
+  getAuth, 
+  connectAuthEmulator 
+} from "firebase/auth";
+import { 
+  getFirestore, 
+  connectFirestoreEmulator, 
+  doc, 
+  getDoc 
+} from "firebase/firestore";
+import { 
+  getFunctions, 
+  connectFunctionsEmulator 
+} from "firebase/functions";
 
-// Your web app's Firebase configuration
+// Config is the same
 const firebaseConfig = {
-
-  apiKey: "AIzaSyCfmFfAeh5nkDsUEbdGCjNdO_fDqF2ZACw",
-
+  apiKey: "YOUR_API_KEY", // (Keep your actual keys)
   authDomain: "momentum-9b492.firebaseapp.com",
-
   projectId: "momentum-9b492",
-
-  storageBucket: "momentum-9b492.firebasestorage.app",
-
-  messagingSenderId: "586333342003",
-
-  appId: "1:586333342003:web:89901ec7ae9787055cd646",
-
-  measurementId: "G-EXB4DVVZ8J"
-
+  storageBucket: "momentum-9b492.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId: "YOUR_APP_ID"
 };
 
+console.log('firebase.js: File loaded.');
+export const app = initializeApp(firebaseConfig);
 
-const app = initializeApp(firebaseConfig);
+// --- 1. DEFINE LOCAL (NON-EXPORTED) VARIABLES ---
+let auth;
+let db;
+let functions;
 
-// Export the services
-export const auth = getAuth(app);
-export const db = getFirestore(app);
-export const functions = getFunctions(app, 'us-central1');
+// --- 2. EXPORT GETTER FUNCTIONS ---
+export const getFirebaseAuth = () => auth;
+export const getDb = () => db;
+export const getFunctionsInstance = () => functions;
 
-// This checks if we are running the app locally
-if (window.location.hostname === 'localhost') {
-  
-  // --- WE ARE BYPASSING THE EMULATORS ---
-  // We're commenting these out to force the app to talk to
-  // the real, live Firebase services.
-  
-  console.log('Connecting to LIVE Firebase services (Emulators Bypassed)...');
-  
-  // connectAuthEmulator(auth, 'http://127.0.0.1:9099');
-  // connectFunctionsEmulator(functions, '127.0.0.1', 5001);
-  // connectFirestoreEmulator(db, '127.0.0.1', 8080);
+// --- 3. INITIALIZE AND ASSIGN THE VARIABLES ---
+export async function initializeServices() {
+  // Assign the local variables
+  auth = getAuth(app);
+  functions = getFunctions(app, 'us-central1');
+  db = getFirestore(app);
+
+  if (window.location.hostname === 'localhost') {
+    console.log('firebase.js: initializeServices() CALLED. Connecting emulators...');
+    try {
+      // Connect all emulators
+      connectAuthEmulator(auth, 'http://localhost:9090');
+      connectFunctionsEmulator(functions, 'localhost', 9099);
+      connectFirestoreEmulator(db, 'localhost', 5001);
+      console.log('firebase.js: Emulators configured. Pinging Firestore...');
+      
+      // Ping Firestore to wait for full connection
+      await getDoc(doc(db, "__test-connection__", "ping"));
+      
+      console.log('firebase.js: Firestore ping successful. All services ready.');
+    } catch (e) {
+      if (e.code === 'unavailable') {
+         console.error('firebase.js: !!! FIRESTORE EMULATOR IS NOT RESPONDING !!!', e);
+         throw e; // This is a fatal error
+      }
+      // The 404 error from the ping is normal and means it connected
+      console.log('firebase.js: Firestore ping successful (ignoring 404). All services ready.');
+    }
+  } else {
+    console.log('firebase.js: Production services initialized.');
+  }
 }

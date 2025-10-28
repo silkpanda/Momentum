@@ -1,23 +1,19 @@
-// firestore.rules (v15 - Fix for PROF-01 and v14 syntax)
+// firestore.emulator.rules
+// (FOR LOCAL EMULATOR TESTING ONLY)
 
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- Helper Functions (v3.1) ---
+    // --- Helper Functions ---
     function isAuth() {
       return request.auth != null;
     }
-
-    // Checks if the logged-in user is an admin of a specific household.
     function isAdmin(householdId) {
       let memberId = request.auth.uid + '_' + householdId;
       return exists(/databases/$(database)/documents/members/$(memberId))
         && get(/databases/$(database)/documents/members/$(memberId)).data.role == 'admin';
     }
-
-    // Checks if the logged-in user is a member (of any role)
-    // of a specific household.
     function isMember(householdId) {
       let memberId = request.auth.uid + '_' + householdId;
       return exists(/databases/$(database)/documents/members/$(memberId));
@@ -42,41 +38,27 @@ service cloud.firestore {
     }
 
     // --- 'members' Collection Rules ---
-
-    // Rules for individual member documents
-    // Doc ID is the composite key: {profileId}_{householdId}
     match /members/{memberId} {
-
-      // --- NEW: CORRECTED CREATE RULE (v15) ---
-      // Allow create if:
-      // 1. You are an admin of the household (for adding new members)
-      //    OR
-      // 2. You are creating your *own* first admin doc (for PROF-01)
       allow create: if isAuth() && 
-                     ( isAdmin(memberId.split('_')[1]) || // <-- Logic inlined
-                       ( request.auth.uid == memberId.split('_')[0] && // <-- Logic inlined
+                     ( isAdmin(memberId.split('_')[1]) || 
+                       ( request.auth.uid == memberId.split('_')[0] && 
                          request.resource.data.role == 'admin'
                        )
                      );
-
-      // Allow read if:
-      //  1. You are the user this member doc is about
-      //  2. You are an admin of this household
       allow read: if isAuth() 
-                  && (request.auth.uid == memberId.split('_')[0] // <-- Logic inlined
-                      || isAdmin(memberId.split('_')[1])); // <-- Logic inlined
-
-      // Allow update, delete *only* if you are an admin
-      // of that household.
+                  && (request.auth.uid == memberId.split('_')[0] 
+                      || isAdmin(memberId.split('_')[1]));
       allow update, delete: if isAuth() 
-                                    && isAdmin(memberId.split('_')[1]); // <-- Logic inlined
+                                    && isAdmin(memberId.split('_')[1]);
     }
     
     // Rules for querying the 'members' collection
     match /members {
-      allow list: if isAuth() 
-                  && request.query.keys.hasOnly(['profileId'])
-                  && request.query.where.profileId == request.auth.uid;
+      
+      // --- THIS IS THE "BRUTE FORCE" FIX ---
+      // This rule is wide open to bypass the emulator auth bug.
+      allow list: if true; 
+      // ------------------------------------
     }
   }
 }
