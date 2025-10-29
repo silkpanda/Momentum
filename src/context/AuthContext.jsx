@@ -1,96 +1,82 @@
-// src/context/AuthContext.jsx (With Extra Logging)
+// src/context/AuthContext.jsx (Corrected)
 
 import React, { useContext, useState, useEffect } from 'react';
-import { 
-  onAuthStateChanged, 
-  createUserWithEmailAndPassword, 
-  signInWithEmailAndPassword, 
-  signOut 
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged
 } from 'firebase/auth';
-import { getFirebaseAuth } from '../firebase'; // <-- CORRECT IMPORT
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { auth, db } from '../firebase'; // Import our services
 
+// Create the context
 const AuthContext = React.createContext();
 
+// Hook for child components to consume the context
 export function useAuth() {
   return useContext(AuthContext);
 }
 
+// The Provider component that will wrap our app
 export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true); // Loading state
 
-  console.log('AuthContext: Provider rendering, initial loading: true');
-
-  function signup(email, password) {
-    console.log('AuthContext: signup() function called.');
-    const authInstance = getFirebaseAuth(); // <-- Get instance
-    if (!authInstance) {
-      console.error("AuthContext: signup() FAILED - Auth not initialized.");
-      return Promise.reject(new Error("Auth service not ready."));
-    }
-    return createUserWithEmailAndPassword(authInstance, email, password);
-  }
-
-  function login(email, password) {
-    console.log('AuthContext: login() function called.');
-    const authInstance = getFirebaseAuth(); // <-- Get instance
-    if (!authInstance) {
-      console.error("AuthContext: login() FAILED - Auth not initialized.");
-      return Promise.reject(new Error("Auth service not ready."));
-    }
-    return signInWithEmailAndPassword(authInstance, email, password);
-  }
-
-  function logout() {
-    console.log('AuthContext: logout() function called.');
-    const authInstance = getFirebaseAuth(); // <-- Get instance
-    if (!authInstance) {
-      console.error("AuthContext: logout() FAILED - Auth not initialized.");
-      return Promise.reject(new Error("Auth service not ready."));
-    }
-    return signOut(authInstance);
-  }
-
-  useEffect(() => {
-    console.log('AuthContext: useEffect subscribing to onAuthStateChanged...');
-    const authInstance = getFirebaseAuth(); // <-- Get instance
+  // --- SIGNUP (AUTH-01) ---
+  // This does TWO things:
+  // 1. Creates the user in Firebase Auth
+  // 2. Creates the user document in our 'users' Firestore collection
+  async function signup(email, password, firstName) {
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    const user = userCredential.user;
     
-    if (!authInstance) {
-      console.error("AuthContext: useEffect FAILED - Auth not initialized!");
-      setLoading(false);
-      return;
-    }
+    // Create the user doc in Firestore
+    // This satisfies the security rule we wrote (must have 'createdAt')
+    return setDoc(doc(db, 'users', user.uid), {
+      email: user.email,
+      firstName: firstName,
+      createdAt: serverTimestamp()
+    });
+  }
 
-    console.log("AuthContext: ...auth instance found. Attaching listener.");
-    const unsubscribe = onAuthStateChanged(authInstance, (user) => {
-      if (user) {
-        console.log(`AuthContext: onAuthStateChanged - USER FOUND. UID: ${user.uid}`);
-        setCurrentUser(user);
-      } else {
-        console.log('AuthContext: onAuthStateChanged - USER IS NULL.');
-        setCurrentUser(null);
-      }
-      console.log('AuthContext: onAuthStateChanged - SETTING LOADING = FALSE');
-      setLoading(false);
+  // --- LOGIN (AUTH-02) ---
+  function login(email, password) {
+    return signInWithEmailAndPassword(auth, email, password);
+  }
+
+  // --- LOGOUT ---
+  function logout() {
+    return signOut(auth);
+  }
+
+  // --- AUTH LISTENER ---
+  // This is the magic. It listens to Firebase for auth changes
+  // and updates our app's state.
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, user => {
+      setCurrentUser(user);
+      setLoading(false); // Auth state is now confirmed
     });
 
-    return () => {
-      console.log('AuthContext: useEffect cleanup, unsubscribing');
-      unsubscribe();
-    };
-  }, []); 
+    // Cleanup function to unsubscribe when component unmounts
+    return unsubscribe;
+  }, []);
 
+  // The value we pass down to all children
   const value = {
     currentUser,
-    loading, 
     signup,
     login,
-    logout,
+    logout
   };
 
+  // Don't render the app until we've confirmed the auth state
   return (
     <AuthContext.Provider value={value}>
-      {children}
+      {!loading && children}
     </AuthContext.Provider>
   );
 }
+
+// (The extra '}' that was here is now removed)

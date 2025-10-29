@@ -1,97 +1,112 @@
-// firestore.rules (v4 - Syntax v4 - 'let' scope fixed)
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper function: Check if a user ID corresponds to an admin of a specific household
-    function isAdmin(userId, householdId) {
-      // Check for null/empty inputs defensively
-      return householdId != null && householdId != "" &&
-             userId != null && userId != "" &&
-             // Construct the composite member document ID
-             exists(/databases/$(database)/documents/members/$(userId + '_' + householdId)) &&
-             get(/databases/$(database)/documents/members/$(userId + '_' + householdId)).data.role == 'admin';
+    // --- Helper Functions ---
+    // Checks if the user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Gets the user's profile doc
+    function getUserProfile(userId) {
+      return get(/databases/$(database)/documents/profiles/$(userId));
+    }
+    
+    // Gets a specific member doc
+    function getMemberDoc(householdId, profileId) {
+    	return get(/databases/$(database)/documents/members/$(householdId + '_' + profileId));
+    }
+    
+    // Checks if user's profile is linked to a specific household
+    function isLinkedToHousehold(userId, householdId) {
+      return getUserProfile(userId).data.owningHouseholdId == householdId;
+    }
+    
+    // Checks if a user is a member of a specific household
+    function isHouseholdMember(householdId) {
+      let profileId = getUserProfile(request.auth.uid).id;
+      return exists(/databases/$(database)/documents/members/$(householdId + '_' + profileId));
     }
 
-    // Helper function: Get the householdId stored on a user's profile
-    // Assumes profileId == auth.uid for logged-in users
-    function getUserHouseholdId(userId) {
-       let profilePath = /databases/$(database)/documents/profiles/$(userId);
-       // Return the householdId field only if the profile exists, otherwise null
-       // Use data.get() for safer access in case field is missing
-       return exists(profilePath) ? get(profilePath).data.get('householdId', null) : null;
+    // Checks if user is an admin of a specific household
+    function isHouseholdAdmin(householdId) {
+      let profileId = getUserProfile(request.auth.uid).id;
+      return getMemberDoc(householdId, profileId).data.role == 'admin';
     }
 
-     // Helper function: Check if a profile is a member of a given household
-    function isMemberOfHousehold(profileId, householdId) {
-        // Check for null/empty inputs defensively
-        return profileId != null && profileId != "" &&
-               householdId != null && householdId != "" &&
-               // Construct the composite member document ID
-               exists(/databases/$(database)/documents/members/$(profileId + '_' + householdId));
-    }
 
-    // --- Profiles Collection ---
-    match /profiles/{profileId} {
-      allow read: if request.auth != null && (
-                    // Allow reading own profile
-                    request.auth.uid == profileId ||
-                    // OR: Allow reading if requester is admin AND target profile is in admin's household
-                    (
-                      // --- FIX: Directly use function calls, no 'let' ---
-                      // 1. Check requester has a household ID on their profile
-                      getUserHouseholdId(request.auth.uid) != null &&
-                      // 2. Check requester is admin of that household
-                      isAdmin(request.auth.uid, getUserHouseholdId(request.auth.uid)) &&
-                      // 3. Check target profile is a member of the requester's household
-                      isMemberOfHousehold(profileId, getUserHouseholdId(request.auth.uid))
-                      // --- END FIX ---
-                    )
-                  );
+    // --- Collection Rules ---
 
-      // Create only allowed if user is creating their own profile doc
-      allow create: if request.auth != null && request.auth.uid == profileId;
-      // Update only allowed for own profile, restrict fields (e.g., cannot change isManaged)
-      allow update: if request.auth != null && request.auth.uid == profileId &&
-                       request.resource.data.keys().hasOnly(['name', 'authUserId', 'isManaged', 'householdId']) && // Allow these fields
-                       request.resource.data.isManaged == resource.data.isManaged; // Prevent changing managed status
-
-      allow delete: if false; // Disallow direct deletion
-    }
-
-    // --- Households Collection ---
     match /households/{householdId} {
-      // Allow read/write ONLY if the user is an admin of THIS household
-      allow read, write: if request.auth != null && isAdmin(request.auth.uid, householdId);
-
-        // --- Tasks Subcollection ---
-        match /tasks/{taskId} {
-            // Allow read/write ONLY if the user is a member of THIS household
-           allow read, write: if request.auth != null && isMemberOfHousehold(request.auth.uid, householdId);
-        }
+      // Create: Only an authenticated user can create a household.
+      // (The createManagedProfile func will handle linking it)
+      allow create: if isAuthenticated();
+      
+      // Read: Only a member of that household can read its details.
+      allow get: if isAuthenticated() && isHouseholdMember(householdId);
+      
+      // List: Don't allow. Users should only query 'members' collection.
+      allow list: if false;
+      
+      // Update: Only an admin of that household can update it.
+      allow update: if isAuthenticated() && isHouseholdAdmin(householdId);
+      
+      // Delete: NO ONE can delete a household from the client. Must be a server-side function.
+      allow delete: if false;
     }
 
-    // --- Members Collection ---
+    match /profiles/{profileId} {
+      // Create: Allow ONLY via the 'createManagedProfile' or 'inviteUserToHousehold' Cloud Functions.
+      // A user CANNOT create their own profile doc directly.
+      allow create: if false;
+      
+      // Read: Allow if you are reading your own profile, OR
+      // if you are a member of the profile's owning household.
+      allow get: if isAuthenticated() &&
+                   (request.auth.uid == profileId || 
+                    isHouseholdMember(resource.data.owningHouseholdId));
+                    
+      // List: Don't allow (prevents scraping all users)
+      allow list: if false;
+
+      // Update: Only allow a user to update their *own* profile.
+      allow update: if isAuthenticated() && request.auth.uid == profileId;
+      
+      // --- NEW RULE ---
+      // Delete: NO ONE can delete a profile from the client.
+      // Must be done via the 'deleteManagedProfile' Cloud Function.
+      allow delete: if false;
+      // ----------------
+    }
+    
     match /members/{memberId} {
-       // --- Allow LIST for any authenticated user ---
-       // Required for the "listen wide, filter client" websocket approach.
-      allow list: if request.auth != null;
-      // --- END FIX ---
-
-      // Allow GET (read single doc) only if requester is admin of that member's household
-      allow get: if request.auth != null && isAdmin(request.auth.uid, resource.data.householdId);
-
-      // Create/Delete handled by Cloud Functions
-      allow create, delete: if false;
-
-      // Allow UPDATE (e.g., points, role) only if requester is admin of that member's household
-      // Also prevent changing critical fields like profileId or householdId
-      allow update: if request.auth != null &&
-                      isAdmin(request.auth.uid, resource.data.householdId) &&
-                      request.resource.data.profileId == resource.data.profileId && // Cannot change profile link
-                      request.resource.data.householdId == resource.data.householdId; // Cannot change household link
+    	// memberId is composite key: {householdId}_{profileId}
+      
+      // Create: Allow ONLY via Cloud Functions.
+      allow create: if false;
+      
+      // Read, List: Allow if you are a member of that household.
+      function isMemberOfHouseholdInDoc() {
+      	return isHouseholdMember(resource.data.householdId);
+      }
+      
+      allow get: if isAuthenticated() && isMemberOfHouseholdInDoc();
+      allow list: if isAuthenticated() && isHouseholdMember(request.query.where[0][2]); // Checks householdId in query
+      
+      // Update: Admins can update points/roles. Users can update their own (if we add features).
+      allow update: if isAuthenticated() && isHouseholdAdmin(resource.data.householdId);
+      
+      // --- NEW RULE ---
+      // Delete: NO ONE can delete a member doc from the client.
+      // Must be done via the 'deleteManagedProfile' Cloud Function.
+      allow delete: if false;
+      // ----------------
     }
+    
+    // Rules for Tasks, StoreItems, Quests etc. would go here
+    // e.g., match /tasks/{taskId} { ... }
+
   }
 }

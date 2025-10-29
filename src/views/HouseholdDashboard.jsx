@@ -1,338 +1,231 @@
-// src/views/HouseholdDashboard.jsx (v4 - With Delete Button & Better Loading)
+// src/views/HouseholdDashboard.jsx (Updated)
 
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { getDb, getFunctionsInstance } from '../firebase'; // Import function getter
+import { db, functions } from '../firebase'; // --- (1) IMPORT functions ---
 import {
   doc,
   getDoc,
   collection,
   query,
   where,
-  onSnapshot,
-  getDocs
-} from 'firebase/firestore';
-import { httpsCallable } from 'firebase/functions'; // Import httpsCallable
-
+  onSnapshot
+} from 'firebase/firestore'; // --- (2) IMPORT MORE FIRESTORE STUFF ---
+import { httpsCallable } from 'firebase/functions'; // --- (3) IMPORT CALLABLE ---
 import InviteMemberForm from '../components/InviteMemberForm';
-import CreateManagedProfileForm from '../components/CreateManagedProfileForm';
+
+// --- (4) PREPARE THE CLOUD FUNCTION ---
+// This creates a reusable reference to our new backend function
+const deleteManagedProfile = httpsCallable(functions, 'deleteManagedProfile');
 
 function HouseholdDashboard() {
   const { householdId } = useParams();
   const { currentUser } = useAuth();
   const [household, setHousehold] = useState(null);
-  const [members, setMembers] = useState([]);
-  const [isLoadingHousehold, setIsLoadingHousehold] = useState(true);
-  const [isLoadingMembers, setIsLoadingMembers] = useState(true);
+  const [members, setMembers] = useState([]); // --- (5) NEW STATE for members ---
+  const [isAdmin, setIsAdmin] = useState(false); // --- (6) NEW STATE for permissions ---
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
-  const [profilesFetched, setProfilesFetched] = useState(false);
-  
-  // --- NEW: Track the current user's admin status ---
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [deleteError, setDeleteError] = useState(''); // State for delete errors
 
-  // --- TARGETED REAL-TIME LISTENER FOR MEMBERS ---
   useEffect(() => {
-    if (!householdId || !currentUser?.uid) {
-      setIsLoadingMembers(false);
-      setMembers([]);
-      return;
-    }
+    if (!currentUser) return;
 
-    console.log(`HouseholdDashboard: Setting up TARGETED listener for members in household ${householdId}...`);
-    setIsLoadingMembers(true);
-    setProfilesFetched(false);
-    setError(prev => prev?.includes("household") ? prev : '');
+    const householdRef = doc(db, 'households', householdId);
+    let unsubscribeMembers = null; // To clean up our listener
 
-    const dbInstance = getDb();
-    if (!dbInstance) {
-      console.error("Database not initialized for member listener.");
-      setError("Database service not ready.");
-      setIsLoadingMembers(false);
-      return;
-    }
-    
-    // --- Admin Status Check ---
-    // Check if the current user is an admin of *this* household
-    const adminMemberRef = doc(dbInstance, 'members', `${currentUser.uid}_${householdId}`);
-    getDoc(adminMemberRef).then(docSnap => {
-        if (docSnap.exists() && docSnap.data().role === 'admin') {
-            console.log("User IS an admin of this household.");
-            setIsAdmin(true);
-        } else {
-            console.log("User is NOT an admin of this household.");
-            setIsAdmin(false);
-        }
-    }).catch(err => {
-        console.error("Error checking admin status:", err);
-        setIsAdmin(false);
-    });
-
-    // --- Member List Listener ---
-    const membersQuery = query(
-      collection(dbInstance, 'members'),
-      where('householdId', '==', householdId)
-    );
-
-    const unsubscribe = onSnapshot(membersQuery, async (membersSnapshot) => {
-      console.log(`HouseholdDashboard (Targeted Listener): Member data updated for ${householdId}.`);
-      setProfilesFetched(false);
-
-      // Set initial member data with "Loading" state for profiles
-      const householdMembersData = membersSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        name: 'Loading name...', // Placeholder
-        isManaged: undefined   // Placeholder
-      }));
-
-      const profileIds = householdMembersData.map(member => member.profileId).filter(id => id);
-      console.log(`HouseholdDashboard (Targeted Listener): Found ${householdMembersData.length} members.`);
-      
-      // Set members immediately with placeholders
-      setMembers(householdMembersData); 
-
-      if (householdMembersData.length === 0) {
-        setIsLoadingMembers(false);
-        return;
-      }
-      setIsLoadingMembers(false); // We have the member list
-
-      // --- Fetch Profiles in Background ---
-      try {
-        let profilesData = {};
-        if (profileIds.length > 0) {
-          const profilesRef = collection(dbInstance, 'profiles');
-          const profilesQuery = query(profilesRef, where('__name__', 'in', profileIds));
-          const profilesSnap = await getDocs(profilesQuery);
-          profilesSnap.docs.forEach(doc => {
-            profilesData[doc.id] = doc.data();
-          });
-          console.log(`Fetched profile data for ${Object.keys(profilesData).length} members.`);
-        }
-
-        // Update members state with real profile data
-        setMembers(prevMembers => prevMembers.map(member => {
-          const profile = profilesData[member.profileId];
-          return {
-            ...member,
-            name: profile?.name ?? `Profile Not Found`, // Clearer fallback
-            isManaged: profile?.isManaged
-          };
-        }));
-        setProfilesFetched(true);
-
-      } catch (profileError) {
-        console.error("Error fetching profiles for members (LIVE):", profileError);
-        setError("Failed to load full profile details for some members.");
-        setMembers(prevMembers => prevMembers.map(member => ({
-          ...member,
-          name: 'Error loading name',
-          isManaged: undefined
-        })));
-        setProfilesFetched(true);
-      }
-    }, (err) => {
-      console.error(`Error listening to members for household ${householdId}:`, err);
-      if (err.code === 'permission-denied') {
-        setError("You don't have permission to view members.");
-      } else {
-        setError("Failed to connect to real-time member updates.");
-      }
-      setIsLoadingMembers(false);
-      setMembers([]);
-    });
-
-    // Cleanup
-    return () => {
-      console.log(`HouseholdDashboard: Unsubscribing TARGETED member listener for ${householdId}.`);
-      unsubscribe();
-    };
-
-  }, [householdId, currentUser]); // Rerun if user or household changes
-  
-  // Effect to fetch initial Household Details (Remains the same)
-  useEffect(() => {
-    // ... (This effect is unchanged) ...
-    // (It fetches household data and sets setIsLoadingHousehold)
     const fetchHouseholdData = async () => {
-        if (!currentUser || !householdId) {
-            setIsLoadingHousehold(false);
-            if (!householdId) setIsLoadingMembers(false);
-            return;
-        }
-        setIsLoadingHousehold(true);
-        setError(prev => prev?.includes("member") ? prev : '');
-        setHousehold(null);
-
-        try {
-            const dbInstance = getDb();
-            if (!dbInstance) throw new Error("Database service not initialized yet.");
-            console.log("Fetching household details (LIVE) for:", householdId);
-            const householdRef = doc(dbInstance, 'households', householdId);
-            const householdSnap = await getDoc(householdRef);
-
-            if (householdSnap.exists()) {
-                setHousehold({ id: householdSnap.id, ...householdSnap.data() });
-            } else {
-                console.error('Household not found (LIVE):', householdId);
-                setError('Household not found.');
-                setIsLoadingMembers(false);
-            }
-        } catch (err) {
-            console.error('Failed to fetch household details (LIVE):', err);
-            if (err.code === 'permission-denied') {
-                setError("You don't have permission to view this household.");
-            } else {
-                setError('Error: Could not load household data.');
-            }
-            setIsLoadingMembers(false);
-        } finally {
-            setIsLoadingHousehold(false);
-        }
-    };
-    fetchHouseholdData();
-  }, [householdId, currentUser]);
-
-  
-  // --- NEW: Delete Profile Function ---
-  const handleDeleteProfile = async (profileId, profileName) => {
-      if (!isAdmin) {
-          setError("You don't have permission to delete members.");
-          return;
-      }
-      
-      // Confirmation dialog
-      if (!window.confirm(`Are you sure you want to delete the profile "${profileName}"? This action cannot be undone.`)) {
-          return;
-      }
-      
-      console.log(`Attempting to delete profile ${profileId} from household ${householdId}...`);
-      setError(''); // Clear old errors
-
+      setIsLoading(true);
       try {
-          const functionsInstance = getFunctionsInstance();
-          if (!functionsInstance) throw new Error("Functions service not ready.");
+        // --- (7) CHECK PERMISSIONS & GET HOUSEHOLD DATA ---
+        // First, let's check if the user is a member and if they are an admin
+        // We use the composite key (uid_hhid) for the 'members' doc
+        const memberRef = doc(db, 'members', `${currentUser.uid}_${householdId}`);
+        const memberSnap = await getDoc(memberRef);
 
-          const deleteProfileFunc = httpsCallable(functionsInstance, 'deleteManagedProfile');
+        if (!memberSnap.exists()) {
+          throw new Error('Access Denied: You are not a member of this household.');
+        }
+        
+        // Set admin status
+        if (memberSnap.data().role === 'admin') {
+          setIsAdmin(true);
+        }
+
+        // Now, fetch the household data
+        const householdSnap = await getDoc(householdRef);
+        if (householdSnap.exists()) {
+          setHousehold({ id: householdSnap.id, ...householdSnap.data() });
+        } else {
+          throw new Error('Household not found.');
+        }
+
+        // --- (8) LISTEN FOR REAL-TIME MEMBER UPDATES ---
+        // Now that we know we're a member, fetch all *other* members
+        const membersQuery = query(collection(db, 'members'), where('householdId', '==', householdId));
+
+        // onSnapshot creates a LIVE listener.
+        // Any change in the 'members' collection for this household
+        // will re-run this code.
+        unsubscribeMembers = onSnapshot(membersQuery, async (snapshot) => {
+          const membersData = [];
           
-          const result = await deleteProfileFunc({
-              profileId: profileId,
-              householdId: householdId
+          // Use Promise.all to fetch all profile data in parallel
+          const profilePromises = snapshot.docs.map(async (memberDoc) => {
+            const member = memberDoc.data();
+            
+            // Get the associated profile document for this member
+            const profileRef = doc(db, 'profiles', member.profileId);
+            const profileSnap = await getDoc(profileRef);
+
+            if (profileSnap.exists()) {
+              // Combine member data + profile data
+              return {
+                ...member,
+                profile: profileSnap.data(), // e.g., { displayName, authUserId }
+                profileId: profileSnap.id, // Make sure we have the ID
+                memberDocId: memberDoc.id, // e.g., "uid_hhid" or "generated_id"
+              };
+            }
+            return null; // Profile was deleted or not found
           });
 
-          if (result.data.success) {
-              console.log("Delete successful:", result.data.message);
-              // No need to do anything else! The websocket listener
-              // will see the 'members' doc disappear and update the UI.
-          } else {
-              throw new Error(result.data.message || "Failed to delete profile.");
-          }
+          const resolvedMembers = await Promise.all(profilePromises);
+          // Filter out any nulls (if a profile was missing)
+          setMembers(resolvedMembers.filter(m => m !== null));
+        });
 
       } catch (err) {
-          console.error("Error calling deleteManagedProfile function:", err);
-          setError(`Error: ${err.message}`);
+        console.error('Failed to fetch household:', err);
+        setError(err.message);
+      } finally {
+        setIsLoading(false);
       }
+    };
+
+    fetchHouseholdData();
+
+    // Cleanup function:
+    // This runs when the component unmounts (user navigates away)
+    return () => {
+      if (unsubscribeMembers) {
+        unsubscribeMembers(); // Detach the live listener
+      }
+    };
+  }, [householdId, currentUser]);
+
+  // --- (9) NEW: HANDLE DELETE FUNCTION ---
+  const handleDeleteProfile = async (profile) => {
+    setDeleteError(''); // Clear old errors
+    
+    // Safety check!
+    if (!window.confirm(`Are you sure you want to delete the profile for "${profile.displayName}"? This cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      // Call our cloud function
+      const result = await deleteManagedProfile({
+        profileId: profile.profileId,
+        householdId: householdId,
+      });
+      
+      console.log(result.data.message);
+      // No need to update state, onSnapshot will handle it automatically!
+      
+    } catch (err) {
+      console.error("Error deleting profile:", err);
+      // 'err.message' from httpsCallable is a JSON string, so we parse it.
+      // This is a bit of a quirk, but it gives us the error message
+      // we wrote in the backend.
+      try {
+        const errorData = JSON.parse(err.message);
+        setDeleteError(errorData.message || 'An unknown error occurred.');
+      } catch (e) {
+        setDeleteError(err.message || 'An unknown error occurred.');
+      }
+    }
   };
-  // --- END: Delete Profile Function ---
 
-
-  // --- RENDER LOGIC ---
-  const isLoading = isLoadingHousehold || (isLoadingMembers && members.length === 0 && !error);
 
   if (isLoading) {
     return <div className="p-8">Loading household...</div>;
   }
 
-  if (!isLoadingHousehold && !household) {
-    return <div className="p-8 text-signal-error">{error || 'Household data could not be loaded or found.'}</div>;
-  }
-  
-  if (!household) {
-      return <div className="p-8 text-text-secondary">Waiting for household data...</div>;
+  if (error) {
+    return <div className="p-8 text-signal-error">{error}</div>;
   }
 
   return (
     <div className="w-full min-h-screen p-8 bg-bg-canvas text-text-primary">
       <header className="mb-12">
-        <Link to="/" className="text-sm text-action-primary hover:underline">
+        <Link to="/dashboard" className="text-sm text-action-primary hover:underline">
           &larr; Back to Dashboard
         </Link>
         <h1 className="text-3xl font-semibold mt-2">
-          {household.name}
+          {household ? household.name : 'Household'}
         </h1>
       </header>
 
-      <main>
-        {/* Member List Section */}
-        <section className="mb-12">
+      <main className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        
+        {/* --- (10) NEW: MEMBER LIST --- */}
+        <div className="md:col-span-2">
           <h2 className="text-2xl font-semibold mb-4">Members</h2>
-          {error && <p className="text-sm text-signal-error mb-4">{error}</p>}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            
-            {isLoadingMembers && members.length === 0 && <p className="text-text-secondary col-span-full">Loading members...</p>}
-
-            {members.length > 0 && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {members.length > 0 ? (
               members.map(member => (
-                <div key={member.id} className="bg-bg-primary p-4 rounded-lg shadow relative"> {/* Added relative positioning */}
-                  
-                  {/* --- NEW: Delete Button --- */}
-                  {/* Show delete button if user is admin AND this is a managed profile */}
-                  {isAdmin && member.isManaged === true && (
-                       <button
-                           onClick={() => handleDeleteProfile(member.profileId, member.name)}
-                           className="absolute top-2 right-2 text-text-secondary hover:text-signal-error p-1 rounded-full hover:bg-bg-secondary"
-                           aria-label={`Delete ${member.name}`}
-                           title={`Delete ${member.name}`}
-                       >
-                           {/* Simple 'X' icon for now */}
-                           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                           </svg>
-                       </button>
-                  )}
-                  {/* --- END: Delete Button --- */}
-
-                  <span className={`text-lg font-medium ${member.name.includes('...') ? 'italic text-text-secondary' : ''}`}>
-                    {member.name}
-                  </span>
-                  <span className="block text-sm text-text-secondary capitalize">Role: {member.role || 'N/A'}</span>
-                  <span className="block text-sm text-text-secondary">Points: {member.points ?? 0}</span>
-                  
-                  <div className="mt-2">
-                      {member.isManaged === true ? (
-                        <span className="text-xs font-semibold bg-bg-secondary px-2 py-0.5 rounded-full">Managed Profile</span>
-                      ) : member.isManaged === false ? (
-                        <span className="text-xs font-semibold bg-action-primary-faded text-action-primary px-2 py-0.5 rounded-full">Auth User</span>
-                      ) : profilesFetched ? (
-                        <span className="text-xs italic text-text-secondary">Profile type unknown</span>
-                      ) : (
-                        <span className="text-xs italic text-text-secondary">Loading type...</span>
-                      )}
-                  </div>
-                </div>
+                <MemberCard
+                  key={member.profileId}
+                  profile={member.profile}
+                  role={member.role}
+                  points={member.points}
+                  showDelete={isAdmin && !member.profile.authUserId} // The magic!
+                  onDelete={() => handleDeleteProfile(member.profile)}
+                />
               ))
-            )}
-
-            {!isLoadingMembers && members.length === 0 && !error.includes('member') && (
-                <p className="text-text-secondary col-span-full">No members have been added to this household yet.</p>
+            ) : (
+              <p>No members found for this household.</p>
             )}
           </div>
-        </section>
+          {deleteError && (
+            <p className="text-sm text-signal-error mt-4">{deleteError}</p>
+          )}
+        </div>
 
-        {/* Forms Section - Show only if user is an admin */}
-        {isAdmin ? (
-            <section>
-              <h2 className="text-2xl font-semibold mb-6">Manage Household</h2>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <InviteMemberForm householdId={householdId} />
-                <CreateManagedProfileForm householdId={householdId} />
-              </div>
-            </section>
-        ) : (
-            <p className="text-text-secondary">You must be an admin to manage this household.</p>
-        )}
+        {/* --- (11) ADMIN-ONLY SECTION --- */}
+        <aside>
+          {isAdmin ? (
+            <InviteMemberForm householdId={householdId} />
+          ) : (
+            <p className="text-text-secondary">You do not have admin permissions.</p>
+          )}
+        </aside>
+
       </main>
+    </div>
+  );
+}
+
+// --- (12) NEW: Simple MemberCard Component ---
+// We can move this to its own file later if we want.
+function MemberCard({ profile, role, points, showDelete, onDelete }) {
+  return (
+    <div className="bg-bg-surface p-4 rounded-lg shadow-md relative">
+      <h3 className="text-lg font-semibold">{profile.displayName}</h3>
+      <p className="text-sm text-text-secondary capitalize">{role}</p>
+      <p className="text-xl font-bold mt-2 text-action-primary">{points} pts</p>
+      
+      {showDelete && (
+        <button
+          onClick={onDelete}
+          className="absolute top-2 right-2 text-xs text-signal-error hover:text-signal-error-hover"
+          title={`Delete ${profile.displayName}`}
+        >
+          &times; Delete
+        </button>
+      )}
     </div>
   );
 }
