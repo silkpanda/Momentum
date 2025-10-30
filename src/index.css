@@ -1,7 +1,40 @@
-/* src/index.css (FIXED) */
+/* src/index.css: FINAL STYLING FIX (Calm Light Theme) */
+
+/* ================================================= */
+/* 1. SEMANTIC COLOR VARIABLES (Based on Style Guide 3.2) */
+/* ================================================= */
+:root {
+    /* Backgrounds */
+    --color-bg-canvas: #F9FAFB;      /* bg-gray-50 */
+    --color-bg-surface: #FFFFFF;     /* bg-white - Cards/Modals */
+    --color-bg-secondary: #F4F6F8;   /* CRITICAL FIX: Added definition for secondary background */
+    
+    /* Text */
+    --color-text-primary: #111827;   /* text-gray-900 */
+    --color-text-secondary: #4B5563; /* text-gray-600 */
+    
+    /* Action & Signal Colors */
+    --color-action-primary: #4F46E5; /* bg-indigo-600 */
+    --color-action-hover: #4338CA;   /* bg-indigo-700 */
+    --color-action-inverted: #FFFFFF; /* Text on button */
+
+    --color-signal-success: #16A34A; /* text-green-600 */
+    --color-signal-alert: #DC2626;   /* text-red-600 */
+    --color-signal-focus: #FACC15;   /* bg-yellow-400 */
+    
+    /* Borders & Shadow */
+    --color-border-subtle: #E5E7EB;  /* border-gray-200 */
+}
+
+/* ================================================= */
+/* 2. TAILWIND DIRECTIVES */
+/* ================================================= */
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Any custom CSS goes here */
+/* Apply the canvas background globally */
+body {
+    background-color: var(--color-bg-canvas);
+}
