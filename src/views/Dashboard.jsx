@@ -1,165 +1,91 @@
-// src/views/Dashboard.jsx (Corrected)
+// src/views/Dashboard.jsx (REFACTORED for SUPABASE)
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { db } from '../firebase';
-import { 
-  collection, 
-  query, 
-  where, 
-  getDocs,
-  writeBatch, 
-  doc,        
-  serverTimestamp 
-} from 'firebase/firestore';
-import { Link } from 'react-router-dom';
+// IMPORT FIX: Import the Supabase client
+import { supabase } from '../supabaseClient'; 
+
 import CreateHouseholdModal from '../components/CreateHouseholdModal';
+import LoadingSpinner from '../components/LoadingSpinner'; 
 
 function Dashboard() {
-  const { currentUser, logout } = useAuth();
-  const [households, setHouseholds] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState('');
+  const { currentUser } = useAuth();
+  const navigate = useNavigate();
   
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false); 
-  const [modalError, setModalError] = useState('');     
+  // State to track loading and whether to show the modal
+  const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
 
-  const fetchHouseholds = useCallback(async () => {
-    if (!currentUser) return;
-    setIsLoading(true);
-    setError('');
-    try {
-      const membersRef = collection(db, 'members');
-      const q = query(membersRef, where('userId', '==', currentUser.uid));
-      const querySnapshot = await getDocs(q);
-      const userHouseholds = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setHouseholds(userHouseholds);
-    } catch (err) {
-      console.error('Failed to fetch households:', err);
-      setError('Error: Could not load your data. Please try again.');
-    } finally {
-      setIsLoading(false);
+  // Function to fetch the user's profile data
+  const checkUserProfile = useCallback(async (authId) => {
+    setLoading(true);
+    
+    // Supabase Query: Select the profile linked to the current auth_user_id
+    const { data: profile, error } = await supabase
+      .from('profiles')
+      .select('creation_household_id') // We only need this field for the redirect check
+      .eq('auth_user_id', authId) // Match the profile by the secure Supabase Auth UID
+      .single(); // Expect a single row
+
+    if (error && error.code !== 'PGRST116') { // PGRST116 is 'no rows returned' (i.e., new user)
+      console.error('Error fetching profile:', error.message);
+      // For production, you might set an error state here
     }
-  }, [currentUser]);
+
+    if (profile && profile.creation_household_id) {
+      // SUCCESS: Profile exists and has a householdId. Navigate directly.
+      console.log("Dashboard: Household found on profile. Redirecting to:", profile.creation_household_id);
+      navigate(`/household/${profile.creation_household_id}`);
+    } else {
+      // FAIL: No profile found, or no household linked. Prompt for creation.
+      console.log("Dashboard: No household found. Showing Create Household Modal.");
+      setShowModal(true);
+    }
+
+    setLoading(false);
+  }, [navigate]);
+
 
   useEffect(() => {
-    fetchHouseholds();
-  }, [fetchHouseholds]); 
-
-  const handleCreateHousehold = async (householdName) => {
-    if (!currentUser) return; 
-
-    setIsSubmitting(true);
-    setModalError('');
-    try {
-      const batch = writeBatch(db);
-      const householdDocRef = doc(collection(db, 'households'));
-      const memberDocRef = doc(db, 'members', `${currentUser.uid}_${householdDocRef.id}`);
-      const householdData = {
-        name: householdName,
-        createdAt: serverTimestamp(),
-        ownerId: currentUser.uid, 
-      };
-      const memberData = {
-        userId: currentUser.uid,
-        householdId: householdDocRef.id,
-        role: 'admin', 
-        joinedAt: serverTimestamp(),
-        points: 0, 
-      };
-      batch.set(householdDocRef, householdData); 
-      batch.set(memberDocRef, memberData);      
-      await batch.commit();
-      setIsModalOpen(false);
-      fetchHouseholds(); 
-    } catch (err) {
-      console.error('Error creating household:', err);
-      setModalError('Failed to create household. Please try again.');
-    } finally {
-      setIsSubmitting(false); 
+    if (!currentUser) {
+      // Safety check: should be handled by router
+      navigate('/login');
+      return;
     }
-  };
+    
+    // CRITICAL: We use the secure Supabase Auth UID for the lookup.
+    checkUserProfile(currentUser.id);
+    
+    // Note: No cleanup needed, as this is a one-time async read, not a listener.
 
-  if (isLoading && households.length === 0) { 
-    return (
-      <div className="w-full min-h-screen flex items-center justify-center bg-bg-canvas text-text-primary">
-        Loading your dashboard...
-      </div>
-    );
+  }, [currentUser, navigate, checkUserProfile]); // Dependency array includes the stable currentUser and checkUserProfile
+
+  // --- RENDERING LOGIC ---
+  if (loading) {
+    return <LoadingSpinner text="Checking Profile Status..." />;
   }
-
-  if (error) {
-    return (
-      <div className="w-full min-h-screen flex items-center justify-center bg-bg-canvas text-signal-error">
-        {error}
-      </div>
-    );
-  }
-
+  
+  // Only render the modal if we've stopped loading AND determined we need a household
   return (
-    <div className="w-full min-h-screen p-8 bg-bg-canvas text-text-primary">
-      <header className="flex justify-between items-center mb-12">
-        <h1 className="text-2xl font-semibold">Dashboard</h1>
-        <button
-          onClick={logout}
-          className="px-4 py-2 bg-bg-secondary rounded-md text-text-primary font-medium hover:bg-border-primary"
-        >
-          Log Out
-        </button>
-      </header>
-
-      <main>
-        {households.length === 0 ? (
-          <div className="max-w-md mx-auto mt-20 text-center bg-bg-primary p-8 rounded-lg shadow-md">
-            <h2 className="text-xl font-semibold mb-4">Welcome to Momentum!</h2>
-            <p className="text-text-secondary mb-6">
-              It looks like you're not part of a household yet. Get started by creating one
-              or by asking an admin of an existing household to send you an invite.
-            </p>
-            <button
-              onClick={() => {
-                setIsModalOpen(true);
-                setModalError(''); 
-              }}
-              className="w-full px-6 py-3 bg-action-primary text-action-primary-inverted font-semibold rounded-md hover:bg-action-primary-hover"
-            >
-              Create Your First Household
-            </button>
-          </div>
-        ) : (
-          <div>
-            <h2 className="text-xl font-semibold">Your Households:</h2>
-            <ul className="mt-4 space-y-3">
-              {households.map(h => (
-                <li key={h.id}>
-                  <Link 
-                    to={`/household/${h.householdId}`} 
-                    className="block p-4 bg-bg-primary rounded-md shadow hover:bg-bg-secondary transition-colors"
-                  >
-                    <span className="font-medium">Go to household: {h.householdId}</span>
-                    <span className="block text-sm text-text-secondary">Your Role: {h.role}</span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </main>
-      
-      <CreateHouseholdModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onSubmit={handleCreateHousehold}
-        isSubmitting={isSubmitting}
-        error={modalError}
+    <div className="flex flex-col items-center justify-center min-h-screen bg-bg-canvas">
+      <CreateHouseholdModal 
+        isOpen={showModal} 
+        // We close the modal and re-run the checkUserProfile logic after creation
+        onClose={() => setShowModal(false)} 
+        onHouseholdCreated={(householdId) => {
+          setShowModal(false);
+          // Instead of immediate navigate, we re-run the check to confirm the profile update
+          // This is a robust pattern for Supabase
+          checkUserProfile(currentUser.id);
+        }}
       />
+      {/* Fallback text if something unexpected happens */}
+      {!showModal && (
+        <p className="text-text-primary">Ready to begin? Something went wrong with the initial check. Please try refreshing.</p>
+      )}
     </div>
   );
 }
 
 export default Dashboard;
-// (The extra '}' that was here is now removed)

@@ -1,11 +1,11 @@
-// src/components/InviteMemberForm.jsx (Corrected)
+// src/components/InviteMemberForm.jsx (REFACTORED for SUPABASE STUB)
 
 import React, { useState } from 'react';
-// --- FIX ---
-// Import the *correct* getter function name from firebase.js
-import { getFunctionsInstance } from '../firebase';
-// --- END FIX ---
-import { httpsCallable } from 'firebase/functions';
+// FIX: Remove Firebase Functions imports
+// import { functions } from "../firebase";
+// import { httpsCallable } from "firebase/functions";
+// NOTE: We will import { supabase } from '../supabaseClient' later for RPC calls.
+
 
 function InviteMemberForm({ householdId }) {
   const [email, setEmail] = useState('');
@@ -13,6 +13,9 @@ function InviteMemberForm({ householdId }) {
   const [success, setSuccess] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // STUB: The inviteUser RPC will be set up later in Supabase
+  // const inviteUser = supabase.rpc('invite_user_to_household');
+  
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!email) {
@@ -25,32 +28,18 @@ function InviteMemberForm({ householdId }) {
     setSuccess('');
 
     try {
-      // --- FIX ---
-      // Get the functions instance using the correct getter
-      console.log("InviteMemberForm: Getting functions instance...");
-      const functionsInstance = getFunctionsInstance();
-      // --- END FIX ---
+      console.log(`InviteMemberForm: Calling RPC 'inviteUserToHousehold' (STUBBED for email: ${email})`);
       
-      if (!functionsInstance) {
-        console.error("InviteMemberForm: Functions not initialized");
-        throw new Error("Functions not initialized");
-      }
-      console.log("InviteMemberForm: Functions instance OK. Calling 'inviteUserToHousehold'...");
-
-      const inviteUser = httpsCallable(functionsInstance, 'inviteUserToHousehold');
+      // STUB: Simulate the RPC call (we will replace this with supabase.rpc() later)
+      await new Promise(resolve => setTimeout(resolve, 1500)); 
       
-      const result = await inviteUser({
-        email: email,
-        householdId: householdId,
-      });
-
-      console.log("InviteMemberForm: Function returned success:", result.data.message);
-      setSuccess(result.data.message);
+      setSuccess(`Invite sent to ${email} successfully (STUB).`);
       setEmail(''); 
 
     } catch (err) {
-      console.error('Error inviting user:', err);
-      setError(err.message); 
+      // NOTE: Supabase RPC errors will be handled here
+      console.error('Error inviting user (STUB):', err);
+      setError('Invite failed. The Supabase RPC is currently stubbed.'); 
     } finally {
       setIsSubmitting(false);
     }

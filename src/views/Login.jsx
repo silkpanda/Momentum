@@ -1,7 +1,7 @@
-// src/views/Login.jsx (Fixed navigation path)
+// src/views/Login.jsx (REFACTORED for SUPABASE)
 
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 function Login() {
@@ -9,63 +9,78 @@ function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  
   const { login } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log('Login handleSubmit fired');
-    setError('');
 
-    if (!login) {
-      setError('Auth service is not available. Please refresh.');
-      console.error('Login function is missing from AuthContext');
+    if (!email || !password) {
+      setError('Please fill in all fields.');
       return;
     }
+    
+    setLoading(true);
+    setError('');
 
     try {
-      setLoading(true);
-      await login(email, password);
+      console.log('Login handleSubmit fired');
+      // The context now handles the Supabase call
+      await login(email, password); 
       console.log('Login successful, navigating to dashboard...');
-      
-      // --- THIS IS THE FIX ---
-      // Your App.jsx routes the dashboard to "/", not "/dashboard"
-      navigate('/'); // Was '/dashboard'
+      navigate('/dashboard');
 
-    } catch (err) {
-      console.error('Login failed in component:', err.message);
-      setError(err.message);
+    } catch (error) {
+      // FIX: The error handling is simplified to use the returned error.message.
+      const message = error.message || 'Login failed. Check credentials.';
+      setError(message);
+      console.error('Login Error:', error);
+      
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-bg-canvas">
-      <div className="max-w-md w-full p-8 bg-bg-primary shadow-md rounded-lg">
-        <h2 className="text-3xl font-semibold text-center text-text-primary mb-8">
-          Log In
+    <div className="flex items-center justify-center min-h-screen bg-bg-canvas">
+      <div className="p-6 max-w-sm w-full bg-bg-primary rounded-lg shadow-xl border border-border-primary">
+        <h2 className="text-xl font-semibold mb-6 text-text-primary text-center">
+          Login to Momentum
         </h2>
         
+        {error && (
+          <div className="bg-signal-error-bg text-signal-error border border-signal-error-border p-3 rounded-md mb-4 text-sm">
+            {error}
+          </div>
+        )}
+
         <form onSubmit={handleSubmit}>
-          {/* Email Input */}
+          {/* Email Field */}
           <div className="mb-4">
-            <label htmlFor="email" className="block text-sm font-medium text-text-primary mb-2">
-              Email Address
+            <label 
+              htmlFor="email" 
+              className="block text-sm font-medium text-text-secondary mb-1"
+            >
+              Email
             </label>
             <input
               type="email"
               id="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              className="w-full px-3 py-2 bg-bg-secondary border border-border-primary rounded-md focus:outline-none focus:ring-2 focus:ring-action-primary"
+              disabled={loading}
               required
-              className="w-full px-3 py-2 bg-bg-primary border border-border-primary rounded-md text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
             />
           </div>
 
-          {/* Password Input */}
+          {/* Password Field */}
           <div className="mb-6">
-            <label htmlFor="password" className="block text-sm font-medium text-text-primary mb-2">
+            <label 
+              htmlFor="password" 
+              className="block text-sm font-medium text-text-secondary mb-1"
+            >
               Password
             </label>
             <input
@@ -73,32 +88,34 @@ function Login() {
               id="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              className="w-full px-3 py-2 bg-bg-secondary border border-border-primary rounded-md focus:outline-none focus:ring-2 focus:ring-action-primary"
+              disabled={loading}
               required
-              className="w-full px-3 py-2 bg-bg-primary border border-border-primary rounded-md text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
             />
           </div>
-          
-          {/* Error Display */}
-          {error && <p className="text-sm text-signal-error mt-4 mb-4 text-center">{error}</p>}
 
           {/* Submit Button */}
-          <div className="mb-6">
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-action-primary text-action-primary-inverted py-2 px-4 rounded-md font-medium hover:bg-action-primary-hover focus:outline-none focus:ring-2 focus:ring-action-primary focus:ring-opacity-50 disabled:opacity-50"
-            >
-              {loading ? 'Logging in...' : 'Log In'}
-            </button>
-          </div>
-          
-          <p className="text-sm text-center text-text-secondary">
-            Don't have an account?{' '}
-            <Link to="/signup" className="font-medium text-action-primary hover:underline">
-              Sign Up
-            </Link>
-          </p>
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full py-2 px-4 bg-action-primary text-action-primary-inverted font-semibold rounded-md hover:bg-action-primary-hover disabled:opacity-50 transition duration-150"
+          >
+            {loading ? 'Logging In...' : 'Log In'}
+          </button>
         </form>
+
+        <div className="mt-4 text-center text-sm">
+          <p className="text-text-secondary">
+            Don't have an account?{' '}
+            <button
+              onClick={() => navigate('/signup')}
+              className="text-action-primary hover:underline font-medium"
+              disabled={loading}
+            >
+              Sign Up
+            </button>
+          </p>
+        </div>
       </div>
     </div>
   );

@@ -1,171 +1,133 @@
-// /src/views/SignUp.jsx (Corrected)
+// src/views/SignUp.jsx (REFACTORED for SUPABASE)
 
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate, Link } from 'react-router-dom';
-
-// Simple styling to start. We'll make this pretty later.
-const styles = {
-  container: {
-    display: 'flex',
-    flexDirection: 'column',
-    maxWidth: '400px',
-    margin: '50px auto',
-    padding: '2rem',
-    backgroundColor: 'var(--color-bg-surface)',
-    borderRadius: '8px',
-    border: '1px solid var(--color-border-primary)',
-  },
-  form: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '1rem',
-  },
-  input: {
-    padding: '0.75rem',
-    fontSize: 'var(--text-base)',
-    fontFamily: 'var(--font-primary)',
-    border: '1px solid var(--color-border-primary)',
-    borderRadius: '4px',
-  },
-  button: {
-    padding: '0.75rem',
-    fontSize: 'var(--text-base)',
-    fontFamily: 'var(--font-primary)',
-    color: 'var(--color-text-on-action)',
-    backgroundColor: 'var(--color-action-primary)',
-    border: 'none',
-    borderRadius: '4px',
-    cursor: 'pointer',
-    fontWeight: 'var(--font-medium)',
-  },
-  buttonDisabled: {
-    backgroundColor: 'var(--color-bg-muted)',
-    cursor: 'not-allowed',
-  },
-  error: {
-    color: 'var(--color-signal-danger)',
-    fontSize: 'var(--text-sm)',
-    textAlign: 'center',
-  },
-  link: {
-    marginTop: '1rem',
-    textAlign: 'center',
-    fontSize: 'var(--text-sm)',
-    color: 'var(--color-action-primary)',
-  },
-  title: {
-    textAlign: 'center',
-    color: 'var(--color-text-primary)',
-    margin: '0 0 1.5rem 0',
-  }
-};
 
 function SignUp() {
-  const [firstName, setFirstName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   
-  const { signup } = useAuth(); // Our hook in action
-  const navigate = useNavigate(); // For redirecting
+  const { signup } = useAuth();
+  const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    // --- Validation ---
-    if (password !== confirmPassword) {
-      return setError('Passwords do not match');
-    }
-    if (firstName.trim() === '') {
-        return setError('First name is required');
+
+    if (!email || !password) {
+      setError('Please fill in all fields.');
+      return;
     }
 
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters long.');
+      return;
+    }
+    
+    setLoading(true);
+    setError('');
+
     try {
-      setError('');
-      setLoading(true);
+      console.log('SignUp handleSubmit fired');
+      // The context now handles the Supabase call
+      await signup(email, password); 
+      console.log('SignUp successful, navigating to dashboard for onboarding...');
       
-      // Call the signup function from our AuthContext
-      await signup(email, password, firstName);
+      // Note: Supabase sends a confirmation email by default. 
+      // We navigate immediately, assuming the user will check their email shortly.
+      navigate('/dashboard'); 
+
+    } catch (error) {
+      // FIX: The error handling is simplified to use the thrown error.message.
+      // Typical Supabase errors here are "User already registered" or password constraints.
+      const message = error.message || 'Sign up failed. Please try a different email.';
+      setError(message);
+      console.error('SignUp Error:', error);
       
-      // On success, our <App /> component's router logic
-      // will see we have a currentUser and automatically
-      // navigate us to the dashboard.
-      // We can also force it here if we want:
-      // navigate('/'); 
-      
-    } catch (err) {
-      // Handle Firebase errors
-      if (err.code === 'auth/email-already-in-use') {
-        setError('This email is already in use');
-      } else if (err.code === 'auth/weak-password') {
-        setError('Password should be at least 6 characters');
-      } else {
-        setError('Failed to create an account. Please try again.');
-        console.error(err); // Log the full error for us
-      }
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div style={styles.container}>
-      <h2 style={styles.title}>Create Your Account</h2>
-      {error && <p style={styles.error}>{error}</p>}
-      
-      <form style={styles.form} onSubmit={handleSubmit}>
-        <input
-          type="text"
-          placeholder="First Name"
-          style={styles.input}
-          value={firstName}
-          onChange={(e) => setFirstName(e.target.value)}
-          required
-        />
-        <input
-          type="email"
-          placeholder="Email"
-          style={styles.input}
-          value={email}
-          onChange={(e) => setEmail(e.targe.value)}
-          required
-        />
-        <input
-          type="password"
-          placeholder="Password"
-          style={styles.input}
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-        />
-        <input
-          type="password"
-          placeholder="Confirm Password"
-          style={styles.input}
-          value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
-          required
-        />
-        <button 
-          type="submit" 
-          style={{...styles.button, ...(loading ? styles.buttonDisabled : {})}}
-          disabled={loading}
-        >
-          {loading ? 'Creating Account...' : 'Sign Up'}
-        </button>
-      </form>
-      
-      <div style={styles.link}>
-        Already have an account? <Link to="/login">Log In</Link>
+    <div className="flex items-center justify-center min-h-screen bg-bg-canvas">
+      <div className="p-6 max-w-sm w-full bg-bg-primary rounded-lg shadow-xl border border-border-primary">
+        <h2 className="text-xl font-semibold mb-6 text-text-primary text-center">
+          Create Your Momentum Account
+        </h2>
+        
+        {error && (
+          <div className="bg-signal-error-bg text-signal-error border border-signal-error-border p-3 rounded-md mb-4 text-sm">
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit}>
+          {/* Email Field */}
+          <div className="mb-4">
+            <label 
+              htmlFor="email" 
+              className="block text-sm font-medium text-text-secondary mb-1"
+            >
+              Email
+            </label>
+            <input
+              type="email"
+              id="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full px-3 py-2 bg-bg-secondary border border-border-primary rounded-md focus:outline-none focus:ring-2 focus:ring-action-primary"
+              disabled={loading}
+              required
+            />
+          </div>
+
+          {/* Password Field */}
+          <div className="mb-6">
+            <label 
+              htmlFor="password" 
+              className="block text-sm font-medium text-text-secondary mb-1"
+            >
+              Password (Min 6 Characters)
+            </label>
+            <input
+              type="password"
+              id="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full px-3 py-2 bg-bg-secondary border border-border-primary rounded-md focus:outline-none focus:ring-2 focus:ring-action-primary"
+              disabled={loading}
+              required
+            />
+          </div>
+
+          {/* Submit Button */}
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full py-2 px-4 bg-action-primary text-action-primary-inverted font-semibold rounded-md hover:bg-action-primary-hover disabled:opacity-50 transition duration-150"
+          >
+            {loading ? 'Registering...' : 'Sign Up'}
+          </button>
+        </form>
+
+        <div className="mt-4 text-center text-sm">
+          <p className="text-text-secondary">
+            Already have an account?{' '}
+            <button
+              onClick={() => navigate('/login')}
+              className="text-action-primary hover:underline font-medium"
+              disabled={loading}
+            >
+              Log In
+            </button>
+          </p>
+        </div>
       </div>
     </div>
   );
 }
 
 export default SignUp;
-
-// (The extra '}' that was here is now removed)

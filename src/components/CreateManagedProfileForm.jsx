@@ -1,8 +1,13 @@
-// src/components/CreateManagedProfileForm.jsx (With Optimistic UI)
+// src/components/CreateManagedProfileForm.jsx (FIXED)
 
 import React, { useState } from 'react';
-import { getFunctionsInstance } from '../firebase';
+// --- FIX START ---
+import { functions } from '../firebase';
+// --- FIX END ---
 import { httpsCallable } from 'firebase/functions';
+
+// Prepare the Cloud Function reference once
+const createManagedProfile = httpsCallable(functions, 'createManagedProfile');
 
 // --- Accept optimistic functions ---
 function CreateManagedProfileForm({ householdId, addOptimisticMember, removeOptimisticMember }) {
@@ -24,45 +29,36 @@ function CreateManagedProfileForm({ householdId, addOptimisticMember, removeOpti
 
     // --- 1. Optimistic Update ---
     // Add temporary member to parent state and get its temp ID
-    const tempId = addOptimisticMember(displayName);
+    const tempName = displayName; // Save name before clearing input
+    const tempId = addOptimisticMember(tempName);
     setDisplayName(''); // Clear input immediately
     // --- End Optimistic Update ---
 
     try {
       // --- 2. Background Sync ---
-      const functionsInstance = getFunctionsInstance();
-      if (!functionsInstance) throw new Error("Functions service not initialized yet.");
-
       console.log("CreateManagedProfileForm: Calling 'createManagedProfile'...");
-      const createManagedProfile = httpsCallable(functionsInstance, 'createManagedProfile');
+
       const result = await createManagedProfile({
-          displayName: displayName,
+          displayName: tempName, // Use the saved name
           householdId: householdId
       });
       // --- End Background Sync ---
 
-      // --- 3. Handle Success ---
+      // ... rest of logic for success/failure is the same
       if (result.data.success) {
         console.log("CreateManagedProfileForm: Success:", result.data.message);
-        // Don't need to set success message, UI already updated.
-        // The real listener will eventually replace the temp entry.
-        // setSuccess(result.data.message || 'Profile created successfully!');
       } else {
         // --- 4. Handle Backend Failure (Rollback) ---
         console.error("CreateManagedProfileForm: Function returned error:", result.data.message);
         setError(result.data.message || 'Failed to create profile.');
-        // Remove the optimistic entry
         removeOptimisticMember(tempId);
-        // --- End Rollback ---
       }
 
     } catch (err) {
       // --- 4. Handle Network/Function Call Failure (Rollback) ---
       console.error('Error creating managed profile:', err);
       setError(err.message || 'An unexpected error occurred. Please try again.');
-      // Remove the optimistic entry
       removeOptimisticMember(tempId);
-      // --- End Rollback ---
     } finally {
       setIsSubmitting(false);
     }
@@ -92,7 +88,6 @@ function CreateManagedProfileForm({ householdId, addOptimisticMember, removeOpti
           <button
             type="submit"
             disabled={isSubmitting}
-            // Style update: Use primary action color for create
             className="px-4 py-2 bg-action-primary text-action-primary-inverted font-semibold rounded-md hover:bg-action-primary-hover disabled:opacity-50"
           >
             {isSubmitting ? 'Creating...' : 'Create Profile'}
@@ -100,8 +95,6 @@ function CreateManagedProfileForm({ householdId, addOptimisticMember, removeOpti
         </div>
 
         {error && <p className="text-sm text-signal-error mt-3">{error}</p>}
-        {/* Success message might be less necessary with optimistic UI */}
-        {/* {success && <p className="text-sm text-signal-success mt-3">{success}</p>} */}
       </form>
     </div>
   );

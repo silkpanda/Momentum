@@ -3,36 +3,29 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- Helper Functions ---
-    // Checks if the user is authenticated
+    // --- Helper Functions (REMAIN, but LIST rule no longer relies on them) ---
     function isAuthenticated() {
       return request.auth != null;
     }
     
-    // Gets the user's profile doc
     function getUserProfile(userId) {
       return get(/databases/$(database)/documents/profiles/$(userId));
     }
     
-    // Gets a specific member doc
     function getMemberDoc(householdId, profileId) {
-    	return get(/databases/$(database)/documents/members/$(householdId + '_' + profileId));
+    	return get(/databases/$(database)/documents/members/$(profileId + '_' + householdId));
     }
     
-    // Checks if user's profile is linked to a specific household
-    function isLinkedToHousehold(userId, householdId) {
-      return getUserProfile(userId).data.owningHouseholdId == householdId;
+    function getProfileIdFromMemberId(memberId) {
+        return memberId.split('_')[0];
     }
     
-    // Checks if a user is a member of a specific household
     function isHouseholdMember(householdId) {
-      let profileId = getUserProfile(request.auth.uid).id;
-      return exists(/databases/$(database)/documents/members/$(householdId + '_' + profileId));
+      return getUserProfile(request.auth.uid).data.householdId == householdId;
     }
 
-    // Checks if user is an admin of a specific household
     function isHouseholdAdmin(householdId) {
-      let profileId = getUserProfile(request.auth.uid).id;
+      let profileId = request.auth.uid;
       return getMemberDoc(householdId, profileId).data.role == 'admin';
     }
 
@@ -40,73 +33,53 @@ service cloud.firestore {
     // --- Collection Rules ---
 
     match /households/{householdId} {
-      // Create: Only an authenticated user can create a household.
-      // (The createManagedProfile func will handle linking it)
       allow create: if isAuthenticated();
-      
-      // Read: Only a member of that household can read its details.
-      allow get: if isAuthenticated() && isHouseholdMember(householdId);
-      
-      // List: Don't allow. Users should only query 'members' collection.
+      allow get: if isAuthenticated() && isHouseholdMember(householdId); 
       allow list: if false;
-      
-      // Update: Only an admin of that household can update it.
       allow update: if isAuthenticated() && isHouseholdAdmin(householdId);
-      
-      // Delete: NO ONE can delete a household from the client. Must be a server-side function.
       allow delete: if false;
     }
 
     match /profiles/{profileId} {
-      // Create: Allow ONLY via the 'createManagedProfile' or 'inviteUserToHousehold' Cloud Functions.
-      // A user CANNOT create their own profile doc directly.
       allow create: if false;
-      
-      // Read: Allow if you are reading your own profile, OR
-      // if you are a member of the profile's owning household.
-      allow get: if isAuthenticated() &&
+      // Note: This GET rule is allowed because it's a simple lookup
+      allow get: if isAuthenticated() && 
                    (request.auth.uid == profileId || 
-                    isHouseholdMember(resource.data.owningHouseholdId));
-                    
-      // List: Don't allow (prevents scraping all users)
+                    isHouseholdMember(resource.data.householdId)); 
       allow list: if false;
-
-      // Update: Only allow a user to update their *own* profile.
       allow update: if isAuthenticated() && request.auth.uid == profileId;
-      
-      // --- NEW RULE ---
-      // Delete: NO ONE can delete a profile from the client.
-      // Must be done via the 'deleteManagedProfile' Cloud Function.
       allow delete: if false;
-      // ----------------
     }
     
     match /members/{memberId} {
-    	// memberId is composite key: {householdId}_{profileId}
-      
-      // Create: Allow ONLY via Cloud Functions.
       allow create: if false;
+      allow get: if isAuthenticated() && getProfileIdFromMemberId(memberId) == request.auth.uid;
       
-      // Read, List: Allow if you are a member of that household.
-      function isMemberOfHouseholdInDoc() {
-      	return isHouseholdMember(resource.data.householdId);
-      }
+      // CRITICAL FINAL FIX: This robust EXISTS pattern is the only rule the Firestore engine allows
+      // for this specific list operation without erroring.
+      allow list: if isAuthenticated() && 
+                  // 1. Query MUST be filtered on householdId
+                  request.query.where[0][0] == 'householdId' &&
+                  // 2. A member doc for the current user MUST exist in the queried household
+                  exists(/databases/$(database)/documents/members/$(request.auth.uid + '_' + request.query.where[0][2]));
       
-      allow get: if isAuthenticated() && isMemberOfHouseholdInDoc();
-      allow list: if isAuthenticated() && isHouseholdMember(request.query.where[0][2]); // Checks householdId in query
-      
-      // Update: Admins can update points/roles. Users can update their own (if we add features).
       allow update: if isAuthenticated() && isHouseholdAdmin(resource.data.householdId);
-      
-      // --- NEW RULE ---
-      // Delete: NO ONE can delete a member doc from the client.
-      // Must be done via the 'deleteManagedProfile' Cloud Function.
       allow delete: if false;
-      // ----------------
     }
     
-    // Rules for Tasks, StoreItems, Quests etc. would go here
-    // e.g., match /tasks/{taskId} { ... }
-
+    match /tasks/{taskId} {
+        allow read: if isAuthenticated() && isHouseholdMember(resource.data.householdId);
+        allow create: if isAuthenticated() && isHouseholdAdmin(request.resource.data.householdId);
+        allow update: if isAuthenticated() && (
+        	isHouseholdAdmin(resource.data.householdId) || 
+            (request.auth.uid == resource.data.assignedProfileId && request.resource.data.keys().hasOnly(['isCompleted']))
+        );
+        allow delete: if isAuthenticated() && isHouseholdAdmin(resource.data.householdId);
+    }
+    
+    match /storeItems/{itemId} {
+        allow read: if isAuthenticated() && isHouseholdMember(resource.data.householdId);
+        allow write: if isAuthenticated() && isHouseholdAdmin(request.resource.data.householdId);
+    }
   }
 }
