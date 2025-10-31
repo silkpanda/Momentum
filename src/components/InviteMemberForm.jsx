@@ -1,80 +1,87 @@
-// src/components/InviteMemberForm.jsx (REFACTORED for SUPABASE STUB)
+// src/components/InviteMemberForm.jsx (COMPLETE)
 
 import React, { useState } from 'react';
-// FIX: Remove Firebase Functions imports
-// import { functions } from "../firebase";
-// import { httpsCallable } from "firebase/functions";
-// NOTE: We will import { supabase } from '../supabaseClient' later for RPC calls.
+import { supabase } from '../supabaseClient'; 
 
-
-function InviteMemberForm({ householdId }) {
+function InviteMemberForm({ onSuccess }) {
   const [email, setEmail] = useState('');
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-  // STUB: The inviteUser RPC will be set up later in Supabase
-  // const inviteUser = supabase.rpc('invite_user_to_household');
-  
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!email) {
-      setError('Please enter an email address.');
+      setError('An email address is required.');
       return;
     }
 
-    setIsSubmitting(true);
-    setError('');
-    setSuccess('');
+    setLoading(true);
+    setError(null);
+    
+    // Payload for the Supabase Stored Procedure
+    const payload = {
+      target_email: email,
+    };
 
     try {
-      console.log(`InviteMemberForm: Calling RPC 'inviteUserToHousehold' (STUBBED for email: ${email})`);
+      console.log("Calling Supabase RPC: invite_auth_user_to_household", payload);
       
-      // STUB: Simulate the RPC call (we will replace this with supabase.rpc() later)
-      await new Promise(resolve => setTimeout(resolve, 1500)); 
+      const { data: resultMessage, error: rpcError } = await supabase.rpc('invite_auth_user_to_household', payload);
+
+      if (rpcError) {
+        throw rpcError;
+      }
       
-      setSuccess(`Invite sent to ${email} successfully (STUB).`);
-      setEmail(''); 
+      // The RPC returns a custom success or failure message (as TEXT)
+      if (resultMessage.startsWith('Error:')) {
+          setError(resultMessage.replace('Error: ', ''));
+      } else {
+          console.log('Invite RPC success:', resultMessage);
+          setEmail('');
+          // CRITICAL: Call onSuccess to close modal and show dashboard notification
+          onSuccess(resultMessage); 
+      }
 
     } catch (err) {
-      // NOTE: Supabase RPC errors will be handled here
-      console.error('Error inviting user (STUB):', err);
-      setError('Invite failed. The Supabase RPC is currently stubbed.'); 
+      console.error('Invite Failed:', err);
+      const message = err.message || 'An unexpected error occurred during the invite process.';
+      setError(message);
     } finally {
-      setIsSubmitting(false);
+      setLoading(false);
     }
   };
 
   return (
-    <div className="max-w-md bg-bg-primary p-6 rounded-lg shadow-md mt-8">
-      <h3 className="text-lg font-semibold mb-4">Invite New Member (Parent)</h3>
-      <form onSubmit={handleSubmit}>
-        <label htmlFor="email" className="block text-sm font-medium text-text-primary mb-2">
-          User's Email
+    <form onSubmit={handleSubmit}>
+      
+      {error && <div className="bg-signal-error-bg text-signal-error p-3 rounded-md mb-4 text-sm">{error}</div>}
+
+      {/* Email Input */}
+      <div className="mb-6">
+        <label htmlFor="email" className="block text-sm font-medium text-text-secondary mb-2">
+          Co-Parent's Email Address
         </label>
-        <div className="flex gap-2">
-          <input
-            type="email"
-            id="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="flex-grow px-3 py-2 bg-bg-primary border border-border-primary rounded-md focus:outline-none focus:ring-2 focus:ring-action-primary"
-            placeholder="friend@example.com"
-            disabled={isSubmitting}
-          />
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="px-4 py-2 bg-action-primary rounded-md text-action-primary-inverted font-medium hover:bg-action-primary-hover disabled:opacity-50"
-          >
-            {isSubmitting ? 'Sending...' : 'Invite'}
-          </button>
-        </div>
-        
-        {error && <p className="text-sm text-signal-error mt-3">{error}</p>}
-        {success && <p className="text-sm text-signal-success mt-3">{success}</p>}
-      </form>
-    </div>
+        <input
+          type="email"
+          id="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          className="w-full px-3 py-2 bg-bg-muted border border-border-primary rounded-md"
+          disabled={loading}
+          placeholder="co-parent@example.com"
+          required
+        />
+      </div>
+
+      {/* Submit Button */}
+      <button
+        type="submit"
+        disabled={loading}
+        className="w-full py-2 px-4 bg-action-primary text-on-action font-semibold rounded-md hover:bg-action-primary-hover disabled:opacity-50 transition duration-150"
+      >
+        {loading ? 'Sending Invite...' : 'Invite to Household'}
+      </button>
+    </form>
   );
 }
 

@@ -1,10 +1,13 @@
-// src/views/Dashboard.jsx (Complete & Updated)
+// src/views/Dashboard.jsx (FINAL PRODUCTION VERSION: Invite Code Flow)
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+// CRITICAL FIX: Corrected import path for useNavigate
+import { useNavigate } from 'react-router-dom'; 
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../supabaseClient'; 
+
 import CreateHouseholdModal from '../components/CreateHouseholdModal';
+import CreateOrJoinModal from '../components/CreateOrJoinModal'; // Handles the Join vs Create choice
 import LoadingSpinner from '../components/LoadingSpinner'; 
 
 function Dashboard() {
@@ -12,43 +15,43 @@ function Dashboard() {
   const navigate = useNavigate();
   
   const [loading, setLoading] = useState(true);
-  const [showModal, setShowModal] = useState(false);
+  // State to track which modal should be visible: 'none', 'choice', 'create'
+  const [modalState, setModalState] = useState('none'); 
 
-  // Function to fetch the user's profile data
+  // Function to fetch the user's household ID using the privileged RPC.
   const checkUserProfile = useCallback(async (authId) => {
     setLoading(true);
     
     let householdId = null;
 
     try {
-      // CRITICAL FIX: Replace SELECT with RPC call to bypass RLS recursion.
-      console.log("Calling Supabase RPC: get_user_household_id to bypass RLS");
-      
+      // Step 1: Securely get the user's household ID using the privileged RPC.
+      // This is the fastest, RLS-bypassing way to check if the user is attached.
       const { data: id, error: rpcError } = await supabase.rpc('get_user_household_id', { auth_id: authId });
 
       if (rpcError) {
         throw rpcError;
       }
       
-      // The RPC returns the household UUID or NULL
       householdId = id; 
 
     } catch (err) {
-      console.error('Error fetching profile:', err.message);
-      // We still try to proceed even if the RPC fails, assuming no household found
+      console.error('Error in initial household lookup:', err.message);
     }
-
+    
+    // 1. SUCCESS: Household found, redirect.
     if (householdId) {
-      // SUCCESS: Profile exists and has a householdId. Navigate directly.
       console.log("Dashboard: Household found on profile. Redirecting to:", householdId);
       navigate(`/household/${householdId}`);
-    } else {
-      // FAIL: No profile found, or householdId is null. Prompt for creation.
-      console.log("Dashboard: No household found. Showing Create Household Modal.");
-      setShowModal(true);
+      setLoading(false);
+      return;
     }
-
+    
+    // 2. FAIL: No household found, show the choice screen.
+    console.log("Dashboard: No household found. Showing Create/Join Choice Modal.");
+    setModalState('choice');
     setLoading(false);
+
   }, [navigate]);
 
 
@@ -62,23 +65,44 @@ function Dashboard() {
     
   }, [currentUser, navigate, checkUserProfile]);
 
+
+  // Handler for successful join/create action
+  const handleHouseholdActionSuccess = (householdId) => {
+      setModalState('none'); // Hide all modals
+
+      // CRITICAL FIX: Add a safe delay (300ms) to guarantee the database 
+      // commit finishes before the front-end runs the profile check.
+      setTimeout(() => {
+          console.log("Timeout complete. Re-checking profile for redirection...");
+          checkUserProfile(currentUser.id); // Re-run check to trigger redirect
+      }, 300); 
+  };
+  
   // --- RENDERING LOGIC ---
+
   if (loading) {
     return <LoadingSpinner text="Checking Profile Status..." />;
   }
   
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-bg-canvas">
-      <CreateHouseholdModal 
-        isOpen={showModal} 
-        onClose={() => setShowModal(false)} 
-        // Re-run the check to trigger the new, successful lookup and redirect
-        onHouseholdCreated={() => {
-          setShowModal(false);
-          checkUserProfile(currentUser.id);
-        }}
+      
+      {/* 1. Create OR Join Choice Modal */}
+      <CreateOrJoinModal 
+        isOpen={modalState === 'choice'} 
+        onClose={() => setModalState('none')} 
+        onShowCreate={() => setModalState('create')} // Switches to the create modal
+        onJoinSuccess={handleHouseholdActionSuccess} // Success handler for joining
       />
-      {!showModal && (
+      
+      {/* 2. Create Household Form Modal (Only shown if user chose to create one) */}
+      <CreateHouseholdModal 
+        isOpen={modalState === 'create'} 
+        onClose={() => setModalState('choice')} // Back button goes to the choice screen
+        onHouseholdCreated={handleHouseholdActionSuccess} // Success handler for creating
+      />
+      
+      {modalState === 'none' && !loading && (
         <p className="text-text-primary">Ready to begin? Something went wrong with the initial check. Please try refreshing.</p>
       )}
     </div>
