@@ -1,101 +1,128 @@
-// src/components/CreateManagedProfileForm.jsx (REFACTORED for SUPABASE)
+// src/components/CreateManagedProfileForm.jsx (Complete & Final)
 
 import React, { useState } from 'react';
-// FIX: Remove Firebase Functions imports
-// import { functions } from '../firebase';
-// import { httpsCallable } from 'firebase/functions';
 import { supabase } from '../supabaseClient'; 
 
-// NOTE: We will use supabase.rpc('create_managed_profile') here.
+const COLOR_PALETTE = [
+  { name: 'Red', class: 'bg-managed-red', value: 'managed-red' },
+  { name: 'Orange', class: 'bg-managed-orange', value: 'managed-orange' },
+  { name: 'Yellow', class: 'bg-managed-yellow', value: 'managed-yellow' },
+  { name: 'Green', class: 'bg-managed-green', value: 'managed-green' },
+  { name: 'Teal', class: 'bg-managed-teal', value: 'managed-teal' },
+  { name: 'Blue', class: 'bg-managed-blue', value: 'managed-blue' },
+  { name: 'Purple', class: 'bg-managed-purple', value: 'managed-purple' },
+  { name: 'Gray', class: 'bg-managed-gray', value: 'managed-gray' },
+];
 
-// Accept optimistic functions from parent
-function CreateManagedProfileForm({ householdId, addOptimisticMember, removeOptimisticMember }) {
+// CRITICAL FIX: Removed householdId from props since the RPC infers it.
+function CreateManagedProfileForm({ onSuccess }) { 
   const [displayName, setDisplayName] = useState('');
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // STUB: Replace the Firebase callable function setup
-  // const createManagedProfile = httpsCallable(functions, 'createManagedProfile');
+  const [profileColor, setProfileColor] = useState(COLOR_PALETTE[0].value); 
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!displayName.trim()) {
-      setError('Please enter a name.');
+    if (!displayName) {
+      setError('A display name is required for the new profile.');
       return;
     }
 
-    setIsSubmitting(true);
-    setError('');
-    setSuccess('');
-
-    // --- 1. Optimistic Update ---
-    const tempName = displayName;
-    const tempId = addOptimisticMember(tempName);
-    setDisplayName('');
-    // --- End Optimistic Update ---
+    setLoading(true);
+    setError(null);
+    
+    // CRITICAL FIX: Payload now only sends display name and color. The household ID is INFERRED by the RPC.
+    const payload = {
+      p_display_name: displayName,
+      p_color: profileColor 
+    };
 
     try {
-      console.log("Calling Supabase RPC: create_managed_profile (STUBBED)");
+      console.log("Calling Supabase RPC: create_managed_profile (Inferred ID)", payload);
+      
+      // Note: The RPC signature is now create_managed_profile(text, text)
+      const { data: newProfileId, error: rpcError } = await supabase.rpc('create_managed_profile', payload);
 
-      // CRITICAL FIX: Replace Cloud Function call with Supabase RPC
-      // const { data, error: rpcError } = await supabase.rpc('create_managed_profile', {
-      //     h_id: householdId,
-      //     p_display_name: tempName
-      // });
+      if (rpcError) {
+        throw rpcError;
+      }
       
-      // STUB: Simulate success for now
-      await new Promise(resolve => setTimeout(resolve, 1500)); 
+      console.log(`Managed Profile created successfully. ID: ${newProfileId}`);
       
-      // if (rpcError) throw rpcError;
+      setDisplayName('');
+      setProfileColor(COLOR_PALETTE[0].value);
       
-      console.log("Managed Profile created successfully (STUB).");
-      setSuccess(`${tempName} profile created!`);
+      onSuccess(newProfileId); 
 
     } catch (err) {
-      console.error('Error creating managed profile:', err);
-      setError(err.message || 'Failed to create profile. Supabase RPC is stubbed.');
-      removeOptimisticMember(tempId); // Rollback optimistic update
+      console.error('Managed Profile Creation Failed:', err);
+      const message = err.message || 'Failed to create profile. Check RLS and RPC logs.';
+      setError(message);
     } finally {
-      setIsSubmitting(false);
+      setLoading(false);
     }
   };
 
   return (
-    <div className="max-w-md bg-bg-primary p-6 rounded-lg shadow-md mt-8">
-      <h3 className="text-lg font-semibold mb-4">Add a New Child Profile</h3>
-       <p className="text-sm text-text-secondary mb-4">
-        Create a profile for a child. They won't have their own login.
-      </p>
-      {/* ... rest of the form UI remains ... */}
-      <form onSubmit={handleSubmit}>
-        <label htmlFor="displayName" className="block text-sm font-medium text-text-primary mb-2 sr-only">
-          Child's First Name
-        </label>
-        <div className="flex flex-col sm:flex-row gap-2">
-          <input
-            type="text"
-            id="displayName"
-            value={displayName}
-            onChange={(e) => setDisplayName(e.target.value)}
-            className="flex-grow px-3 py-2 bg-bg-secondary border border-border-primary rounded-md text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
-            placeholder="e.g., Sammy"
-            disabled={isSubmitting}
-            required
-          />
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="px-4 py-2 bg-action-primary text-action-primary-inverted font-semibold rounded-md hover:bg-action-primary-hover disabled:opacity-50"
-          >
-            {isSubmitting ? 'Creating...' : 'Create Profile'}
-          </button>
-        </div>
+    <form onSubmit={handleSubmit}>
+      
+      {error && <div className="bg-signal-error-bg text-signal-error p-3 rounded-md mb-4 text-sm">{error}</div>}
 
-        {error && <p className="text-sm text-signal-error mt-3">{error}</p>}
-        {success && <p className="text-sm text-signal-success mt-3">{success}</p>}
-      </form>
-    </div>
+      {/* 1. Display Name Input */}
+      <div className="mb-4">
+        <label htmlFor="displayName" className="block text-sm font-medium text-text-secondary mb-2">
+          Profile Name (e.g., Liam, Sarah)
+        </label>
+        <input
+          type="text"
+          id="displayName"
+          value={displayName}
+          onChange={(e) => setDisplayName(e.target.value)}
+          className="w-full px-3 py-2 bg-bg-muted border border-border-primary rounded-md"
+          disabled={loading}
+          required
+        />
+      </div>
+
+      {/* 2. Color Picker */}
+      <div className="mb-6">
+        <label className="block text-sm font-medium text-text-secondary mb-2">
+          Profile Color
+        </label>
+        <div className="flex space-x-2">
+          {COLOR_PALETTE.map((color) => (
+            <button
+              key={color.value}
+              type="button"
+              onClick={() => setProfileColor(color.value)}
+              disabled={loading}
+              className={`w-8 h-8 rounded-full transition duration-150 cursor-pointer ${color.class} ${
+                profileColor === color.value 
+                  ? 'ring-4 ring-action-primary' 
+                  : 'border-2 border-transparent hover:ring-2 hover:ring-text-secondary'
+              }`}
+              title={color.name}
+              aria-label={`Select ${color.name} color`}
+            >
+              {profileColor === color.value && (
+                <svg className="w-5 h-5 text-white mx-auto" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+              )}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* 3. Submit Button */}
+      <button
+        type="submit"
+        disabled={loading}
+        className="w-full py-2 px-4 bg-action-primary text-on-action font-semibold rounded-md hover:bg-action-primary-hover disabled:opacity-50 transition duration-150"
+      >
+        {loading ? 'Creating Profile...' : 'Create Managed Profile'}
+      </button>
+    </form>
   );
 }
 

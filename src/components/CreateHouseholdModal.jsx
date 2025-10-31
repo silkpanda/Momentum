@@ -103,7 +103,7 @@ function CreateHouseholdModal({ isOpen, onClose, onHouseholdCreated }) {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 px-4 bg-action-primary text-action-primary-inverted font-semibold rounded-md hover:bg-action-primary-hover disabled:opacity-50 transition duration-150"
+            className="w-full py-3 px-4 bg-action-primary text-on-action font-semibold rounded-md hover:bg-action-primary-hover disabled:opacity-50 transition duration-150"
           >
             {loading ? 'Creating Structure...' : 'Create Household & Profile'}
           </button>

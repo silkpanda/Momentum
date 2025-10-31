@@ -1,107 +1,174 @@
-// src/views/HouseholdDashboard.jsx (REFACTORED for SUPABASE)
+// src/views/HouseholdDashboard.jsx (Final RLS Fix)
 
-import React, { useEffect, useState, useCallback } from "react";
-import { useParams, Link } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
-// FIX: Replaced all Firebase/Firestore imports with the Supabase client
-import { supabase } from '../supabaseClient'; 
+import React, { useState, useEffect, useCallback } from 'react';
+import { useParams } from 'react-router-dom';
+import { supabase } from '../supabaseClient';
+import LoadingSpinner from '../components/LoadingSpinner';
+import CreateManagedProfileModal from '../components/CreateManagedProfileModal'; 
 
-// Components we expect to use
-import InviteMemberForm from "../components/InviteMemberForm"; 
-import CreateManagedProfileForm from "../components/CreateManagedProfileForm"; 
-import ChildMemberCard from "../components/ChildMemberCard"; 
-import LoadingSpinner from "../components/LoadingSpinner"; 
-
-// Initial placeholder data structures
-const initialHouseholdState = { name: "Loading Household...", ownerId: "" };
-const initialMembersState = { parents: [], children: [] };
 
 function HouseholdDashboard() {
   const { householdId } = useParams();
-  const { currentUser } = useAuth();
-  
-  const [household, setHousehold] = useState(initialHouseholdState);
-  const [members, setMembers] = useState(initialMembersState);
+  const [householdData, setHouseholdData] = useState(null);
+  const [profiles, setProfiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [showManagedProfileModal, setShowManagedProfileModal] = useState(false); 
 
-  // STUB: This is the core function we will refactor to use Supabase.select()
-  const fetchHouseholdData = useCallback(async () => {
-    if (!currentUser || !householdId) return;
 
-    setLoading(true);
+  // Function to fetch all necessary data for the dashboard
+  const fetchDashboardData = useCallback(async () => {
     setError(null);
 
-    try {
-      console.log(`[STUB] Fetching data for household ID: ${householdId} via Supabase...`);
-
-      // ----------------------------------------------------
-      // CURRENTLY STUBBED: THIS IS WHERE THE SUPABASE REFACTOR WILL GO
-      // 1. Fetch Household Details: supabase.from('households').select().eq('id', householdId)
-      // 2. Fetch Members List: supabase.from('household_members').select('*, profiles(*)').eq('household_id', householdId)
-      // ----------------------------------------------------
-      
-      // Simulate successful data load for the build to pass
-      await new Promise(resolve => setTimeout(resolve, 800)); 
-      
-      setHousehold({ name: "The " + householdId.substring(0, 4).toUpperCase() + " Family", ownerId: currentUser.id });
-      setMembers({
-        parents: [{ profileId: currentUser.id, displayName: currentUser.email, role: 'admin', points: 150 }],
-        children: [] // No children yet
-      });
-
-    } catch (err) {
-      console.error("HouseholdDashboard Data Error (STUB):", err);
-      setError("Failed to load dashboard data. Check database connection and RLS policies.");
-    } finally {
-      setLoading(false);
+    if (!householdId) {
+      setError("Error: No Household ID provided in URL.");
+      return;
     }
-  }, [currentUser, householdId]);
+
+    console.log(`[STUB] Fetching data for household ID: ${householdId} via Supabase...`);
+
+    try {
+      // --- DEBUG LOG 1 ---
+      console.log('DEBUG LOG 1: Attempting to fetch Household Name via RPC.'); 
+
+      // 1. CRITICAL FIX: Fetch Household Name using RLS-bypassing RPC
+      const { data: houseName, error: houseError } = await supabase.rpc('get_household_name_by_id', { h_id: householdId });
+
+      if (houseError) throw houseError;
+      setHouseholdData({ household_name: houseName });
+      
+      // --- DEBUG LOG 2 ---
+      console.log('DEBUG LOG 2: Household Name fetched successfully. Attempting to fetch Profiles via RPC.');
+
+      // 2. Fetch Profiles using the RLS-bypassing RPC (Already fixed in previous step)
+      const { data: profilesData, error: profilesError } = await supabase.rpc('get_household_profiles', { h_id: householdId });
+
+      if (profilesError) throw profilesError;
+      setProfiles(profilesData);
+      
+      // --- DEBUG LOG 3 ---
+      console.log('DEBUG LOG 3: Profiles list fetched successfully. Dashboard is ready.');
+      
+    } catch (err) {
+      console.error('Household Data Fetch Failed:', err);
+      setError('Failed to load household data. The final RLS policy is still blocking the request.');
+      setHouseholdData(null);
+      setProfiles([]);
+    }
+  }, [householdId]);
+
 
   useEffect(() => {
-    fetchHouseholdData();
-  }, [fetchHouseholdData]);
+    if (!householdId) return;
 
+    setLoading(true);
+
+    // Initial Data Fetch
+    fetchDashboardData().finally(() => setLoading(false));
+
+    // Realtime Subscription Setup (WebSockets)
+    const channel = supabase.channel(`profiles_household_${householdId}`)
+      .on('postgres_changes', 
+          { 
+              event: 'INSERT', 
+              schema: 'public', 
+              table: 'profiles', 
+              filter: `household_id=eq.${householdId}` 
+          }, 
+          (payload) => {
+              console.log('Realtime Update Received (New Profile):', payload);
+              fetchDashboardData(); 
+          }
+      )
+      .subscribe(); 
+
+    // Cleanup function
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [householdId, fetchDashboardData]); 
+
+  const handleProfileAdded = useCallback(() => {
+    fetchDashboardData(); 
+  }, [fetchDashboardData]);
 
   if (loading) {
-    return <LoadingSpinner text="Loading Household Dashboard..." />;
+    return <LoadingSpinner text="Loading your family dashboard..." />;
   }
 
   if (error) {
-    return <div className="text-signal-error p-8 text-center">{error}</div>;
+    return <div className="p-8 text-center text-text-primary bg-bg-canvas min-h-screen">Error: {error}</div>;
   }
-  
-  // NOTE: The UI rendering logic is simplified below to avoid dependencies on missing files
+
+  // Placeholder UI for the dashboard
   return (
     <div className="p-8 bg-bg-canvas min-h-screen">
-      <h1 className="text-3xl font-bold mb-4 text-text-primary">{household.name} Dashboard</h1>
-      <p className="text-text-secondary mb-8">Welcome, {currentUser.email}. You are an **{members.parents[0].role}**.</p>
-      
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Column 1: Family Members */}
-        <div className="col-span-1">
-          <h2 className="text-xl font-semibold mb-4 text-text-primary">Family Members</h2>
-          {members.parents.map(m => (
-            <div key={m.profileId} className="bg-bg-primary p-4 rounded-lg shadow mb-3">
-              <p className="font-medium">{m.displayName} (Parent)</p>
-              <p className="text-sm text-text-secondary">Points: {m.points}</p>
-            </div>
-          ))}
-          {members.children.map(m => (
-            <ChildMemberCard key={m.profileId} member={m} />
-          ))}
-          <CreateManagedProfileForm householdId={householdId} />
-          <InviteMemberForm householdId={householdId} /> 
+      <h1 className="text-2xl font-bold text-text-primary mb-6">
+        {householdData?.household_name || 'Your Household'} Dashboard
+      </h1>
+
+      {/* Profile Management Section */}
+      <div className="bg-bg-surface p-6 rounded-lg shadow-md mb-8">
+        <h2 className="text-xl font-semibold text-text-primary mb-4">Family Profiles ({profiles.length})</h2>
+        
+        {/* Profiles List */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+          {profiles.length > 0 ? (
+            profiles.map(profile => (
+              <div 
+                key={profile.id} 
+                className={`p-4 rounded-md shadow-sm border border-border-primary ${
+                  profile.is_admin ? 'bg-bg-muted' : '' 
+                }`}
+                style={{ 
+                    backgroundColor: profile.is_admin ? undefined : `var(--color-${profile.profile_color})`
+                }}
+              >
+                <p className={`font-medium text-lg ${profile.is_admin ? 'text-text-primary' : 'text-text-inverted'}`}>
+                    {profile.display_name}
+                </p>
+                <p className={`text-sm ${profile.is_admin ? 'text-text-secondary' : 'text-text-inverted'}`}>
+                    {profile.is_admin ? 'Admin (You)' : 'Managed User'}
+                </p>
+                <p className={`text-xs mt-2 ${profile.is_admin ? 'text-text-primary' : 'text-text-inverted'}`}>
+                    Points: {profile.points}
+                </p>
+              </div>
+            ))
+          ) : (
+            <p className="text-text-secondary">No profiles found yet. Let's add some!</p>
+          )}
         </div>
 
-        {/* Column 2: Tasks (Future Feature) */}
-        <div className="col-span-2">
-            <h2 className="text-xl font-semibold mb-4 text-text-primary">Tasks & Activity (Coming Soon)</h2>
-            <div className="bg-bg-secondary p-8 rounded-lg shadow-inner">
-                <p className="text-text-secondary">Task and Rewards system will be built here using Supabase Edge Functions for secure point transactions.</p>
-            </div>
+        {/* Button to open the managed profile modal */}
+        <button
+          onClick={() => setShowManagedProfileModal(true)}
+          className="py-2 px-4 bg-action-primary text-on-action font-semibold rounded-md hover:bg-action-primary-hover transition duration-150"
+        >
+          + Add New Family Member
+        </button>
+      </div>
+
+      {/* Tasks and Rewards Sections (Stubs) */}
+      <div className="space-y-8">
+        <div className="bg-bg-surface p-6 rounded-lg shadow-md">
+          <h2 className="text-xl font-semibold text-text-primary">Tasks (In Progress)</h2>
+          <p className="text-text-secondary mt-2">Task creation and management UI goes here.</p>
+        </div>
+        <div className="bg-bg-surface p-6 rounded-lg shadow-md">
+          <h2 className="text-xl font-semibold text-text-primary">Rewards Store (To Do)</h2>
+          <p className="text-text-secondary mt-2">Store item creation and point redemption goes here.</p>
         </div>
       </div>
+      
+      {/* Managed Profile Modal Integration */}
+      <CreateManagedProfileModal
+        isOpen={showManagedProfileModal}
+        onClose={() => setShowManagedProfileModal(false)}
+        householdId={householdId}
+        onProfileAdded={handleProfileAdded}
+      />
+
     </div>
   );
 }

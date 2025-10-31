@@ -1,4 +1,4 @@
-// tailwind.config.js
+// tailwind.config.js (COMPLETE FILE)
 
 /** @type {import('tailwindcss').Config} */
 export default {
@@ -9,12 +9,9 @@ export default {
   theme: {
     extend: {
       // --- 1. Typography ---
-      // Here we teach Tailwind to use our --font-primary variable
-      // whenever it sees the 'font-primary' class.
       fontFamily: {
         primary: ['var(--font-primary)'],
       },
-      // We also teach it our custom text sizes.
       fontSize: {
         '2xl': 'var(--text-2xl)',
         'lg': 'var(--text-lg)',
@@ -24,8 +21,6 @@ export default {
       },
 
       // --- 2. Colors ---
-      // This is the big one. We're mapping all our CSS variables
-      // to Tailwind color names.
       colors: {
         // Semantic Roles (Signal)
         'bg-canvas': 'var(--color-bg-canvas)',
@@ -48,12 +43,25 @@ export default {
         'signal-success': 'var(--color-signal-success)',
         'signal-warning': 'var(--color-signal-warning)',
         'signal-danger': 'var(--color-signal-danger)',
+        'signal-error': 'var(--color-signal-error)',
+        'signal-error-bg': 'var(--color-signal-error-bg)',
+        'signal-error-border': 'var(--color-signal-error-border)',
 
-        // Accent Palette (User-controlled)
+        // Accent Palette (for future theme/settings use)
         'accent-forest': 'var(--palette-accent-forest)',
         'accent-ruby': 'var(--palette-accent-ruby)',
         'accent-aqua': 'var(--palette-accent-aqua)',
 
+        // --- NEW: Managed Profile Palette (CRITICAL FIX AREA) ---
+        'managed-red': 'var(--color-managed-red)',
+        'managed-orange': 'var(--color-managed-orange)',
+        'managed-yellow': 'var(--color-managed-yellow)',
+        'managed-green': 'var(--color-managed-green)',
+        'managed-teal': 'var(--color-managed-teal)',
+        'managed-blue': 'var(--color-managed-blue)',
+        'managed-purple': 'var(--color-managed-purple)',
+        'managed-gray': 'var(--color-managed-gray)',
+        
         // Base Palette (for convenience, if needed)
         'palette-gray-0': 'var(--palette-gray-0)',
         'palette-gray-50': 'var(--palette-gray-50)',

@@ -53,7 +53,8 @@ function SignUp() {
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-bg-canvas">
-      <div className="p-6 max-w-sm w-full bg-bg-primary rounded-lg shadow-xl border border-border-primary">
+      {/* FIX: Changed bg-bg-primary to the correct semantic background: bg-bg-surface */}
+      <div className="p-6 max-w-sm w-full bg-bg-surface rounded-lg shadow-xl border border-border-primary">
         <h2 className="text-xl font-semibold mb-6 text-text-primary text-center">
           Create Your Momentum Account
         </h2>
@@ -78,7 +79,7 @@ function SignUp() {
               id="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-3 py-2 bg-bg-secondary border border-border-primary rounded-md focus:outline-none focus:ring-2 focus:ring-action-primary"
+              className="w-full px-3 py-2 bg-bg-muted border border-border-primary rounded-md focus:outline-none focus:ring-2 focus:ring-action-primary"
               disabled={loading}
               required
             />
@@ -97,7 +98,7 @@ function SignUp() {
               id="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-3 py-2 bg-bg-secondary border border-border-primary rounded-md focus:outline-none focus:ring-2 focus:ring-action-primary"
+              className="w-full px-3 py-2 bg-bg-muted border border-border-primary rounded-md focus:outline-none focus:ring-2 focus:ring-action-primary"
               disabled={loading}
               required
             />
@@ -107,7 +108,7 @@ function SignUp() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-2 px-4 bg-action-primary text-action-primary-inverted font-semibold rounded-md hover:bg-action-primary-hover disabled:opacity-50 transition duration-150"
+            className="w-full py-2 px-4 bg-action-primary text-on-action font-semibold rounded-md hover:bg-action-primary-hover disabled:opacity-50 transition duration-150"
           >
             {loading ? 'Registering...' : 'Sign Up'}
           </button>
