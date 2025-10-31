@@ -8,8 +8,10 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import CreateManagedProfileModal from '../components/CreateManagedProfileModal'; 
 import InviteMemberModal from '../components/InviteMemberModal'; 
 import UpdateProfileModal from '../components/UpdateProfileModal'; 
-import EditManagedProfileModal from '../components/EditManagedProfileModal'; // CRITICAL: Import for managed edits
+import EditManagedProfileModal from '../components/EditManagedProfileModal'; 
+import ProfileListItem from '../components/ProfileListItem'; // <--- NEW IMPORT
 
+// The rest of the file remains the same until the rendering section
 
 function HouseholdDashboard() {
   const { householdId } = useParams();
@@ -29,7 +31,7 @@ function HouseholdDashboard() {
   
   // State for the Edit Profile Modals
   const [showEditProfileModal, setShowEditProfileModal] = useState(false); 
-  const [profileToEdit, setProfileToEdit] = useState(null); // NEW: Tracks which profile is being edited
+  const [profileToEdit, setProfileToEdit] = useState(null); 
 
 
   // Function to fetch all necessary data for the dashboard
@@ -130,9 +132,9 @@ function HouseholdDashboard() {
   const handleProfileUpdated = useCallback((message) => {
       setNotification(message);
       setTimeout(() => setNotification(null), 5000); 
-      fetchDashboardData(); // CRUCIAL: Re-fetch data to show the updated name/color
-      setShowEditProfileModal(false); // Close self-edit modal
-      setProfileToEdit(null); // Close managed-edit modal
+      fetchDashboardData(); 
+      setShowEditProfileModal(false); 
+      setProfileToEdit(null); 
   }, [fetchDashboardData]);
 
 
@@ -143,7 +145,7 @@ function HouseholdDashboard() {
 
     fetchDashboardData().finally(() => setLoading(false));
 
-    // CRITICAL: Realtime Subscription Setup (The primary, clean mechanism)
+    // CRITICAL: Realtime Subscription Setup 
     const channel = supabase.channel(`profiles_household_${householdId}`)
       .on('postgres_changes', 
           { 
@@ -209,46 +211,13 @@ function HouseholdDashboard() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
           {profiles.length > 0 ? (
             profiles.map(profile => (
-              <div 
-                key={profile.id} 
-                className={`p-4 rounded-md shadow-sm border border-border-primary ${
-                  profile.is_admin ? 'bg-bg-muted' : '' 
-                }`}
-                style={{ 
-                    backgroundColor: profile.is_admin ? undefined : `var(--color-${profile.profile_color})`
-                }}
-              >
-                <p className={`font-medium text-lg ${profile.is_admin ? 'text-text-primary' : 'text-text-inverted'}`}>
-                    {profile.display_name}
-                </p>
-                <p className={`text-sm ${profile.is_admin ? 'text-text-secondary' : 'text-text-inverted'}`}>
-                    {profile.is_admin ? (profile.auth_user_id === currentAuthUserId ? 'Admin (You)' : 'Co-Admin') : 'Managed User'}
-                </p>
-                <p className={`text-xs mt-2 ${profile.is_admin ? 'text-text-primary' : 'text-text-inverted'}`}>
-                    Points: {profile.points}
-                </p>
-
-                {/* NEW: EDIT/DELETE BUTTONS */}
-                <div className="flex justify-between items-center mt-3">
-                    {/* EDIT BUTTON (Visible for ALL profiles, handled by the handler) */}
-                    <button
-                        onClick={() => handleEditProfile(profile)}
-                        className="text-xs text-gray-900 hover:text-action-primary hover:underline font-medium"
-                    >
-                        Edit Profile
-                    </button>
-
-                    {/* DELETE BUTTON (Visible only if NOT the current logged-in user) */}
-                    {profile.auth_user_id !== currentAuthUserId && (
-                        <button
-                            onClick={() => handleDeleteProfile(profile.id, profile.display_name)}
-                            className="text-xs text-signal-danger hover:underline font-medium"
-                        >
-                            Hard Delete
-                        </button>
-                    )}
-                </div>
-              </div>
+              <ProfileListItem // <--- NEW COMPONENT USAGE
+                key={profile.id}
+                profile={profile}
+                currentAuthUserId={currentAuthUserId}
+                handleEditProfile={handleEditProfile}
+                handleDeleteProfile={handleDeleteProfile}
+              />
             ))
           ) : (
             <p className="text-text-secondary">No profiles found yet. Let's add some!</p>
