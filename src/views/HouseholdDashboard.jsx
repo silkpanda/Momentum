@@ -44,9 +44,10 @@ function HouseholdDashboard() {
   
   const [showEditProfileModal, setShowEditProfileModal] = useState(false); 
   const [profileToEdit, setProfileToEdit] = useState(null); 
-  
-  // --- NEW: FAST FETCHER FOR TASKS ONLY ---
-  const fetchTasksOnly = useCallback(async () => {
+
+
+  // --- Task Fetcher function (Stable, fast) ---
+  const fetchTasks = useCallback(async () => {
     try {
         const { data: tasksData, error: tasksError } = await supabase
             .from('tasks')
@@ -55,17 +56,15 @@ function HouseholdDashboard() {
             .order('created_at', { ascending: false }); 
 
         if (tasksError) throw tasksError;
-        setTasks(tasksData);
-        return true; // Return success status
+        setTasks(tasksData); 
     } catch (err) {
-        console.error('Fast task fetch failed:', err);
-        return false;
+        console.error('Task fetch failed:', err);
     }
   }, []);
-  // --- END NEW FAST FETCHER ---
+  // --- END Task Fetcher ---
 
 
-  // Function to fetch all necessary data for the dashboard (SLOW, full)
+  // Function to fetch all necessary data for the dashboard (Slow, full sync)
   const fetchDashboardData = useCallback(async () => {
     setError(null);
 
@@ -81,8 +80,8 @@ function HouseholdDashboard() {
       if (houseError) throw houseError;
       setHouseholdData({ household_name: houseName });
       
-      // 2. Fetch Tasks (using the fast fetcher)
-      await fetchTasksOnly(); // Use the fast fetcher here
+      // 2. Fetch Tasks 
+      await fetchTasks(); 
       
     } catch (err) {
       console.error('Household Data Fetch Failed:', err);
@@ -90,7 +89,7 @@ function HouseholdDashboard() {
       setHouseholdData(null);
       setTasks([]); 
     }
-  }, [householdId, activeProfileId, fetchTasksOnly]); 
+  }, [householdId, activeProfileId, fetchTasks]); 
 
 
   // HANDLER: Calls the RPC to generate the invite code (unchanged)
@@ -153,15 +152,15 @@ function HouseholdDashboard() {
   };
 
 
-  // HANDLER: After any profile update modal closes (unchanged)
+  // HANDLER: After any profile update modal closes (removed fetchDashboardData)
   const handleProfileUpdated = useCallback((message) => {
       const notificationType = message.toLowerCase().includes('error') ? 'error' : 'success';
       setNotification({ message: message, type: notificationType }); 
       setTimeout(() => setNotification(null), 5000); 
-      fetchDashboardData(); 
+      // Rely on the subscription for data update
       setShowEditProfileModal(false); 
       setProfileToEdit(null); 
-  }, [fetchDashboardData]);
+  }, []); 
 
 
   // HANDLER: On successful task creation (unchanged)
@@ -169,7 +168,7 @@ function HouseholdDashboard() {
       setNotification({ message: message, type: 'success' }); 
       setTimeout(() => setNotification(null), 5000); 
       
-      fetchDashboardData(); 
+      fetchDashboardData(); // Still need full fetch here for new task list item
   }, [fetchDashboardData]);
 
   
@@ -177,7 +176,6 @@ function HouseholdDashboard() {
   const handleCompleteTask = async (taskId, taskTitle) => {
     try {
         setLoading(true);
-        // Calls the RPC (which checks assigned_profile_id against auth.uid()'s profile)
         const { error: rpcError } = await supabase.rpc('complete_task', { 
             task_id: taskId,
             p_assigned_profile_id: activeProfileId 
@@ -188,8 +186,8 @@ function HouseholdDashboard() {
         setNotification({ message: `Task "${taskTitle}" marked as completed! Waiting for Admin approval.`, type: 'success' });
         setTimeout(() => setNotification(null), 5000); 
 
-        await fetchTasksOnly(); // <--- CRITICAL FIX: Fast fetch only!
-
+        // FINAL FIX: NO FETCH HERE. Trust the listener for the instant update.
+        
     } catch (err) {
         console.error('Task Completion Failed:', err);
         setNotification({ message: `Error completing task: ${err.message}`, type: 'error' });
@@ -210,7 +208,7 @@ function HouseholdDashboard() {
         setNotification({ message: `✅ Task "${taskTitle}" approved and points awarded!`, type: 'success' });
         setTimeout(() => setNotification(null), 5000); 
 
-        // REMAINS FULL FETCH: This action updates points (profiles) AND tasks, requiring a full sync.
+        // KEEP FETCH: This MUST call the full fetch because it updates the profiles table (points).
         fetchDashboardData(); 
 
     } catch (err) {
@@ -233,8 +231,8 @@ function HouseholdDashboard() {
         setNotification({ message: `❌ Task "${taskTitle}" rejected and sent back to pending.`, type: 'error' });
         setTimeout(() => setNotification(null), 5000); 
 
-        await fetchTasksOnly(); // <--- CRITICAL FIX: Fast fetch only!
-
+        // FINAL FIX: NO FETCH HERE. Trust the listener for the instant update.
+        
     } catch (err) {
         console.error('Task Rejection Failed:', err);
         setNotification({ message: `Error rejecting task: ${err.message}`, type: 'error' });
@@ -257,7 +255,7 @@ function HouseholdDashboard() {
       .on('postgres_changes', 
           { event: 'INSERT|UPDATE|DELETE', schema: 'public', table: 'profiles', filter: `household_id=eq.${householdId}` }, 
           () => {
-             // Profile change (points update) requires a full data re-fetch for safety/consistency
+             // Profile change (NEW USER/EDIT/POINTS) forces a full data re-fetch.
              console.log('Realtime Profile Update (Points/Edit) Received - Forcing full fetch.');
              fetchDashboardData(); 
           }
@@ -265,9 +263,44 @@ function HouseholdDashboard() {
       .on('postgres_changes', 
           { event: 'INSERT|UPDATE|DELETE', schema: 'public', table: 'tasks', filter: `household_id=eq.${householdId}` }, 
           (payload) => {
-              // OPTIMIZATION: When a task changes in the background (another user), use the fast fetch
-              console.log('Realtime Task Update Received - Triggering fast fetch.');
-              fetchTasksOnly();
+              // *** THE FINAL STABLE FIX FOR TASKS ***: Directly manipulate the tasks array with payload data.
+              console.log(`Realtime Task Update Received: ${payload.eventType} - Applying direct array change.`);
+
+              setTasks(prevTasks => {
+                  const updatedTask = payload.new;
+                  const oldTask = payload.old;
+                  const taskId = updatedTask?.id || oldTask?.id;
+
+                  // 1. DELETE
+                  if (payload.eventType === 'DELETE') {
+                      return prevTasks.filter(t => t.id !== taskId);
+                  } 
+                  
+                  // 2. INSERT
+                  if (payload.eventType === 'INSERT') {
+                      // Prepend new task and ensure it's not a duplicate
+                      return [updatedTask, ...prevTasks.filter(t => t.id !== taskId)];
+                  } 
+                  
+                  // 3. UPDATE (Status Change)
+                  if (payload.eventType === 'UPDATE') {
+                      const existingTaskIndex = prevTasks.findIndex(t => t.id === taskId);
+                      
+                      // Task exists in the current view, so update it in place.
+                      if (existingTaskIndex > -1) {
+                          const newTasks = [...prevTasks];
+                          newTasks[existingTaskIndex] = updatedTask;
+                          return newTasks;
+                      }
+                      
+                      // If the updated task did not exist, but its status is now visible (e.g., pending/completed), add it.
+                      if (updatedTask.status === 'pending' || updatedTask.status === 'completed') {
+                           return [updatedTask, ...prevTasks];
+                      }
+                  }
+
+                  return prevTasks; 
+              });
           }
       )
       .subscribe(); 
@@ -276,16 +309,18 @@ function HouseholdDashboard() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [householdId, fetchDashboardData, isProfileContextLoading, fetchTasksOnly]); 
+  }, [householdId, fetchDashboardData, isProfileContextLoading, fetchTasks]); 
 
-  // Handlers for modals (unchanged)
-  const handleProfileAdded = useCallback(() => { fetchDashboardData(); }, [fetchDashboardData]);
+  // Handlers for modals (removed redundant fetches)
+  const handleProfileAdded = useCallback(() => { 
+      // CRITICAL FIX: Rely on the profiles subscription (which calls fetchDashboardData)
+  }, []);
   const handleInviteSuccess = useCallback((message) => {
       const notificationType = message.toLowerCase().includes('error') ? 'error' : 'success';
       setNotification({ message: message, type: notificationType });
       setTimeout(() => setNotification(null), 5000); 
-      fetchDashboardData();
-  }, [fetchDashboardData]);
+      // CRITICAL FIX: Rely on the profiles subscription
+  }, []);
 
   // If initial context loading, show spinner
   if (isProfileContextLoading) {
