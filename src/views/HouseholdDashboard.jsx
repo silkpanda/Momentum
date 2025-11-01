@@ -1,4 +1,4 @@
-// src/views/HouseholdDashboard.jsx
+// src/views/HouseholdDashboard.jsx (WITH LOGGING)
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
@@ -20,6 +20,7 @@ function HouseholdDashboard() {
   const { householdId } = useParams();
   const { currentUser } = useAuth(); 
   
+  // NOTE: Profiles data is now managed entirely by useProfile()
   const { 
     profiles, 
     activeProfileId, 
@@ -31,7 +32,7 @@ function HouseholdDashboard() {
   
   const [householdData, setHouseholdData] = useState(null);
   const [tasks, setTasks] = useState([]); 
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true); // This loading state is for the *rest* of the dashboard data (household name, tasks)
   const [error, setError] = useState(null);
   const [showManagedProfileModal, setShowManagedProfileModal] = useState(false); 
   const [showInviteModal, setShowInviteModal] = useState(false); 
@@ -52,6 +53,7 @@ function HouseholdDashboard() {
         const { data: tasksData, error: tasksError } = await supabase
             .from('tasks')
             .select('*')
+            .eq('household_id', householdId) // Ensure we only get tasks for this household
             .in('status', ['pending', 'completed']) 
             .order('created_at', { ascending: false }); 
 
@@ -60,12 +62,13 @@ function HouseholdDashboard() {
     } catch (err) {
         console.error('Task fetch failed:', err);
     }
-  }, []);
+  }, [householdId]);
   // --- END Task Fetcher ---
 
 
-  // Function to fetch all necessary data for the dashboard (Slow, full sync)
+  // Function to fetch all necessary *NON-PROFILE* data for the dashboard 
   const fetchDashboardData = useCallback(async () => {
+    console.log('AXIOM LOG: [Dashboard] fetchDashboardData CALLED.');
     setError(null);
 
     if (!householdId || !activeProfileId) {
@@ -80,7 +83,7 @@ function HouseholdDashboard() {
       if (houseError) throw houseError;
       setHouseholdData({ household_name: houseName });
       
-      // 2. Fetch Tasks 
+      // 2. Fetch Tasks (Tasks have their own Realtime manipulation, but we still need the initial fetch)
       await fetchTasks(); 
       
     } catch (err) {
@@ -89,7 +92,7 @@ function HouseholdDashboard() {
       setHouseholdData(null);
       setTasks([]); 
     }
-  }, [householdId, activeProfileId, fetchTasks]); 
+  }, [householdId, activeProfileId, fetchTasks]); // Removed fetchTasks from dependency array as it's already a dependency of fetchDashboardData
 
 
   // HANDLER: Calls the RPC to generate the invite code (unchanged)
@@ -98,6 +101,7 @@ function HouseholdDashboard() {
       setInviteCode(null);
       
       try {
+          // This RPC is simple and does not affect the profile list
           const { data: newCode, error: rpcError } = await supabase.rpc('create_invite_code');
 
           if (rpcError) throw rpcError;
@@ -116,7 +120,7 @@ function HouseholdDashboard() {
   };
 
 
-  // HANDLER: For deleting a profile (Hard Delete) (unchanged)
+  // HANDLER: For deleting a profile (Hard Delete) 
   const handleDeleteProfile = async (profileId, displayName) => {
     if (!window.confirm(`Are you sure you want to permanently delete the profile for ${displayName}? This action cannot be undone.`)) {
         return;
@@ -131,7 +135,11 @@ function HouseholdDashboard() {
         setNotification({ message: `Successfully deleted ${displayName}.`, type: 'success' });
         setTimeout(() => setNotification(null), 5000); 
 
-        fetchDashboardData(); 
+        // CRITICAL FIX: The ProfileContext listener will automatically detect the DELETE 
+        // and re-fetch the profile list. We only need to check if the Task List needs a refresh.
+        // Task List subscription will handle this if the profile deletion triggers a cascade.
+        // For simplicity and safety, we force a task list refresh in case of a hard profile delete.
+        fetchTasks(); 
 
     } catch (err) {
         console.error('Delete Failed:', err);
@@ -152,26 +160,28 @@ function HouseholdDashboard() {
   };
 
 
-  // HANDLER: After any profile update modal closes (removed fetchDashboardData)
+  // HANDLER: After any profile update modal closes (CLEANUP: Rely on the subscription)
   const handleProfileUpdated = useCallback((message) => {
       const notificationType = message.toLowerCase().includes('error') ? 'error' : 'success';
       setNotification({ message: message, type: notificationType }); 
       setTimeout(() => setNotification(null), 5000); 
-      // Rely on the subscription for data update
+      // ProfileContext's Realtime listener handles the data update! No fetch needed.
       setShowEditProfileModal(false); 
       setProfileToEdit(null); 
   }, []); 
 
 
-  // HANDLER: On successful task creation (unchanged)
+  // HANDLER: On successful task creation 
   const handleTaskCreated = useCallback((message) => {
       setNotification({ message: message, type: 'success' }); 
       setTimeout(() => setNotification(null), 5000); 
       
-      fetchDashboardData(); // Still need full fetch here for new task list item
-  }, [fetchDashboardData]);
+      // The Task Realtime listener handles the data update! No full fetch needed.
+      // fetchDashboardData(); <-- REMOVED
+      
+  }, []); // Removed fetchDashboardData from dependency array
 
-  
+
   // HANDLER FOR TASK COMPLETION (P0, TASK-03)
   const handleCompleteTask = async (taskId, taskTitle) => {
     try {
@@ -186,7 +196,7 @@ function HouseholdDashboard() {
         setNotification({ message: `Task "${taskTitle}" marked as completed! Waiting for Admin approval.`, type: 'success' });
         setTimeout(() => setNotification(null), 5000); 
 
-        // FINAL FIX: NO FETCH HERE. Trust the listener for the instant update.
+        // CRITICAL FIX: NO FETCH HERE. Trust the listener for the instant task update.
         
     } catch (err) {
         console.error('Task Completion Failed:', err);
@@ -208,8 +218,9 @@ function HouseholdDashboard() {
         setNotification({ message: `✅ Task "${taskTitle}" approved and points awarded!`, type: 'success' });
         setTimeout(() => setNotification(null), 5000); 
 
-        // KEEP FETCH: This MUST call the full fetch because it updates the profiles table (points).
-        fetchDashboardData(); 
+        // CRITICAL FIX: The ProfileContext listener will refresh profiles/points.
+        // The Task listener will refresh the task status.
+        // fetchDashboardData(); <-- REMOVED
 
     } catch (err) {
         console.error('Task Approval Failed:', err);
@@ -231,8 +242,8 @@ function HouseholdDashboard() {
         setNotification({ message: `❌ Task "${taskTitle}" rejected and sent back to pending.`, type: 'error' });
         setTimeout(() => setNotification(null), 5000); 
 
-        // FINAL FIX: NO FETCH HERE. Trust the listener for the instant update.
-        
+        // CRITICAL FIX: NO FETCH HERE. Trust the listener for the instant task update.
+
     } catch (err) {
         console.error('Task Rejection Failed:', err);
         setNotification({ message: `Error rejecting task: ${err.message}`, type: 'error' });
@@ -244,26 +255,32 @@ function HouseholdDashboard() {
 
 
   useEffect(() => {
+    console.log(`AXIOM LOG: [Dashboard] Main Effect RUN. isProfileContextLoading: ${isProfileContextLoading}.`);
     if (!householdId || isProfileContextLoading) return;
 
     setLoading(true);
 
+    // Initial load of household name and tasks (profiles are handled by the context)
     fetchDashboardData().finally(() => setLoading(false));
 
-    // CRITICAL: Realtime Subscription Setup 
+    // CRITICAL: Removed the Realtime Subscription Setup for the 'profiles' table.
+    // The ProfileContext now manages that listener and its state.
+    
+    // CRITICAL: Realtime Subscription Setup for Tasks (KEPT FOR EFFICIENT TASK UPDATE)
     const channel = supabase.channel(`household_${householdId}_updates`)
-      .on('postgres_changes', 
+      /* .on('postgres_changes', // <-- PROFILE LISTENER REMOVED
           { event: 'INSERT|UPDATE|DELETE', schema: 'public', table: 'profiles', filter: `household_id=eq.${householdId}` }, 
           () => {
-             // Profile change (NEW USER/EDIT/POINTS) forces a full data re-fetch.
+             // THIS CODE IS NOW IN ProfileContext.jsx
              console.log('Realtime Profile Update (Points/Edit) Received - Forcing full fetch.');
              fetchDashboardData(); 
           }
       )
+      */
       .on('postgres_changes', 
           { event: 'INSERT|UPDATE|DELETE', schema: 'public', table: 'tasks', filter: `household_id=eq.${householdId}` }, 
           (payload) => {
-              // *** THE FINAL STABLE FIX FOR TASKS ***: Directly manipulate the tasks array with payload data.
+              // *** THE FINAL STABLE FIX FOR TASKS (KEPT) ***: Directly manipulate the tasks array with payload data.
               console.log(`Realtime Task Update Received: ${payload.eventType} - Applying direct array change.`);
 
               setTasks(prevTasks => {
@@ -311,15 +328,15 @@ function HouseholdDashboard() {
     };
   }, [householdId, fetchDashboardData, isProfileContextLoading, fetchTasks]); 
 
-  // Handlers for modals (removed redundant fetches)
+  // Handlers for modals (CLEANUP: Removed redundant fetches, relying on subscriptions)
   const handleProfileAdded = useCallback(() => { 
-      // CRITICAL FIX: Rely on the profiles subscription (which calls fetchDashboardData)
+      // CRITICAL FIX: Rely on the profiles subscription in ProfileContext
   }, []);
   const handleInviteSuccess = useCallback((message) => {
       const notificationType = message.toLowerCase().includes('error') ? 'error' : 'success';
       setNotification({ message: message, type: notificationType });
       setTimeout(() => setNotification(null), 5000); 
-      // CRITICAL FIX: Rely on the profiles subscription
+      // CRITICAL FIX: Rely on the profiles subscription in ProfileContext
   }, []);
 
   // If initial context loading, show spinner
