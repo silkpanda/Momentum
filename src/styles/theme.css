@@ -32,12 +32,22 @@
   --color-action-primary: var(--palette-action-500);
   --color-action-primary-hover: var(--palette-action-600);
   --color-text-on-action: var(--palette-gray-0);
+
   --palette-success-500: #10B981;
   --palette-warning-500: #F59E0B;
+  
   --palette-danger-500: #EF4444;
+  --palette-danger-100: #FEE2E2; /* Lighter shade for backgrounds */
+  --palette-danger-200: #FECACA; /* Border shade */
+  
   --color-signal-success: var(--palette-success-500);
   --color-signal-warning: var(--palette-warning-500);
   --color-signal-danger: var(--palette-danger-500);
+
+  /* NEW ERROR VARIABLES for forms and modals (BUG-026 fix) */
+  --color-signal-error: var(--palette-danger-500);
+  --color-signal-error-bg: var(--palette-danger-100);
+  --color-signal-error-border: var(--palette-danger-200);
 
   /* === 4. Accent Palette (User-controlled) === */
   --palette-accent-forest: #059669;
@@ -55,14 +65,16 @@
   --font-medium: 500;
   --font-semibold: 600;
 
-  /* === 6. Profile Colors (Dynamic) === */
-  /* These variables allow components to dynamically apply a member's chosen accent color 
-     using an inline style like: style={{ '--profile-color': 'var(--profile-color-forest)' }} */
-  --profile-color-forest: var(--palette-accent-forest);
-  --profile-color-ruby: var(--palette-accent-ruby);
-  --profile-color-aqua: var(--palette-accent-aqua);
-  /* The bug mentions 'managed-green', so we'll add it as an alias for robustness */
-  --profile-color-managed-green: var(--palette-accent-forest);
+  /* === 6. Managed Profile Palette (BUG-029 Fix & New Standard) === */
+  /* These are the variables the ProfileListItem.jsx component and tailwind.config.js now rely on */
+  --color-managed-red: #DC2626;      /* Alias of Ruby */
+  --color-managed-orange: #F97316;    /* New vibrant color */
+  --color-managed-yellow: #FACC15;    /* New vibrant color */
+  --color-managed-green: #059669;    /* Alias of Forest */
+  --color-managed-teal: #14B8A6;     /* New vibrant color */
+  --color-managed-blue: #2563EB;     /* New vibrant color */
+  --color-managed-purple: #9333EA;    /* New vibrant color */
+  --color-managed-gray: #6B7280;     /* Alias of Gray-500 */
 }
 
 /* Also, let's add a quick body style */

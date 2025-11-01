@@ -1,46 +1,77 @@
-// src/views/HouseholdDashboard.jsx (FINAL PRODUCTION-READY VERSION with Full Admin Edit Control)
+// src/views/HouseholdDashboard.jsx
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../context/AuthContext'; 
+import { useProfile } from '../context/ProfileContext'; 
 import LoadingSpinner from '../components/LoadingSpinner';
 import CreateManagedProfileModal from '../components/CreateManagedProfileModal'; 
 import InviteMemberModal from '../components/InviteMemberModal'; 
 import UpdateProfileModal from '../components/UpdateProfileModal'; 
 import EditManagedProfileModal from '../components/EditManagedProfileModal'; 
-import ProfileListItem from '../components/ProfileListItem'; // <--- NEW IMPORT
+import ProfileListItem from '../components/ProfileListItem'; 
+import NotificationBanner from '../components/NotificationBanner'; 
+import CreateTaskModal from '../components/CreateTaskModal'; 
+import TaskListItem from '../components/TaskListItem'; 
 
-// The rest of the file remains the same until the rendering section
 
 function HouseholdDashboard() {
   const { householdId } = useParams();
   const { currentUser } = useAuth(); 
   
+  const { 
+    profiles, 
+    activeProfileId, 
+    activeProfileData, 
+    isImpersonating, 
+    switchProfile, 
+    isLoading: isProfileContextLoading,
+  } = useProfile();
+  
   const [householdData, setHouseholdData] = useState(null);
-  const [profiles, setProfiles] = useState([]);
+  const [tasks, setTasks] = useState([]); 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showManagedProfileModal, setShowManagedProfileModal] = useState(false); 
   const [showInviteModal, setShowInviteModal] = useState(false); 
   const [notification, setNotification] = useState(null); 
   
-  // State for generating and displaying the invite code
+  const [showCreateTaskModal, setShowCreateTaskModal] = useState(false); 
+  
   const [inviteCode, setInviteCode] = useState(null);
   const [codeLoading, setCodeLoading] = useState(false);
   
-  // State for the Edit Profile Modals
   const [showEditProfileModal, setShowEditProfileModal] = useState(false); 
   const [profileToEdit, setProfileToEdit] = useState(null); 
+  
+  // --- NEW: FAST FETCHER FOR TASKS ONLY ---
+  const fetchTasksOnly = useCallback(async () => {
+    try {
+        const { data: tasksData, error: tasksError } = await supabase
+            .from('tasks')
+            .select('*')
+            .in('status', ['pending', 'completed']) 
+            .order('created_at', { ascending: false }); 
+
+        if (tasksError) throw tasksError;
+        setTasks(tasksData);
+        return true; // Return success status
+    } catch (err) {
+        console.error('Fast task fetch failed:', err);
+        return false;
+    }
+  }, []);
+  // --- END NEW FAST FETCHER ---
 
 
-  // Function to fetch all necessary data for the dashboard
+  // Function to fetch all necessary data for the dashboard (SLOW, full)
   const fetchDashboardData = useCallback(async () => {
     setError(null);
 
-    if (!householdId) {
-      setError("Error: No Household ID provided in URL.");
-      return;
+    if (!householdId || !activeProfileId) {
+        if (!householdId) setError("Error: No Household ID provided in URL.");
+        return;
     }
 
     try {
@@ -50,22 +81,19 @@ function HouseholdDashboard() {
       if (houseError) throw houseError;
       setHouseholdData({ household_name: houseName });
       
-      // 2. Fetch Profiles (RPC)
-      const { data: profilesData, error: profilesError } = await supabase.rpc('get_household_profiles', { h_id: householdId });
-
-      if (profilesError) throw profilesError;
-      setProfiles(profilesData);
+      // 2. Fetch Tasks (using the fast fetcher)
+      await fetchTasksOnly(); // Use the fast fetcher here
       
     } catch (err) {
       console.error('Household Data Fetch Failed:', err);
       setError('Failed to load household data. Check network or final RLS policy.');
       setHouseholdData(null);
-      setProfiles([]);
+      setTasks([]); 
     }
-  }, [householdId]);
+  }, [householdId, activeProfileId, fetchTasksOnly]); 
 
 
-  // HANDLER: Calls the RPC to generate the invite code
+  // HANDLER: Calls the RPC to generate the invite code (unchanged)
   const handleGenerateCode = async () => {
       setCodeLoading(true);
       setInviteCode(null);
@@ -75,13 +103,13 @@ function HouseholdDashboard() {
 
           if (rpcError) throw rpcError;
 
+          setNotification({ message: `New invite code generated: ${newCode}. It expires in 7 days.`, type: 'success' });
           setInviteCode(newCode);
-          setNotification(`New invite code generated: ${newCode}. It expires in 7 days.`);
           setTimeout(() => setNotification(null), 7000); 
 
       } catch (err) {
           console.error('Code Generation Failed:', err);
-          setNotification('Error generating code. Are you the Admin of this household?');
+          setNotification({ message: 'Error generating code. Are you the Admin of this household?', type: 'error' });
           setTimeout(() => setNotification(null), 5000); 
       } finally {
           setCodeLoading(false);
@@ -89,7 +117,7 @@ function HouseholdDashboard() {
   };
 
 
-  // HANDLER: For deleting a profile (Hard Delete)
+  // HANDLER: For deleting a profile (Hard Delete) (unchanged)
   const handleDeleteProfile = async (profileId, displayName) => {
     if (!window.confirm(`Are you sure you want to permanently delete the profile for ${displayName}? This action cannot be undone.`)) {
         return;
@@ -101,36 +129,34 @@ function HouseholdDashboard() {
 
         if (rpcError) throw rpcError;
 
-        setNotification(`Successfully deleted ${displayName}.`);
+        setNotification({ message: `Successfully deleted ${displayName}.`, type: 'success' });
         setTimeout(() => setNotification(null), 5000); 
 
-        // Re-fetch data to update the list
         fetchDashboardData(); 
 
     } catch (err) {
         console.error('Delete Failed:', err);
-        setNotification(`Error deleting ${displayName}: ${err.message}`);
+        setNotification({ message: `Error deleting ${displayName}: ${err.message}`, type: 'error' });
         setTimeout(() => setNotification(null), 7000); 
     } finally {
         setLoading(false);
     }
   };
 
-  // HANDLER: Routes the Edit action to the correct modal
+  // HANDLER: Routes the Edit action to the correct modal (unchanged)
   const handleEditProfile = (profile) => {
-      // 1. If the profile belongs to the current user, show the self-edit modal
       if (profile.auth_user_id === currentUser?.id) {
-          setShowEditProfileModal(true); // Opens the UpdateProfileModal
+          setShowEditProfileModal(true); 
       } else {
-          // 2. If it's another profile (managed or co-admin), set the target profile
-          setProfileToEdit(profile); // This opens the EditManagedProfileModal
+          setProfileToEdit(profile); 
       }
   };
 
 
-  // HANDLER: After any profile update modal closes
+  // HANDLER: After any profile update modal closes (unchanged)
   const handleProfileUpdated = useCallback((message) => {
-      setNotification(message);
+      const notificationType = message.toLowerCase().includes('error') ? 'error' : 'success';
+      setNotification({ message: message, type: notificationType }); 
       setTimeout(() => setNotification(null), 5000); 
       fetchDashboardData(); 
       setShowEditProfileModal(false); 
@@ -138,27 +164,110 @@ function HouseholdDashboard() {
   }, [fetchDashboardData]);
 
 
+  // HANDLER: On successful task creation (unchanged)
+  const handleTaskCreated = useCallback((message) => {
+      setNotification({ message: message, type: 'success' }); 
+      setTimeout(() => setNotification(null), 5000); 
+      
+      fetchDashboardData(); 
+  }, [fetchDashboardData]);
+
+  
+  // HANDLER FOR TASK COMPLETION (P0, TASK-03)
+  const handleCompleteTask = async (taskId, taskTitle) => {
+    try {
+        setLoading(true);
+        // Calls the RPC (which checks assigned_profile_id against auth.uid()'s profile)
+        const { error: rpcError } = await supabase.rpc('complete_task', { 
+            task_id: taskId,
+            p_assigned_profile_id: activeProfileId 
+        });
+
+        if (rpcError) throw rpcError;
+
+        setNotification({ message: `Task "${taskTitle}" marked as completed! Waiting for Admin approval.`, type: 'success' });
+        setTimeout(() => setNotification(null), 5000); 
+
+        await fetchTasksOnly(); // <--- CRITICAL FIX: Fast fetch only!
+
+    } catch (err) {
+        console.error('Task Completion Failed:', err);
+        setNotification({ message: `Error completing task: ${err.message}`, type: 'error' });
+        setTimeout(() => setNotification(null), 7000); 
+    } finally {
+        setLoading(false);
+    }
+  };
+  
+  // HANDLER: ADMIN APPROVE (P0, TASK-04)
+  const handleApproveTask = async (taskId, taskTitle) => {
+    try {
+        setLoading(true);
+        const { error: rpcError } = await supabase.rpc('approve_task', { task_id: taskId });
+
+        if (rpcError) throw rpcError;
+
+        setNotification({ message: `✅ Task "${taskTitle}" approved and points awarded!`, type: 'success' });
+        setTimeout(() => setNotification(null), 5000); 
+
+        // REMAINS FULL FETCH: This action updates points (profiles) AND tasks, requiring a full sync.
+        fetchDashboardData(); 
+
+    } catch (err) {
+        console.error('Task Approval Failed:', err);
+        setNotification({ message: `Error approving task: ${err.message}`, type: 'error' });
+        setTimeout(() => setNotification(null), 7000); 
+    } finally {
+        setLoading(false);
+    }
+  };
+  
+  // HANDLER: ADMIN REJECT (P0, TASK-04)
+  const handleRejectTask = async (taskId, taskTitle) => {
+    try {
+        setLoading(true);
+        const { error: rpcError } = await supabase.rpc('reject_task', { task_id: taskId });
+
+        if (rpcError) throw rpcError;
+
+        setNotification({ message: `❌ Task "${taskTitle}" rejected and sent back to pending.`, type: 'error' });
+        setTimeout(() => setNotification(null), 5000); 
+
+        await fetchTasksOnly(); // <--- CRITICAL FIX: Fast fetch only!
+
+    } catch (err) {
+        console.error('Task Rejection Failed:', err);
+        setNotification({ message: `Error rejecting task: ${err.message}`, type: 'error' });
+        setTimeout(() => setNotification(null), 7000); 
+    } finally {
+        setLoading(false);
+    }
+  };
+
+
   useEffect(() => {
-    if (!householdId) return;
+    if (!householdId || isProfileContextLoading) return;
 
     setLoading(true);
 
     fetchDashboardData().finally(() => setLoading(false));
 
     // CRITICAL: Realtime Subscription Setup 
-    const channel = supabase.channel(`profiles_household_${householdId}`)
+    const channel = supabase.channel(`household_${householdId}_updates`)
       .on('postgres_changes', 
-          { 
-              event: 'INSERT|UPDATE', 
-              schema: 'public', 
-              table: 'profiles', 
-              filter: `household_id=eq.${householdId}` 
-          }, 
+          { event: 'INSERT|UPDATE|DELETE', schema: 'public', table: 'profiles', filter: `household_id=eq.${householdId}` }, 
+          () => {
+             // Profile change (points update) requires a full data re-fetch for safety/consistency
+             console.log('Realtime Profile Update (Points/Edit) Received - Forcing full fetch.');
+             fetchDashboardData(); 
+          }
+      )
+      .on('postgres_changes', 
+          { event: 'INSERT|UPDATE|DELETE', schema: 'public', table: 'tasks', filter: `household_id=eq.${householdId}` }, 
           (payload) => {
-              if (payload.new?.household_id === householdId || payload.old?.household_id === householdId) {
-                  console.log('Realtime Update Received (Confirmed Relevant).');
-                  fetchDashboardData(); 
-              }
+              // OPTIMIZATION: When a task changes in the background (another user), use the fast fetch
+              console.log('Realtime Task Update Received - Triggering fast fetch.');
+              fetchTasksOnly();
           }
       )
       .subscribe(); 
@@ -167,68 +276,96 @@ function HouseholdDashboard() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [householdId, fetchDashboardData]); 
+  }, [householdId, fetchDashboardData, isProfileContextLoading, fetchTasksOnly]); 
 
-  // Handlers for modals
+  // Handlers for modals (unchanged)
   const handleProfileAdded = useCallback(() => { fetchDashboardData(); }, [fetchDashboardData]);
   const handleInviteSuccess = useCallback((message) => {
-      setNotification(message);
+      const notificationType = message.toLowerCase().includes('error') ? 'error' : 'success';
+      setNotification({ message: message, type: notificationType });
       setTimeout(() => setNotification(null), 5000); 
       fetchDashboardData();
   }, [fetchDashboardData]);
 
-  if (loading) {
+  // If initial context loading, show spinner
+  if (isProfileContextLoading) {
+    return <LoadingSpinner text="Initializing household profiles..." />;
+  }
+  
+  // AUTHENTICATED USER logic (used for Admin permissions, regardless of active profile)
+  const currentAuthUserId = currentUser?.id;
+  const authUserProfileData = profiles.find(p => p.auth_user_id === currentAuthUserId);
+  const isAuthUserAdmin = authUserProfileData?.is_admin;
+
+
+  // Check for the most critical data points
+  if (loading || !activeProfileId) { 
     return <LoadingSpinner text="Loading your family dashboard..." />;
   }
-
+  
   if (error) {
     return <div className="p-8 text-center text-text-primary bg-bg-canvas min-h-screen">Error: {error}</div>;
   }
+  
+  const viewAsText = isImpersonating 
+    ? `Viewing as: ${activeProfileData?.display_name}`
+    : `Active Profile: ${activeProfileData?.display_name} (Admin)`;
 
-  // Helper to get current user's Auth ID securely
-  const currentAuthUserId = currentUser?.id;
-
-  // Placeholder UI for the dashboard
+  // Final UI Rendering
   return (
     <div className="p-8 bg-bg-canvas min-h-screen">
       
-      {/* Notification Bar */}
-      {notification && (
-          <div className={`p-4 mb-4 text-sm font-medium text-text-on-action ${notification.startsWith('Error') ? 'bg-signal-danger' : 'bg-signal-success'} rounded-md shadow-lg`}>
-              {notification}
-          </div>
-      )}
+      {/* Notification Banner Component */}
+      <NotificationBanner 
+          message={notification?.message} 
+          type={notification?.type}
+      />
 
-      <h1 className="text-2xl font-bold text-text-primary mb-6">
-        {householdData?.household_name || 'Your Household'} Dashboard
-      </h1>
+      <header className="mb-6">
+          <h1 className="text-2xl font-bold text-text-primary">
+            {householdData?.household_name || 'Your Household'} Dashboard
+          </h1>
+          {/* Active Profile Display */}
+          <p className="text-sm text-text-secondary mt-1">
+              {viewAsText}
+          </p>
+      </header>
 
-      {/* Profile Management Section */}
+
+      {/* Profile Management Section (The Profile Switcher) */}
       <div className="bg-bg-surface p-6 rounded-lg shadow-md mb-8">
-        <h2 className="text-xl font-semibold text-text-primary mb-4">Family Profiles ({profiles.length})</h2>
+        <h2 className="text-xl font-semibold text-text-primary mb-4">
+            Switch Profile Context
+        </h2>
         
-        {/* --- PROFILES LIST RENDERING --- */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+        {/* PROFILE SWITCHER UI */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-6">
           {profiles.length > 0 ? (
             profiles.map(profile => (
-              <ProfileListItem // <--- NEW COMPONENT USAGE
+              <div 
                 key={profile.id}
-                profile={profile}
-                currentAuthUserId={currentAuthUserId}
-                handleEditProfile={handleEditProfile}
-                handleDeleteProfile={handleDeleteProfile}
-              />
+                onClick={() => switchProfile(profile.id)} 
+                className={`cursor-pointer rounded-md transition duration-150 ease-in-out ${
+                    profile.id === activeProfileId 
+                    ? 'ring-4 ring-action-primary ring-offset-2' 
+                    : 'hover:opacity-80'
+                }`}
+              >
+                  <ProfileListItem 
+                    profile={profile}
+                    currentAuthUserId={currentAuthUserId} 
+                    handleEditProfile={handleEditProfile}
+                    handleDeleteProfile={handleDeleteProfile}
+                  />
+              </div>
             ))
           ) : (
-            <p className="text-text-secondary">No profiles found yet. Let's add some!</p>
+            <p className="text-text-secondary">No profiles found.</p>
           )}
         </div>
-        {/* --- END PROFILES LIST --- */}
-
 
         {/* Action Buttons */}
         <div className="flex flex-wrap items-center space-x-4">
-            {/* 1. Add Managed Member Button */}
             <button
               onClick={() => setShowManagedProfileModal(true)}
               className="py-2 px-4 bg-action-primary text-on-action font-semibold rounded-md hover:bg-action-primary-hover transition duration-150 mb-2 md:mb-0"
@@ -236,7 +373,6 @@ function HouseholdDashboard() {
               + Add New Family Member
             </button>
             
-            {/* 2. GENERATE CODE Button */}
             <button
               onClick={handleGenerateCode}
               disabled={codeLoading}
@@ -245,7 +381,6 @@ function HouseholdDashboard() {
               {codeLoading ? 'Generating...' : 'Generate Invite Code'}
             </button>
             
-            {/* 3. CODE DISPLAY */}
             {inviteCode && (
                 <div className="text-lg font-bold text-text-primary bg-bg-muted p-2 rounded-md border border-border-primary ml-4 transition-all duration-300 ease-in-out">
                     Code: <span className="text-action-primary tracking-widest">{inviteCode}</span>
@@ -254,15 +389,42 @@ function HouseholdDashboard() {
         </div>
       </div>
 
-      {/* Tasks and Rewards Sections (Stubs) */}
+      {/* Tasks and Rewards Sections */}
       <div className="space-y-8">
         <div className="bg-bg-surface p-6 rounded-lg shadow-md">
-          <h2 className="text-xl font-semibold text-text-primary">Tasks (In Progress)</h2>
-          <p className="text-text-secondary mt-2">Task creation and management UI goes here.</p>
+          <h2 className="text-xl font-semibold text-text-primary mb-4">Family Tasks ({tasks.length})</h2>
+          
+          <div className="mb-4">
+            <button
+              onClick={() => setShowCreateTaskModal(true)} 
+              className="py-2 px-4 bg-action-primary text-text-on-action font-semibold rounded-md hover:bg-action-primary-hover transition duration-150"
+            >
+              + Create New Task
+            </button>
+          </div>
+          
+          <div className="mt-4">
+            {tasks.length > 0 ? (
+                tasks.map(task => (
+                    <TaskListItem 
+                        key={task.id}
+                        task={task}
+                        profiles={profiles} 
+                        currentProfileId={activeProfileId} 
+                        isAuthUserAdmin={isAuthUserAdmin} 
+                        onComplete={handleCompleteTask}     
+                        onApprove={handleApproveTask}      
+                        onReject={handleRejectTask}        
+                    />
+                ))
+            ) : (
+                <p className="text-text-secondary">No tasks found. Click "Create New Task" to get started!</p>
+            )}
+          </div>
         </div>
         <div className="bg-bg-surface p-6 rounded-lg shadow-md">
           <h2 className="text-xl font-semibold text-text-primary">Rewards Store (To Do)</h2>
-          <p className="text-text-secondary mt-2">Store item creation and point redemption goes here.</p>
+          <p className="text-text-secondary mt-2">Store item creation and point redemption UI will go here.</p>
         </div>
       </div>
       
@@ -277,20 +439,23 @@ function HouseholdDashboard() {
         onClose={() => setShowInviteModal(false)}
         onInviteSuccess={handleInviteSuccess}
       />
-      {/* MODAL: Edit Your Own Profile */}
       <UpdateProfileModal
         isOpen={showEditProfileModal && !profileToEdit}
         onClose={() => setShowEditProfileModal(false)}
         onProfileUpdated={handleProfileUpdated}
       />
-      {/* NEW MODAL: Edit Other Profile (Managed/Co-Admin) */}
       <EditManagedProfileModal
         isOpen={!!profileToEdit}
         onClose={() => setProfileToEdit(null)}
         targetProfile={profileToEdit}
         onProfileUpdated={handleProfileUpdated}
       />
-
+      <CreateTaskModal
+          isOpen={showCreateTaskModal}
+          onClose={() => setShowCreateTaskModal(false)}
+          profiles={profiles} 
+          onTaskCreated={handleTaskCreated}
+      />
     </div>
   );
 }

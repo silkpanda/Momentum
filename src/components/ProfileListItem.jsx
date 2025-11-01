@@ -3,26 +3,30 @@
 import React from 'react';
 
 /**
- * Renders a full, styled list item for a household member profile.
+ * Renders a full, stylized list item for a household member profile.
  * This component is designed to be used within the HouseholdDashboard profiles grid.
- * It contains the bug fix for dynamic profile color application (BUG-029).
+ * It now correctly handles color contrast for all profile types (Admin and Managed).
  * * @param {object} profile - The profile object from the database.
  * @param {string} currentAuthUserId - The ID of the currently logged-in user for 'You' designation.
  * @param {function} handleEditProfile - Function to open the edit modal.
  * @param {function} handleDeleteProfile - Function to handle profile hard delete.
  */
 function ProfileListItem({ profile, currentAuthUserId, handleEditProfile, handleDeleteProfile }) {
-    // Determine the text color based on whether the background is colored (Managed User) or not (Admin).
-    const isManagedUser = !profile.is_admin;
-    const textColorClass = isManagedUser ? 'text-text-inverted' : 'text-text-primary';
-    const subTextColorClass = isManagedUser ? 'text-text-inverted opacity-80' : 'text-text-secondary';
+    
+    const isAdmin = profile.is_admin;
+    
+    // The core text color rule: If the profile has *any* color set (meaning a dark background), 
+    // the text must be light/inverted for contrast. Otherwise, use dark/primary text.
+    const hasDynamicColor = !!profile.profile_color; 
+    
+    const textColorClass = hasDynamicColor ? 'text-text-inverted' : 'text-text-primary';
+    const subTextColorClass = hasDynamicColor ? 'text-text-inverted opacity-80' : 'text-text-secondary';
 
-    // The core fix for BUG-029: The background color is set dynamically using the CSS variable pattern
-    // defined in theme.css (e.g., var(--color-managed-green)).
+    // The background color is dynamically set for ALL profiles using their profile_color.
     const dynamicStyle = {
-        backgroundColor: isManagedUser 
+        backgroundColor: profile.profile_color 
             ? `var(--color-${profile.profile_color})` 
-            : 'var(--color-bg-muted)' // Admins get the muted gray background
+            : 'var(--color-bg-muted)' 
     };
 
     return (
@@ -35,7 +39,7 @@ function ProfileListItem({ profile, currentAuthUserId, handleEditProfile, handle
                 {profile.display_name}
             </p>
             <p className={`text-sm ${subTextColorClass}`}>
-                {profile.is_admin 
+                {isAdmin
                     ? (profile.auth_user_id === currentAuthUserId ? 'Admin (You)' : 'Co-Admin') 
                     : 'Managed User'}
             </p>
@@ -45,11 +49,12 @@ function ProfileListItem({ profile, currentAuthUserId, handleEditProfile, handle
 
             {/* EDIT/DELETE BUTTONS */}
             <div className="flex justify-between items-center mt-3 pt-3 border-t border-solid border-opacity-30" 
-                 style={{ borderColor: isManagedUser ? 'var(--color-text-inverted)' : 'var(--color-border-primary)' }}>
+                 // The divider line needs to adjust for contrast. Inverted for colored background, Primary for light background.
+                 style={{ borderColor: hasDynamicColor ? 'var(--color-text-inverted)' : 'var(--color-border-primary)' }}>
                 {/* EDIT BUTTON (Visible for ALL profiles) */}
                 <button
                     onClick={() => handleEditProfile(profile)}
-                    className={`text-xs ${isManagedUser ? 'text-text-inverted hover:text-white' : 'text-gray-900 hover:text-action-primary'} font-medium underline-offset-2 hover:underline`}
+                    className={`text-xs ${hasDynamicColor ? 'text-text-inverted hover:text-white' : 'text-text-primary hover:text-action-primary'} font-medium underline-offset-2 hover:underline`}
                 >
                     Edit Profile
                 </button>
@@ -58,7 +63,7 @@ function ProfileListItem({ profile, currentAuthUserId, handleEditProfile, handle
                 {profile.auth_user_id !== currentAuthUserId && (
                     <button
                         onClick={() => handleDeleteProfile(profile.id, profile.display_name)}
-                        className={`text-xs ${isManagedUser ? 'text-text-inverted hover:text-signal-danger' : 'text-signal-danger hover:underline'} font-medium underline-offset-2 hover:underline`}
+                        className={`text-xs ${hasDynamicColor ? 'text-text-inverted hover:text-signal-danger' : 'text-signal-danger hover:underline'} font-medium underline-offset-2 hover:underline`}
                     >
                         Hard Delete
                     </button>

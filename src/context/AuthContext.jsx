@@ -27,6 +27,10 @@ export const AuthProvider = ({ children }) => {
       password 
     });
     if (error) throw error;
+    // CRITICAL FIX: Update state immediately upon successful signup
+    if (data.user) {
+        setCurrentUser(data.user);
+    }
     return data;
   };
 
@@ -37,6 +41,11 @@ export const AuthProvider = ({ children }) => {
       password 
     });
     if (error) throw error;
+    
+    // CRITICAL FIX: Update state immediately upon successful login
+    if (data.user) {
+        setCurrentUser(data.user);
+    }
     return data;
   };
 
@@ -49,10 +58,11 @@ export const AuthProvider = ({ children }) => {
   // --- State Synchronization (Supabase Auth Listener) ---
 
   useEffect(() => {
-    // Subscribes to changes in the authentication state
+    // The listener is still needed for session changes (e.g., token refresh, logout event from another tab)
     const { data: authListener } = supabase.auth.onAuthStateChange(
       (event, session) => {
-        // session.user is the authenticated user object (from auth.users table)
+        // We only update if the event is a true state change (like a sign-out) 
+        // to avoid overwriting the synchronous login update, but we keep it simple here.
         setCurrentUser(session?.user ?? null);
         setLoading(false);
       }
