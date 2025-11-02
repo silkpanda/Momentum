@@ -1,6 +1,6 @@
-// src/context/ProfileContext.jsx (FINAL SYNCHRONIZATION FIX)
+// src/context/ProfileContext.jsx (HARDENED LOOP BREAK WITH LOGGING)
 
-import React, { useContext, useState, useEffect, useCallback } from 'react';
+import React, { useContext, useState, useEffect, useCallback, useRef } from 'react'; 
 import { supabase } from '../supabaseClient'; 
 import { useAuth } from '../context/AuthContext'; 
 
@@ -16,11 +16,9 @@ export function useProfile() {
 const getInitialActiveProfile = (profiles, currentUser) => {
     if (!profiles || profiles.length === 0) return null;
     
-    // 1. Try to find the profile linked to the currently logged-in Auth User
     const authProfile = profiles.find(p => p.auth_user_id === currentUser?.id);
     if (authProfile) return authProfile.id;
     
-    // 2. Default to the first profile in the list
     return profiles[0].id;
 };
 
@@ -36,14 +34,19 @@ export function ProfileProvider({ children, householdId }) {
   const [activeProfileId, setActiveProfileId] = useState(null);
   const [isImpersonating, setIsImpersonating] = useState(false);
   
-  const { currentUser, loading: authLoading } = useAuth(); // CRITICAL FIX: Extract authLoading
+  const { currentUser, loading: authLoading } = useAuth();
+
+  // CRITICAL FINAL GUARD: Ref to prevent the fetch from re-running on state change.
+  const fetchAttemptedRef = useRef(false);
 
 
   // --- Core Data Fetcher ---
   const fetchProfiles = useCallback(async () => {
+    console.log('AXIOM LOG: [Context] fetchProfiles CALLED.');
     if (!householdId) {
         setProfiles([]);
         setIsLoading(false);
+        console.log('AXIOM LOG: [Context] fetchProfiles EXIT: No Household ID.');
         return;
     }
       
@@ -58,15 +61,19 @@ export function ProfileProvider({ children, householdId }) {
       .order('created_at', { ascending: true }); 
 
     if (error) {
-      console.error('Supabase Profiles Fetch Error:', error.message, 'Details:', error);
+      console.error('AXIOM ERROR: Supabase Profiles Fetch Failed!', error.message, 'Details:', error);
       setProfilesError(error.message || 'Error loading household members. Check RLS policy or Network.');
       setProfiles([]);
+      console.log('AXIOM LOG: [Context] fetchProfiles EXIT: Network Error.');
     } else {
       setProfiles(data || []);
+      console.log(`AXIOM LOG: [Context] fetchProfiles SUCCESS. Found ${data ? data.length : 0} profiles.`);
     }
     
     setIsLoading(false);
+    console.log('AXIOM LOG: [Context] fetchProfiles RETURNED.');
   }, [householdId]);
+
 
   // --- Profile Switching Logic ---
   const switchProfile = useCallback((profileId) => {
@@ -83,19 +90,26 @@ export function ProfileProvider({ children, householdId }) {
 
   // Effect 1: Handles Data Fetching and Realtime subscription
   useEffect(() => {
+    console.log(`AXIOM LOG: [Context] Effect 1 (Data Fetch) RUN. Auth Loading: ${authLoading}, Current User: ${!!currentUser}, Fetch Attempted: ${fetchAttemptedRef.current}`);
+    
     if (!householdId) return;
     
-    // CRITICAL DOUBLE-GUARD: Do not proceed if Auth is still loading OR if user is null.
+    // 1. CRITICAL GUARD: Only run the initial fetch once.
+    if (fetchAttemptedRef.current) return;
+    
+    // 2. CRITICAL DOUBLE-GUARD: Wait for Auth and User
     if (authLoading || !currentUser) {
         if (!authLoading && !currentUser) {
-            // This case means Auth is done, but no user is logged in (should be caught by router)
             console.error("AXIOM WARNING: Auth finished, but no user present. Skipping fetch.");
         }
         return;
     }
 
+    // This is the one and only time the fetch will be called on mount
     fetchProfiles();
+    fetchAttemptedRef.current = true; // Mark as initiated
 
+    // 3. Realtime Subscription Setup
     const channel = supabase.channel(`profiles_for_${householdId}`) 
       .on(
         'postgres_changes',
@@ -107,6 +121,7 @@ export function ProfileProvider({ children, householdId }) {
         },
         () => {
           console.log('Profile Realtime change detected. Refreshing profile state...');
+          // On change, we bypass the ref and run the fetch again to update data
           fetchProfiles(); 
         }
       )
@@ -116,12 +131,13 @@ export function ProfileProvider({ children, householdId }) {
       supabase.removeChannel(channel);
     };
 
-  // The dependency array now forces a re-run when currentUser changes (login completion)
+  // The dependency array forces a re-run when external conditions (auth) change.
   }, [householdId, fetchProfiles, authLoading, currentUser]); 
 
 
   // Effect 2: Handles Profile ID selection and validity checks (Stable)
   useEffect(() => {
+    console.log(`AXIOM LOG: [Context] Effect 2 (ID Select) RUN. Profiles Count: ${profiles.length}, Is Loading: ${isLoading}`);
     if (isLoading || profiles.length === 0) return;
 
     let calculatedId = activeProfileId;

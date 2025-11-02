@@ -1,6 +1,6 @@
-// src/views/HouseholdDashboard.jsx (DECOUPLED LOAD FOR SYNC STABILITY)
+// src/views/HouseholdDashboard.jsx (MODIFIED - FINAL STABILITY FIX WITH LOGGING)
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../context/AuthContext'; 
@@ -44,10 +44,14 @@ function HouseholdDashboard() {
   
   const [showEditProfileModal, setShowEditProfileModal] = useState(false); 
   const [profileToEdit, setProfileToEdit] = useState(null); 
+  
+  // CRITICAL FIX: Ref to ensure the initial fetch only happens ONCE per component mount/remount.
+  const fetchInitiatedRef = useRef(false);
 
 
   // --- Task Fetcher function (Stable) ---
   const fetchTasks = useCallback(async () => {
+    console.log('AXIOM LOG: [Dashboard] fetchTasks CALLED.');
     try {
         const { data: tasksData, error: tasksError } = await supabase
             .from('tasks')
@@ -59,18 +63,20 @@ function HouseholdDashboard() {
         if (tasksError) throw tasksError;
         setTasks(tasksData); 
     } catch (err) {
-        console.error('Task fetch failed:', err);
+        console.error('AXIOM ERROR: Task fetch failed:', err);
     }
+    console.log('AXIOM LOG: [Dashboard] fetchTasks RETURNED.');
   }, [householdId]);
 
 
   // Function to fetch all necessary *NON-PROFILE* data for the dashboard 
-  // CRITICAL FIX: Removed activeProfileId from dependencies and internal guard.
   const fetchDashboardData = useCallback(async () => {
+    console.log('AXIOM LOG: [Dashboard] fetchDashboardData CALLED.');
     setError(null);
 
     if (!householdId) {
         setError("Error: No Household ID provided in URL.");
+        console.log('AXIOM LOG: [Dashboard] fetchDashboardData EXIT: Missing ID.');
         return;
     }
 
@@ -78,18 +84,22 @@ function HouseholdDashboard() {
       // 1. Fetch Household Name (RPC)
       const { data: houseName, error: houseError } = await supabase.rpc('get_household_name_by_id', { h_id: householdId });
 
-      if (houseError) throw houseError;
+      if (houseError) {
+          console.error('AXIOM ERROR: Household Name RPC Failed:', houseError);
+          throw houseError;
+      }
       setHouseholdData({ household_name: houseName });
 
       // 2. Fetch Tasks
       await fetchTasks(); 
       
     } catch (err) {
-      console.error('Household Data Fetch Failed (Overall):', err);
+      console.error('AXIOM ERROR: Household Data Fetch Failed (Overall):', err);
       setError('Failed to load critical household data.');
       setHouseholdData(null);
       setTasks([]); 
     }
+    console.log('AXIOM LOG: [Dashboard] fetchDashboardData RETURNED.');
   }, [householdId, fetchTasks]); 
 
 
@@ -108,19 +118,27 @@ function HouseholdDashboard() {
 
   // --- MAIN EFFECT: Initial Load and Task Realtime Listener ---
   useEffect(() => {
-    // CRITICAL FIX: We do not wait for ProfileContextLoading here.
+    console.log(`AXIOM LOG: [Dashboard] Main Effect RUN. Household ID: ${householdId}, Fetch Initiated Ref: ${fetchInitiatedRef.current}`);
+    
     if (!householdId) return; 
+    
+    // CRITICAL FINAL GUARD: If we've already run the initial fetch, do not re-run it.
+    if (fetchInitiatedRef.current) return;
 
     setLoading(true);
 
     // 1. Initial load of household name and tasks
     fetchDashboardData().finally(() => setLoading(false));
 
+    // Set the ref to true so this logic never runs again on subsequent renders/re-mounts.
+    fetchInitiatedRef.current = true;
+
     // 2. Realtime Subscription Setup for Tasks (unchanged)
     const channel = supabase.channel(`household_${householdId}_updates`)
       .on('postgres_changes', 
           { event: 'INSERT|UPDATE|DELETE', schema: 'public', table: 'tasks', filter: `household_id=eq.${householdId}` }, 
           (payload) => {
+              // ... state manipulation logic ...
               setTasks(prevTasks => {
                   const updatedTask = payload.new;
                   const oldTask = payload.old;
@@ -153,7 +171,7 @@ function HouseholdDashboard() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [householdId, fetchDashboardData, fetchTasks]); // CRITICAL FIX: Removed isProfileContextLoading
+  }, [householdId, fetchDashboardData, fetchTasks]);
 
 
   // If ProfileContext is loading, show spinner
