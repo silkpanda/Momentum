@@ -1,110 +1,119 @@
-// src/views/Dashboard.jsx (FINAL PRODUCTION VERSION: Invite Code Flow)
+// src/views/Dashboard.jsx (MODIFIED - FINAL REDIRECT LOOP FIX)
 
-import React, { useEffect, useState, useCallback } from 'react';
-// CRITICAL FIX: Corrected import path for useNavigate
-import { useNavigate } from 'react-router-dom'; 
+import React, { useEffect, useState, useRef } from 'react'; // IMPORT useRef
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { supabase } from '../supabaseClient'; 
-
-import CreateHouseholdModal from '../components/CreateHouseholdModal';
-import CreateOrJoinModal from '../components/CreateOrJoinModal'; // Handles the Join vs Create choice
-import LoadingSpinner from '../components/LoadingSpinner'; 
+import { supabase } from '../supabaseClient';
+import LoadingSpinner from '../components/LoadingSpinner';
+import CreateOrJoinModal from '../components/CreateOrJoinModal';
 
 function Dashboard() {
-  const { currentUser } = useAuth();
-  const navigate = useNavigate();
+  const { currentUser, loading: authLoading } = useAuth();
+  const navigate = useNavigate(); 
   
-  const [loading, setLoading] = useState(true);
-  // State to track which modal should be visible: 'none', 'choice', 'create'
-  const [modalState, setModalState] = useState('none'); 
-
-  // Function to fetch the user's household ID using the privileged RPC.
-  const checkUserProfile = useCallback(async (authId) => {
-    setLoading(true);
-    
-    let householdId = null;
-
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [profile, setProfile] = useState(null);
+  const [showModal, setShowModal] = useState(false);
+  const [error, setError] = useState(null);
+  
+  // CRITICAL FIX: Use a ref to prevent re-navigation on re-mount
+  const navigatedRef = useRef(false); 
+  
+  // --- Data Fetcher for the user's profile ---
+  const fetchProfile = async (userId) => {
     try {
-      // Step 1: Securely get the user's household ID using the privileged RPC.
-      // This is the fastest, RLS-bypassing way to check if the user is attached.
-      const { data: id, error: rpcError } = await supabase.rpc('get_user_household_id', { auth_id: authId });
-
-      if (rpcError) {
-        throw rpcError;
-      }
+      setProfileLoading(true);
+      const { data, error } = await supabase
+        .from('profiles')
+        .select(`household_id`) // Only need the household ID
+        .eq('auth_user_id', userId)
+        .single();
       
-      householdId = id; 
+      if (error && error.code !== 'PGRST116') { // PGRST116 is "No rows found"
+        throw error;
+      }
 
+      setProfile(data || null);
+      
     } catch (err) {
-      console.error('Error in initial household lookup:', err.message);
+      console.error('Error fetching profile:', err);
+      setError('Could not load profile data.');
+      setProfile(null);
+    } finally {
+      setProfileLoading(false);
     }
-    
-    // 1. SUCCESS: Household found, redirect.
-    if (householdId) {
-      console.log("Dashboard: Household found on profile. Redirecting to:", householdId);
-      navigate(`/household/${householdId}`);
-      setLoading(false);
-      return;
-    }
-    
-    // 2. FAIL: No household found, show the choice screen.
-    console.log("Dashboard: No household found. Showing Create/Join Choice Modal.");
-    setModalState('choice');
-    setLoading(false);
-
-  }, [navigate]);
+  };
 
 
+  // --- PRIMARY EFFECT: Initial Fetch ---
   useEffect(() => {
+    // 1. Guardrail: Do not proceed if Auth is still loading or if we already navigated.
+    if (authLoading || navigatedRef.current) return;
+    
+    // 2. Not logged in: Route protection handles this, but here for clarity.
     if (!currentUser) {
       navigate('/login');
       return;
     }
     
-    checkUserProfile(currentUser.id);
+    // 3. User is logged in. Fetch their profile to get the householdId.
+    fetchProfile(currentUser.id);
     
-  }, [currentUser, navigate, checkUserProfile]);
-
-
-  // Handler for successful join/create action
-  const handleHouseholdActionSuccess = (householdId) => {
-      setModalState('none'); // Hide all modals
-
-      // CRITICAL FIX: Add a safe delay (300ms) to guarantee the database 
-      // commit finishes before the front-end runs the profile check.
-      setTimeout(() => {
-          console.log("Timeout complete. Re-checking profile for redirection...");
-          checkUserProfile(currentUser.id); // Re-run check to trigger redirect
-      }, 300); 
-  };
+  }, [authLoading, currentUser, navigate]); 
   
-  // --- RENDERING LOGIC ---
+  // --- SECONDARY EFFECT: Handle Redirect AFTER Profile Load ---
+  useEffect(() => {
+    // Only run if profile loading is complete AND we have profile data
+    if (!profileLoading && profile) {
+      
+      // 1. Redirect if householdId exists AND we haven't already navigated
+      if (profile.household_id && !navigatedRef.current) {
+        console.log(`Dashboard: Household found on profile. Redirecting to: ${profile.household_id}`);
+        // Set the ref to true BEFORE navigating
+        navigatedRef.current = true; 
+        navigate(`/household/${profile.household_id}`, { replace: true });
+        return;
+      }
+      
+      // 2. No household ID found: Prompt the user to create/join
+      // We only show the modal if we haven't already navigated (i.e., this isn't a post-login state)
+      if (!profile.household_id) {
+          setShowModal(true);
+      }
+    }
+  }, [profileLoading, profile, navigate]);
 
-  if (loading) {
-    return <LoadingSpinner text="Checking Profile Status..." />;
+
+  // --- Render Logic ---
+  // If the ref is true, we are in the middle of a redirect, just show the spinner to prevent flicker.
+  if (navigatedRef.current || authLoading || profileLoading) {
+    return <LoadingSpinner text="Checking user status and household..." />;
+  }
+
+  if (error) {
+    return <div className="text-signal-error p-8">{error}</div>;
   }
   
+  // The rest of the component only renders if profileLoading is false and redirect didn't happen
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-bg-canvas">
+    <div className="p-8">
+      <h1 className="text-xl font-semibold">Welcome, {currentUser?.email}</h1>
+      <p className="text-text-secondary">You must create or join a household to continue.</p>
       
-      {/* 1. Create OR Join Choice Modal */}
+      <button 
+        onClick={() => setShowModal(true)}
+        className="mt-4 py-2 px-4 bg-action-primary text-on-action font-semibold rounded-md hover:bg-action-primary-hover transition duration-150"
+      >
+        Create or Join Household
+      </button>
+
+      {/* Modal is shown if profile.household_id is null */}
       <CreateOrJoinModal 
-        isOpen={modalState === 'choice'} 
-        onClose={() => setModalState('none')} 
-        onShowCreate={() => setModalState('create')} // Switches to the create modal
-        onJoinSuccess={handleHouseholdActionSuccess} // Success handler for joining
+        isOpen={showModal} 
+        onClose={() => setShowModal(false)} 
+        // Force a data refresh after modal completes to check for new household ID
+        onHouseholdActionComplete={() => fetchProfile(currentUser.id)}
       />
-      
-      {/* 2. Create Household Form Modal (Only shown if user chose to create one) */}
-      <CreateHouseholdModal 
-        isOpen={modalState === 'create'} 
-        onClose={() => setModalState('choice')} // Back button goes to the choice screen
-        onHouseholdCreated={handleHouseholdActionSuccess} // Success handler for creating
-      />
-      
-      {modalState === 'none' && !loading && (
-        <p className="text-text-primary">Ready to begin? Something went wrong with the initial check. Please try refreshing.</p>
-      )}
     </div>
   );
 }

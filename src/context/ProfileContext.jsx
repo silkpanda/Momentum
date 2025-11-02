@@ -1,4 +1,4 @@
-// src/context/ProfileContext.jsx (DEFINITIVE FIX FOR LOAD LOOP)
+// src/context/ProfileContext.jsx (FINAL SYNCHRONIZATION FIX)
 
 import React, { useContext, useState, useEffect, useCallback } from 'react';
 import { supabase } from '../supabaseClient'; 
@@ -36,7 +36,7 @@ export function ProfileProvider({ children, householdId }) {
   const [activeProfileId, setActiveProfileId] = useState(null);
   const [isImpersonating, setIsImpersonating] = useState(false);
   
-  const { currentUser } = useAuth(); // Correctly imported and working
+  const { currentUser, loading: authLoading } = useAuth(); // CRITICAL FIX: Extract authLoading
 
 
   // --- Core Data Fetcher ---
@@ -58,8 +58,8 @@ export function ProfileProvider({ children, householdId }) {
       .order('created_at', { ascending: true }); 
 
     if (error) {
-      console.error('Supabase Profiles Fetch Error:', error);
-      setProfilesError('Error loading household members.');
+      console.error('Supabase Profiles Fetch Error:', error.message, 'Details:', error);
+      setProfilesError(error.message || 'Error loading household members. Check RLS policy or Network.');
       setProfiles([]);
     } else {
       setProfiles(data || []);
@@ -75,16 +75,24 @@ export function ProfileProvider({ children, householdId }) {
 
     const isImpersonatingCheck = targetProfile.auth_user_id !== currentUser?.id;
     
-    // NOTE: This switch function is correctly calling the setters
     setActiveProfileId(profileId);
     setIsImpersonating(isImpersonatingCheck);
     
   }, [profiles, currentUser]);
 
 
-  // Effect 1: Handles Data Fetching and Realtime subscription (Stable)
+  // Effect 1: Handles Data Fetching and Realtime subscription
   useEffect(() => {
     if (!householdId) return;
+    
+    // CRITICAL DOUBLE-GUARD: Do not proceed if Auth is still loading OR if user is null.
+    if (authLoading || !currentUser) {
+        if (!authLoading && !currentUser) {
+            // This case means Auth is done, but no user is logged in (should be caught by router)
+            console.error("AXIOM WARNING: Auth finished, but no user present. Skipping fetch.");
+        }
+        return;
+    }
 
     fetchProfiles();
 
@@ -108,26 +116,22 @@ export function ProfileProvider({ children, householdId }) {
       supabase.removeChannel(channel);
     };
 
-  }, [householdId, fetchProfiles]);
+  // The dependency array now forces a re-run when currentUser changes (login completion)
+  }, [householdId, fetchProfiles, authLoading, currentUser]); 
 
 
-  // Effect 2: Handles Profile ID selection and validity checks
-  // CRITICAL FIX: The logic is now entirely guarded against setting state with the same value.
+  // Effect 2: Handles Profile ID selection and validity checks (Stable)
   useEffect(() => {
-    // Only run if loading is complete and we have data
     if (isLoading || profiles.length === 0) return;
 
     let calculatedId = activeProfileId;
-    let shouldRecalculate = false;
     
     // 1. Check if we need to select a new ID (Initial Set OR Invalid ID)
     if (!activeProfileId || !profiles.find(p => p.id === activeProfileId)) {
         calculatedId = getInitialActiveProfile(profiles, currentUser);
-        shouldRecalculate = true;
     }
 
-    // 2. Set ID only if calculated value is DIFFERENT from current state OR if a change was forced
-    // The "OR shouldRecalculate" handles the initial state where activeProfileId is null.
+    // 2. Set ID only if calculated value is DIFFERENT from current state
     if (calculatedId !== activeProfileId) {
         setActiveProfileId(calculatedId); 
     }
@@ -138,13 +142,13 @@ export function ProfileProvider({ children, householdId }) {
 
     if (targetProfile) {
       const isImpersonatingCheck = targetProfile.auth_user_id !== currentUser?.id;
-      // Fix: Only call setIsImpersonating if the value is changing.
+      // Only call setIsImpersonating if the value is changing.
       if (isImpersonatingCheck !== isImpersonating) {
         setIsImpersonating(isImpersonatingCheck);
       }
     }
     
-  // We keep all dependencies to adhere to React rules, relying on our internal guards.
+  // The dependencies are stable and complete.
   }, [profiles, currentUser, isLoading, activeProfileId, isImpersonating]);
 
 
