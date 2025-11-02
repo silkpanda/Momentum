@@ -1,78 +1,96 @@
-// tailwind.config.js (COMPLETE FILE)
+// tailwind.config.js (FIXED: Added safelist for dynamic profile colors)
+
+import daisyui from 'daisyui';
 
 /** @type {import('tailwindcss').Config} */
 export default {
   content: [
     "./index.html",
-    "./src/**/*.{js,ts,jsx,tsx}", // Scan all our React components
+    "./src/**/*.{js,ts,jsx,tsx}",
   ],
+  
+  // 🛠️ FIX: Added the 'safelist' property
+  // This forces Tailwind to generate CSS for these classes,
+  // so they work when pulled dynamically from the database.
+  safelist: [
+    'auth-blue',
+    'auth-purple',
+    'managed-green',
+    'managed-orange',
+    'managed-red',
+    'managed-teal',
+    'managed-purple',
+    'managed-blue',
+  ],
+
   theme: {
     extend: {
-      // --- 1. Typography ---
-      fontFamily: {
-        primary: ['var(--font-primary)'],
-      },
-      fontSize: {
-        '2xl': 'var(--text-2xl)',
-        'lg': 'var(--text-lg)',
-        'base': 'var(--text-base)',
-        'sm': 'var(--text-sm)',
-        'xs': 'var(--text-xs)',
-      },
-
-      // --- 2. Colors ---
+      // FPO: Define our semantic colors as extensions
       colors: {
-        // Semantic Roles (Signal)
-        'bg-canvas': 'var(--color-bg-canvas)',
-        'bg-surface': 'var(--color-bg-surface)',
-        'bg-muted': 'var(--color-bg-muted)',
-        
-        'text-primary': 'var(--color-text-primary)',
-        'text-secondary': 'var(--color-text-secondary)',
-        'text-disabled': 'var(--color-text-disabled)',
-        'text-inverted': 'var(--color-text-inverted)',
-
-        'border-primary': 'var(--color-border-primary)',
-        'border-muted': 'var(--color-border-muted)',
-
-        // Action & State (Spark)
-        'action-primary': 'var(--color-action-primary)',
-        'action-primary-hover': 'var(--color-action-primary-hover)',
-        'text-on-action': 'var(--color-text-on-action)',
-        
-        'signal-success': 'var(--color-signal-success)',
-        'signal-warning': 'var(--color-signal-warning)',
-        'signal-danger': 'var(--color-signal-danger)',
-        'signal-error': 'var(--color-signal-error)',
-        'signal-error-bg': 'var(--color-signal-error-bg)',
-        'signal-error-border': 'var(--color-signal-error-border)',
-
-        // Accent Palette (for future theme/settings use)
-        'accent-forest': 'var(--palette-accent-forest)',
-        'accent-ruby': 'var(--palette-accent-ruby)',
-        'accent-aqua': 'var(--palette-accent-aqua)',
-
-        // --- NEW: Managed Profile Palette (CRITICAL FIX AREA) ---
-        'managed-red': 'var(--color-managed-red)',
-        'managed-orange': 'var(--color-managed-orange)',
-        'managed-yellow': 'var(--color-managed-yellow)',
-        'managed-green': 'var(--color-managed-green)',
-        'managed-teal': 'var(--color-managed-teal)',
-        'managed-blue': 'var(--color-managed-blue)',
-        'managed-purple': 'var(--color-managed-purple)',
-        'managed-gray': 'var(--color-managed-gray)',
-        
-        // Base Palette (for convenience, if needed)
-        'palette-gray-0': 'var(--palette-gray-0)',
-        'palette-gray-50': 'var(--palette-gray-50)',
-        'palette-gray-100': 'var(--palette-gray-100)',
-        'palette-gray-300': 'var(--palette-gray-300)',
-        'palette-gray-500': 'var(--palette-gray-500)',
-        'palette-gray-700': 'var(--palette-gray-700)',
-        'palette-gray-900': 'var(--palette-gray-900)',
-        'palette-black': 'var(--palette-black)',
+        // Example: 'color-action-primary': 'var(--color-action-primary)',
       },
     },
   },
-  plugins: [],
-}
+  
+  plugins: [
+    daisyui,
+  ],
+  
+  // DaisyUI theme configuration
+  daisyui: {
+    themes: [
+      {
+        momentum: {
+          // FPO: This is a placeholder theme. We will replace this
+          // with the full theme from the Style Guide.
+          "primary": "#661AE6",
+          "secondary": "#D926AA",
+          "accent": "#1FB2A5",
+          "neutral": "#191D24",
+          "base-100": "#2A303C",
+          "info": "#3ABFF8",
+          "success": "#36D399",
+          "warning": "#FBBD23",
+          "error": "#F87272",
+
+          // 🛠️ DEFINE THE ACTUAL COLORS
+          // We must also define what these classes mean.
+          // These are based on the 'UpdateProfileModal.jsx' file.
+          '.auth-blue': {
+            'background-color': '#3b82f6', // bg-blue-500
+            'color': '#ffffff', // text-white
+          },
+          '.auth-purple': {
+            'background-color': '#8b5cf6', // bg-violet-500
+            'color': '#ffffff',
+          },
+          '.managed-green': {
+            'background-color': '#22c55e', // bg-green-500
+            'color': '#ffffff',
+          },
+          '.managed-orange': {
+            'background-color': '#f97316', // bg-orange-500
+            'color': '#ffffff',
+          },
+          '.managed-red': {
+            'background-color': '#ef4444', // bg-red-500
+            'color': '#ffffff',
+          },
+          '.managed-teal': {
+            'background-color': '#14b8a6', // bg-teal-500
+            'color': '#ffffff',
+          },
+          '.managed-purple': {
+            'background-color': '#a855f7', // bg-purple-500
+            'color': '#ffffff',
+          },
+          '.managed-blue': {
+            'background-color': '#0ea5e9', // bg-sky-500
+            'color': '#ffffff',
+          },
+        },
+      },
+      // FPO: "dark", "cupcake", "light"
+    ],
+  },
+};

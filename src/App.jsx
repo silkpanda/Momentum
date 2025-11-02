@@ -1,88 +1,64 @@
-// src/App.jsx
+// src/App.jsx (FIXED: Removed redundant HouseholdContextWrapper)
 
 import React from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom'; 
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { ProfileProvider } from './context/ProfileContext'; 
+
+// Views
 import Login from './views/Login';
 import SignUp from './views/SignUp';
-import Dashboard from './views/Dashboard'; 
+import Dashboard from './views/Dashboard';
 import HouseholdDashboard from './views/HouseholdDashboard';
 import LoadingSpinner from './components/LoadingSpinner';
 
+// This is the main protected route component
+function ProtectedRoute({ children }) {
+  const { currentUser, loading } = useAuth();
 
-// --- HOUSEHOLD CONTEXT WRAPPER COMPONENT ---
-const HouseholdContextWrapper = ({ children }) => {
-    // FIX: Check for 'currentUser' and 'loading', not 'isAuthenticated'
-    const { currentUser, loading } = useAuth(); 
-    
-    if (loading) {
-        return <LoadingSpinner text="Authenticating..." />;
-    }
-    
-    if (!currentUser) {
-        return <Navigate to="/login" replace />;
-    }
-    
-    // All routes that require household data and profile context should be
-    // wrapped in the ProfileProvider.
-    return (
-        <ProfileProvider>
-            {children}
-        </ProfileProvider>
-    );
-};
-// --- END CONTEXT WRAPPER ---
+  if (loading) {
+    // Show a top-level spinner while auth is loading
+    return <LoadingSpinner />;
+  }
 
+  if (!currentUser) {
+    // Redirect to login if not authenticated
+    return <Navigate to="/login" replace />;
+  }
 
-// --- PRIVATE ROUTE COMPONENT (Standard for secured routes) ---
-const PrivateRoute = ({ children }) => {
-    // FIX: Check for 'currentUser' and 'loading', not 'isAuthenticated'
-    const { currentUser, loading } = useAuth(); 
-    
-    if (loading) {
-        return <LoadingSpinner text="Authenticating..." />;
-    }
-    
-    // CORE FIX: Use currentUser object to determine authentication status
-    return currentUser ? children : <Navigate to="/login" replace />;
-};
-// --- END PRIVATE ROUTE ---
+  // Render the protected component
+  return children;
+}
 
-
+// 🛠️ FIX: Removed the redundant 'HouseholdContextWrapper'
+// The HouseholdDashboard now manages its own ProfileProvider.
 function App() {
   return (
-    // AuthProvider is the outermost layer, handling authentication state
     <AuthProvider>
-        <Routes>
-            {/* Public Routes */}
-            <Route path="/login" element={<Login />} />
-            <Route path="/signup" element={<SignUp />} />
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            
-            {/* Private Routes */}
-            <Route 
-                path="/dashboard" 
-                element={
-                    <PrivateRoute>
-                        <Dashboard />
-                    </PrivateRoute>
-                } 
-            />
-            
-            {/* Household Dashboard Route (Requires the new ProfileContext) */}
-            <Route 
-                path="/household/:householdId" 
-                element={
-                    <HouseholdContextWrapper> 
-                        <HouseholdDashboard />
-                    </HouseholdContextWrapper>
-                } 
-            />
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/signup" element={<SignUp />} />
+        
+        {/* Protected Routes */}
+        <Route 
+          path="/dashboard" 
+          element={
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/household/:householdId" 
+          element={
+            <ProtectedRoute>
+              <HouseholdDashboard />
+            </ProtectedRoute>
+          } 
+        />
 
-            {/* Catch-all route */}
-            <Route path="*" element={<p>404: Not Found</p>} />
-        </Routes>
+        {/* Default route */}
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+      </Routes>
     </AuthProvider>
   );
 }

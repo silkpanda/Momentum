@@ -1,42 +1,61 @@
-// src/components/ProfileCard.jsx
+// src/components/ProfileCard.jsx (FIXED: Uses display_name and profile_color)
 
 import React from 'react';
+import { PencilSquareIcon } from '@heroicons/react/24/solid';
+import { useProfile } from '../context/ProfileContext';
 
-/**
- * Renders a small, stylized card for a household member.
- * This component dynamically applies the member's profile color.
- * * Props:
- * @param {string} name - The display name of the member (e.g., "Dad", "Emily").
- * @param {string} color - The member's chosen color key (e.g., 'forest', 'ruby', 'aqua'). 
- * This maps to the CSS variables in theme.css.
- */
-function ProfileCard({ name, color }) {
-  // We clean the color name and use it to construct the CSS variable name.
-  // Example: 'forest' becomes 'var(--profile-color-forest)'
-  const colorKey = `--profile-color-${color}`;
+function ProfileCard({ profile, isImpersonating = false, onClick }) {
+  const { openUpdateModal } = useProfile();
 
-  // The first letter of the name is used for the simple avatar.
-  const initial = name.charAt(0).toUpperCase();
+  // 🛠️ FIX: Use 'display_name' and 'profile_color'
+  const name = profile?.display_name || 'Loading...';
+  const color = profile?.profile_color || 'bg-base-300';
+  
+  const avatarText = (name && name.length > 0) ? name.charAt(0).toUpperCase() : '?';
 
-  // We use the `style` prop to inject a custom CSS variable value into this component.
-  // This allows the background to be set to the user's dynamic color.
+  const handleEdit = (e) => {
+    e.stopPropagation(); // Prevent card click
+    
+    if (profile?.id) {
+      if (profile.auth_user_id) {
+        openUpdateModal(profile.id);
+      } else {
+        console.log('FPO: Open Edit Managed Profile Modal');
+        // FPO: openEditManagedModal(profile.id);
+      }
+    }
+  };
+
   return (
     <div 
-      className="p-3 w-40 rounded-lg shadow-md flex flex-col items-center justify-center transition-shadow duration-150 ease-in-out"
-      style={{
-        backgroundColor: `var(${colorKey}, var(--color-bg-muted))`, // Use the dynamic color, or fall back to muted gray
-        color: 'var(--color-text-inverted)', // Text on the colored background should be white/inverted
-      }}
+      className={`flex items-center p-2 rounded-lg shadow-md cursor-pointer ${color} text-base-100`}
+      onClick={onClick}
     >
-      <div 
-        className="w-10 h-10 rounded-full bg-color-bg-surface flex items-center justify-center mb-2"
-        style={{ color: 'var(--color-text-primary)', backgroundColor: 'var(--color-bg-surface)' }}
-      >
-        <span className="text-lg font-semibold">{initial}</span>
+      {/* Avatar */}
+      <div className="flex-shrink-0">
+        <div className="flex items-center justify-center h-10 w-10 rounded-full bg-black bg-opacity-20 text-lg font-bold">
+          {avatarText}
+        </div>
       </div>
-      <p className="text-sm font-medium truncate w-full text-center" title={name}>
-        {name}
-      </p>
+
+      {/* Name and Status */}
+      <div className="flex-grow mx-2">
+        <p className="font-bold">{name}</p>
+        <p className="text-xs font-light opacity-80">
+          {isImpersonating ? 'Viewing as Child (Click to return)' : 'Active Profile'}
+        </p>
+      </div>
+
+      {/* Edit Button */}
+      <div className="flex-shrink-0">
+        <button 
+          className="btn btn-ghost btn-circle btn-sm"
+          onClick={handleEdit}
+          aria-label="Edit profile"
+        >
+          <PencilSquareIcon className="h-5 w-5" />
+        </button>
+      </div>
     </div>
   );
 }

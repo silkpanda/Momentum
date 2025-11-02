@@ -1,76 +1,62 @@
-// src/components/ProfileListItem.jsx
+// src/components/ProfileListItem.jsx (FIXED: Uses display_name and profile_color)
 
 import React from 'react';
+import { PencilSquareIcon } from '@heroicons/react/24/solid';
+import { useProfile } from '../context/ProfileContext';
 
-/**
- * Renders a full, stylized list item for a household member profile.
- * This component is designed to be used within the HouseholdDashboard profiles grid.
- * It now correctly handles color contrast for all profile types (Admin and Managed).
- * * @param {object} profile - The profile object from the database.
- * @param {string} currentAuthUserId - The ID of the currently logged-in user for 'You' designation.
- * @param {function} handleEditProfile - Function to open the edit modal.
- * @param {function} handleDeleteProfile - Function to handle profile hard delete.
- */
-function ProfileListItem({ profile, currentAuthUserId, handleEditProfile, handleDeleteProfile }) {
+function ProfileListItem({ profile, isActive, onClick }) {
+  const { openUpdateModal } = useProfile();
+
+  // 🛠️ FIX: Use 'display_name' and 'profile_color'
+  const name = profile?.display_name || '...';
+  const color = profile?.profile_color || 'bg-base-300';
+  const avatarText = (name && name.length > 0) ? name.charAt(0).toUpperCase() : '?';
+
+  const handleEdit = (e) => {
+    e.stopPropagation(); // Prevent card click
     
-    const isAdmin = profile.is_admin;
-    
-    // The core text color rule: If the profile has *any* color set (meaning a dark background), 
-    // the text must be light/inverted for contrast. Otherwise, use dark/primary text.
-    const hasDynamicColor = !!profile.profile_color; 
-    
-    const textColorClass = hasDynamicColor ? 'text-text-inverted' : 'text-text-primary';
-    const subTextColorClass = hasDynamicColor ? 'text-text-inverted opacity-80' : 'text-text-secondary';
+    if (profile?.id) {
+      if (profile.auth_user_id) {
+        openUpdateModal(profile.id);
+      } else {
+        console.log('FPO: Open Edit Managed Profile Modal');
+        // FPO: openEditManagedModal(profile.id);
+      }
+    }
+  };
+  
+  const itemClasses = isActive
+    ? 'border-primary'
+    : 'border-transparent hover:border-base-content opacity-60 hover:opacity-100';
 
-    // The background color is dynamically set for ALL profiles using their profile_color.
-    const dynamicStyle = {
-        backgroundColor: profile.profile_color 
-            ? `var(--color-${profile.profile_color})` 
-            : 'var(--color-bg-muted)' 
-    };
-
-    return (
-        <div 
-            key={profile.id} 
-            className={`p-4 rounded-md shadow-sm border border-border-primary transition duration-150 ease-in-out hover:shadow-lg`}
-            style={dynamicStyle}
-        >
-            <p className={`font-medium text-lg ${textColorClass}`}>
-                {profile.display_name}
-            </p>
-            <p className={`text-sm ${subTextColorClass}`}>
-                {isAdmin
-                    ? (profile.auth_user_id === currentAuthUserId ? 'Admin (You)' : 'Co-Admin') 
-                    : 'Managed User'}
-            </p>
-            <p className={`text-xs mt-2 ${subTextColorClass}`}>
-                Points: {profile.points}
-            </p>
-
-            {/* EDIT/DELETE BUTTONS */}
-            <div className="flex justify-between items-center mt-3 pt-3 border-t border-solid border-opacity-30" 
-                 // The divider line needs to adjust for contrast. Inverted for colored background, Primary for light background.
-                 style={{ borderColor: hasDynamicColor ? 'var(--color-text-inverted)' : 'var(--color-border-primary)' }}>
-                {/* EDIT BUTTON (Visible for ALL profiles) */}
-                <button
-                    onClick={() => handleEditProfile(profile)}
-                    className={`text-xs ${hasDynamicColor ? 'text-text-inverted hover:text-white' : 'text-text-primary hover:text-action-primary'} font-medium underline-offset-2 hover:underline`}
-                >
-                    Edit Profile
-                </button>
-
-                {/* DELETE BUTTON (Visible only if NOT the current logged-in user) */}
-                {profile.auth_user_id !== currentAuthUserId && (
-                    <button
-                        onClick={() => handleDeleteProfile(profile.id, profile.display_name)}
-                        className={`text-xs ${hasDynamicColor ? 'text-text-inverted hover:text-signal-danger' : 'text-signal-danger hover:underline'} font-medium underline-offset-2 hover:underline`}
-                    >
-                        Hard Delete
-                    </button>
-                )}
-            </div>
+  return (
+    <div 
+      className={`flex flex-col items-center cursor-pointer p-1 border-b-2 transition-all ${itemClasses}`}
+      onClick={onClick}
+    >
+      {/* Avatar */}
+      <div className={`flex-shrink-0 relative ${profile.auth_user_id ? 'group' : ''}`}>
+        <div className={`flex items-center justify-center h-12 w-12 rounded-full font-bold ${color} text-base-100`}>
+          {avatarText}
         </div>
-    );
+        
+        {profile.auth_user_id && (
+          <button 
+            className="absolute -top-1 -right-1 btn btn-xs btn-circle btn-ghost bg-base-100 text-content-primary opacity-0 group-hover:opacity-100"
+            onClick={handleEdit}
+            aria-label="Edit profile"
+          >
+            <PencilSquareIcon className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+      
+      {/* Name */}
+      <span className="mt-1 text-xs font-medium w-16 text-center truncate">
+        {name}
+      </span>
+    </div>
+  );
 }
 
 export default ProfileListItem;
