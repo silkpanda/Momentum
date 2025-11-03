@@ -1,4 +1,4 @@
-// src/components/ProfileCard.jsx (FIXED: Uses display_name and profile_color)
+// src/components/ProfileCard.jsx (FIXED: Used correct 'text-base-content' class)
 
 import React from 'react';
 import { PencilSquareIcon } from '@heroicons/react/24/solid';
@@ -7,7 +7,6 @@ import { useProfile } from '../context/ProfileContext';
 function ProfileCard({ profile, isImpersonating = false, onClick }) {
   const { openUpdateModal } = useProfile();
 
-  // 🛠️ FIX: Use 'display_name' and 'profile_color'
   const name = profile?.display_name || 'Loading...';
   const color = profile?.profile_color || 'bg-base-300';
   
@@ -28,20 +27,23 @@ function ProfileCard({ profile, isImpersonating = false, onClick }) {
 
   return (
     <div 
-      className={`flex items-center p-2 rounded-lg shadow-md cursor-pointer ${color} text-base-100`}
+      className={`flex items-center p-2 rounded-lg shadow-md cursor-pointer bg-base-100`}
       onClick={onClick}
     >
       {/* Avatar */}
       <div className="flex-shrink-0">
-        <div className="flex items-center justify-center h-10 w-10 rounded-full bg-black bg-opacity-20 text-lg font-bold">
+        <div className={`flex items-center justify-center h-10 w-10 rounded-full text-lg font-bold ${color} text-base-100`}>
           {avatarText}
         </div>
       </div>
 
       {/* Name and Status */}
       <div className="flex-grow mx-2">
-        <p className="font-bold">{name}</p>
-        <p className="text-xs font-light opacity-80">
+        {/* 🛠️ FIX: Replaced 'text-content-primary' with 'text-base-content' */}
+        <p className="font-bold text-base-content">{name}</p>
+        
+        {/* 🛠️ FIX: Replaced 'text-content-secondary' with 'text-base-content' and opacity */}
+        <p className="text-xs font-light text-base-content opacity-80">
           {isImpersonating ? 'Viewing as Child (Click to return)' : 'Active Profile'}
         </p>
       </div>
@@ -53,7 +55,8 @@ function ProfileCard({ profile, isImpersonating = false, onClick }) {
           onClick={handleEdit}
           aria-label="Edit profile"
         >
-          <PencilSquareIcon className="h-5 w-5" />
+          {/* 🛠️ FIX: Added 'text-base-content' to the icon */}
+          <PencilSquareIcon className="h-5 w-5 text-base-content" />
         </button>
       </div>
     </div>

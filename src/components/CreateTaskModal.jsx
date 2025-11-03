@@ -1,8 +1,9 @@
-// src/components/CreateTaskModal.jsx (FIXED: Uses display_name)
+// src/components/CreateTaskModal.jsx (FIXED: Style Guide UI)
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { useProfile } from '../context/ProfileContext';
+import { XMarkIcon } from '@heroicons/react/24/solid';
 
 function CreateTaskModal({ isOpen, onClose, preselectedProfileId }) {
   const { profiles, activeProfileData } = useProfile();
@@ -13,18 +14,15 @@ function CreateTaskModal({ isOpen, onClose, preselectedProfileId }) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Effect to set the default assigned profile
   useEffect(() => {
-    // Only set if the profiles are actually loaded
-    if (profiles.length > 0) {
+    if (isOpen && profiles.length > 0) {
       if (preselectedProfileId) {
         setAssignedProfileId(preselectedProfileId);
-      } else {
-        // Default to the first profile if none is preselected
+      } else if (profiles.length > 0) {
         setAssignedProfileId(profiles[0].id);
       }
     }
-  }, [preselectedProfileId, profiles, isOpen]); // Reset when modal opens
+  }, [preselectedProfileId, profiles, isOpen]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -45,7 +43,7 @@ function CreateTaskModal({ isOpen, onClose, preselectedProfileId }) {
         assigned_profile_id: assignedProfileId,
         title: title,
         point_value: pointValue,
-        status: 'pending' // FPO: Add due_date, etc.
+        status: 'pending'
       });
 
     setIsLoading(false);
@@ -54,10 +52,7 @@ function CreateTaskModal({ isOpen, onClose, preselectedProfileId }) {
       console.error('AXIOM ERROR: Failed to create task', insertError);
       setError(insertError.message);
     } else {
-      // Success
       console.log('AXIOM LOG: Task created successfully');
-      // FPO: We don't need to refresh tasks because the
-      // realtime subscription in HouseholdDashboard should catch it.
       handleClose();
     }
   };
@@ -66,20 +61,30 @@ function CreateTaskModal({ isOpen, onClose, preselectedProfileId }) {
     // Reset form
     setTitle('');
     setPointValue(10);
-    setAssignedProfileId(profiles.length > 0 ? profiles[0].id : ''); // Reset to default
+    setAssignedProfileId(profiles.length > 0 ? profiles[0].id : '');
     setError(null);
     setIsLoading(false);
     onClose();
   };
 
-  if (!isOpen) {
-    return null;
-  }
-
+  // 🛠️ FIX: Use 'modal-open' class conditionally
   return (
-    <div className="modal modal-open">
-      <div className="modal-box">
-        <h3 className="font-bold text-lg mb-4">Create New Task</h3>
+    <div className={`modal ${isOpen ? 'modal-open' : ''} modal-bottom sm:modal-middle`}>
+      {/* 🛠️ FIX: Updated modal-box styling */}
+      <div className="modal-box bg-base-200">
+        
+        {/* Header */}
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="font-bold text-lg">Create New Task</h3>
+          <button 
+            className="btn btn-ghost btn-sm btn-circle" 
+            onClick={handleClose}
+            disabled={isLoading}
+          >
+            <XMarkIcon className="h-6 w-6" />
+          </button>
+        </div>
+
         
         <form onSubmit={handleSubmit}>
           <div className="form-control w-full mb-4">
@@ -96,39 +101,42 @@ function CreateTaskModal({ isOpen, onClose, preselectedProfileId }) {
             />
           </div>
 
-          <div className="form-control w-full mb-4">
-            <label className="label">
-              <span className="label-text">Point Value</span>
-            </label>
-            <input 
-              type="number" 
-              className="input input-bordered w-full"
-              value={pointValue}
-              onChange={(e) => setPointValue(parseInt(e.target.value, 10))}
-              min="0"
-              step="5"
-              required
-            />
-          </div>
+          <div className="flex gap-4 mb-4">
+            <div className="form-control w-1/2">
+              <label className="label">
+                <span className="label-text">Point Value</span>
+              </label>
+              <input 
+                type="number" 
+                className="input input-bordered w-full"
+                value={pointValue}
+                onChange={(e) => setPointValue(parseInt(e.target.value, 10))}
+                min="0"
+                step="5"
+                required
+              />
+            </div>
 
-          <div className="form-control w-full mb-4">
-            <label className="label">
-              <span className="label-text">Assign To</span>
-            </label>
-            <select 
-              className="select select-bordered"
-              value={assignedProfileId}
-              onChange={(e) => setAssignedProfileId(e.target.value)}
-              required
-            >
-              <option value="" disabled>Select profile</option>
-              {/* 🛠️ FIX: Map over the profiles from context and use display_name */}
-              {profiles.map(profile => (
-                <option key={profile.id} value={profile.id}>
-                  {profile.display_name} 
-                </option>
-              ))}
-            </select>
+            <div className="form-control w-1/2">
+              <label className="label">
+                <span className="label-text">Assign To</span>
+              </label>
+              <select 
+                className="select select-bordered"
+                value={assignedProfileId}
+                onChange={(e) => setAssignedProfileId(e.target.value)}
+                required
+              >
+                {/* Note: We removed "Select profile" because the useEffect
+                  now guarantees a default selection, which is better UX.
+                */}
+                {profiles.map(profile => (
+                  <option key={profile.id} value={profile.id}>
+                    {profile.display_name} 
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           {error && (
@@ -139,16 +147,8 @@ function CreateTaskModal({ isOpen, onClose, preselectedProfileId }) {
 
           <div className="modal-action">
             <button 
-              type="button" 
-              className="btn btn-ghost" 
-              onClick={handleClose}
-              disabled={isLoading}
-            >
-              Cancel
-            </button>
-            <button 
               type="submit" 
-              className="btn btn-primary"
+              className="btn btn-primary w-full"
               disabled={isLoading}
             >
               {isLoading ? <span className="loading loading-spinner"></span> : 'Create Task'}
@@ -157,6 +157,11 @@ function CreateTaskModal({ isOpen, onClose, preselectedProfileId }) {
         </form>
 
       </div>
+      
+      {/* 🛠️ FIX: Add modal-backdrop for clicking off to close */}
+      <form method="dialog" className="modal-backdrop">
+        <button onClick={handleClose} disabled={isLoading}>close</button>
+      </form>
     </div>
   );
 }

@@ -1,28 +1,26 @@
-/* src/index.css: THE PRIMARY CSS ENTRY POINT */
-
-/* --- 1. VARIABLE IMPORT & DEFINITION --- */
-/* CRITICAL: We use @import to pull ALL our theme variables FIRST. */
-@import "./styles/theme.css"; 
-
-/* --- 2. TAILWIND DIRECTIVES --- */
-/* These MUST come AFTER all other imports and before any other CSS. */
+/* src/index.css */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* --- 3. GLOBAL BASE STYLES --- */
-/* Apply the canvas background globally using the variable we imported */
-body {
-    /* Set the font from the theme variables */
-    font-family: var(--font-primary);
-    /* Set the background from the theme variables */
-    background-color: var(--color-bg-canvas);
-    /* Set the primary text color from the theme variables */
-    color: var(--color-text-primary);
-    margin: 0;
-    padding: 0;
-    /* This prevents mobile highlight on elements */
-    -webkit-tap-highlight-color: transparent; 
+/*
+  Set up the base font styles according to the Style Guide
+  - Primary Typeface: Inter (with system fallbacks)
+*/
+html,
+body,
+#root {
+  height: 100%;
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
 }
 
-/* Any other global utility or base styles can go below here. */
+body {
+  /* 🛠️ FIX: Removed 'background-color'
+     We now let DaisyUI's 'data-theme' attribute on
+     the <html> tag control the 'base-100' background.
+  */
+  
+  /* Per Style Guide: "maximum legibility" */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}

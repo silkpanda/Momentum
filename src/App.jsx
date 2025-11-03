@@ -1,4 +1,4 @@
-// src/App.jsx (FIXED: Removed redundant HouseholdContextWrapper)
+// src/App.jsx (FIXED: Uses 'user' instead of 'currentUser')
 
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
@@ -13,14 +13,16 @@ import LoadingSpinner from './components/LoadingSpinner';
 
 // This is the main protected route component
 function ProtectedRoute({ children }) {
-  const { currentUser, loading } = useAuth();
+  // 🛠️ FIX: Changed 'currentUser' to 'user' to match the AuthContext
+  const { user, loading } = useAuth();
 
   if (loading) {
     // Show a top-level spinner while auth is loading
     return <LoadingSpinner />;
   }
 
-  if (!currentUser) {
+  // 🛠️ FIX: Changed 'currentUser' to 'user'
+  if (!user) {
     // Redirect to login if not authenticated
     return <Navigate to="/login" replace />;
   }
@@ -29,8 +31,6 @@ function ProtectedRoute({ children }) {
   return children;
 }
 
-// 🛠️ FIX: Removed the redundant 'HouseholdContextWrapper'
-// The HouseholdDashboard now manages its own ProfileProvider.
 function App() {
   return (
     <AuthProvider>

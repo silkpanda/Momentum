@@ -1,7 +1,6 @@
-// src/components/TaskListItem.jsx (FIXED: Uses display_name and profile_color)
+// src/components/TaskListItem.jsx (FIXED: Used correct 'text-base-content' class)
 
 import React from 'react';
-// (useProfile hook was already correctly removed from this file)
 
 // Icons
 import { 
@@ -19,21 +18,15 @@ function TaskListItem({ task, profiles }) {
 
   const assignedProfile = profiles.find(p => p.id === task.assigned_profile_id);
   
-  // 🛠️ FIX: Use 'profile_color' and 'display_name'
   const profileColor = assignedProfile?.profile_color || 'bg-base-300';
   const profileName = assignedProfile?.display_name || 'Unassigned';
 
-  // FPO: Task action handlers
   const handleComplete = () => {
     console.log(`FPO: Complete task ${task.id}`);
   };
 
   const handleUndo = () => {
     console.log(`FPO: Undo task ${task.id}`);
-  };
-
-  const handleClaim = () => {
-    console.log(`FPO: Claim task ${task.id}`);
   };
 
   const renderTaskAction = () => {
@@ -43,7 +36,8 @@ function TaskListItem({ task, profiles }) {
           className="btn btn-ghost btn-circle btn-sm"
           onClick={handleUndo}
         >
-          <ArrowUturnDownIcon className="h-5 w-5 text-content-secondary" />
+          {/* 🛠️ FIX: Replaced 'text-content-secondary' with 'text-base-content' + opacity */}
+          <ArrowUturnDownIcon className="h-5 w-5 text-base-content opacity-60" />
         </button>
       );
     }
@@ -54,7 +48,8 @@ function TaskListItem({ task, profiles }) {
           className="btn btn-ghost btn-circle btn-sm"
           onClick={handleComplete}
         >
-          <CheckCircleIconOutline className="h-6 w-6 text-content-secondary hover:text-success" />
+          {/* 🛠️ FIX: Replaced 'text-content-secondary' with 'text-base-content' + opacity */}
+          <CheckCircleIconOutline className="h-6 w-6 text-base-content opacity-60 hover:text-success" />
         </button>
       );
     }
@@ -67,17 +62,20 @@ function TaskListItem({ task, profiles }) {
       {/* Profile Color + Name */}
       <div className="flex-shrink-0 flex items-center">
         <div className={`w-3 h-10 rounded-full ${profileColor}`}></div>
-        <span className="ml-2 text-xs font-medium text-content-secondary w-16 truncate">
+        {/* 🛠️ FIX: Replaced 'text-content-secondary' with 'text-base-content' + opacity */}
+        <span className="ml-2 text-xs font-medium text-base-content opacity-80 w-16 truncate">
           {profileName}
         </span>
       </div>
 
       {/* Task Title + Points */}
       <div className="flex-grow mx-2">
-        <p className={`font-medium ${task.status === 'completed' ? 'line-through text-content-secondary' : ''}`}>
+        {/* 🛠️ FIX: Added 'text-base-content' and handled completed state */}
+        <p className={`font-medium text-base-content ${task.status === 'completed' ? 'line-through opacity-60' : ''}`}>
           {task.title}
         </p>
-        <span className="text-sm font-light text-content-secondary">
+        {/* 🛠️ FIX: Replaced 'text-content-secondary' with 'text-base-content' + opacity */}
+        <span className="text-sm font-light text-base-content opacity-80">
           {task.point_value} pts
         </span>
       </div>

@@ -1,4 +1,4 @@
-// src/views/HouseholdDashboard.jsx (FIXED: Removed stray </WELCOME> tag)
+// src/views/HouseholdDashboard.jsx (FIXED: Correctly render all profiles)
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -11,7 +11,7 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import ProfileCard from '../components/ProfileCard';
 import ProfileListItem from '../components/ProfileListItem';
 import TaskListItem from '../components/TaskListItem';
-import CreateManagedProfileModal from '../components/CreateManagedProfileModal';
+import CreateChildProfileModal from '../components/CreateChildProfileModal';
 import InviteMemberModal from '../components/InviteMemberModal';
 import EditManagedProfileModal from '../components/EditManagedProfileModal';
 import UpdateProfileModal from '../components/UpdateProfileModal';
@@ -30,19 +30,15 @@ import {
 function HouseholdDashboard() {
   const { householdId } = useParams();
   const navigate = useNavigate();
-  // 'userProfile' comes from useAuth(), NOT useProfile()
   const { currentUser, loading: authLoading, userProfile, logout } = useAuth();
 
-  // State for this Dashboard (Parent)
   const [isTasksLoading, setIsTasksLoading] = useState(true);
   const [tasks, setTasks] = useState([]);
   const [tasksError, setTasksError] = useState(null);
   
-  // Modal States
-  const [isCreateProfileModalOpen, setIsCreateProfileModalOpen] = useState(false);
+  const [isCreateChildProfileModalOpen, setIsCreateChildProfileModalOpen] = useState(false);
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   
-  // Ref to prevent main effect from re-running on dev strict mode
   const fetchAttemptedRef = useRef(false);
 
   // --- Data Fetching Functions ---
@@ -112,6 +108,7 @@ function HouseholdDashboard() {
     console.log('AXIOM LOG: [Dashboard] Main Effect: FIRING fetchDashboardData');
     fetchDashboardData();
 
+    // NOTE: Realtime subscription for tasks is here
     const channel = supabase
       .channel(`tasks_for_${householdId}`)
       .on(
@@ -155,13 +152,13 @@ function HouseholdDashboard() {
   return (
     <ProfileProvider householdId={householdId}>
       <DashboardContent
-        userProfile={userProfile} // Pass the userProfile from useAuth() down
+        userProfile={userProfile}
         isTasksLoading={isTasksLoading}
         tasks={tasks}
         tasksError={tasksError}
         onLogout={handleLogout}
         onOpenInvite={() => setIsInviteModalOpen(true)}
-        onOpenCreateProfile={() => setIsCreateProfileModalOpen(true)}
+        onOpenCreateProfile={() => setIsCreateChildProfileModalOpen(true)}
       />
 
       {/* Modals */}
@@ -171,13 +168,12 @@ function HouseholdDashboard() {
         householdId={householdId}
       />
       
-      <CreateManagedProfileModal
-        isOpen={isCreateProfileModalOpen}
-        onClose={() => setIsCreateProfileModalOpen(false)}
+      <CreateChildProfileModal
+        isOpen={isCreateChildProfileModalOpen}
+        onClose={() => setIsCreateChildProfileModalOpen(false)}
         householdId={householdId}
       />
       
-      {/* These modals are self-activating via context */}
       <EditManagedProfileModal />
       <UpdateProfileModal />
       <CreateTaskModal />
@@ -189,7 +185,7 @@ function HouseholdDashboard() {
 
 // --- Child Component: DashboardContent ---
 function DashboardContent({ 
-  userProfile, // This is the prop from useAuth()
+  userProfile,
   isTasksLoading, 
   tasks, 
   tasksError,
@@ -198,7 +194,6 @@ function DashboardContent({
   onOpenCreateProfile
 }) {
   
-  // Consume the profile context
   const { 
     profiles, 
     activeProfileId, 
@@ -208,7 +203,6 @@ function DashboardContent({
     switchProfile 
   } = useProfile();
 
-  // Modal State
   const [isCreateTaskModalOpen, setIsCreateTaskModalOpen] = useState(false);
   
   console.log(`AXIOM LOG: [DashboardContent] Render. 
@@ -219,46 +213,54 @@ function DashboardContent({
 
   // Loading & Error Root State
   if (isProfilesLoading || isTasksLoading) {
-    console.log('AXIOM LOG: [DashboardContent] RENDER: LoadingSpinner (Profiles or Tasks)');
-    return <LoadingSpinner />;
+    return (
+      <div className="bg-base-100 h-full w-full">
+        <LoadingSpinner />
+      </div>
+    );
   }
 
   if (profilesError || tasksError) {
-    console.log('AXIOM LOG: [DashboardContent] RENDER: Error Display');
     return (
-      <div className="text-error-content p-4">
-        <p>Error loading dashboard:</p>
-        <p>{profilesError}</p>
-        <p>{tasksError}</p>
+      <div className="bg-base-100 h-full w-full p-4">
+        <div className="alert alert-error">
+          <p>Error loading dashboard:</p>
+          <p>{profilesError}</p>
+          <p>{tasksError}</p>
+        </div>
       </div>
     );
   }
   
   // --- Computed UI State ---
   
-  // Find authProfile safely, checking for userProfile prop first
-  const authProfile = userProfile 
-    ? profiles.find(p => p.auth_user_id === userProfile.auth_user_id) 
+  // 🛠️ FIX: Correctly filter profiles into Parents (have auth) and Children (no auth)
+  const parentProfiles = profiles.filter(p => p.auth_user_id);
+  const childProfiles = profiles.filter(p => !p.auth_user_id);
+
+  // Get the *currently logged-in* user's parent profile
+  const loggedInParentProfile = userProfile 
+    ? parentProfiles.find(p => p.auth_user_id === userProfile.auth_user_id) 
     : undefined;
     
-  const managedProfiles = profiles.filter(p => !p.auth_user_id);
-  const isAdmin = activeProfileData?.is_admin || false;
+  const isParent = activeProfileData?.is_admin || false;
   
-  // Determine if impersonating, now with safe checks
-  const isImpersonating = authProfile ? activeProfileData?.id !== authProfile.id : false;
+  // 🛠️ FIX: Impersonating logic must use the loggedInParentProfile
+  const isImpersonating = loggedInParentProfile ? activeProfileData?.id !== loggedInParentProfile.id : false;
 
 
   console.log('AXIOM LOG: [DashboardContent] RENDER: Main UI');
+  
   return (
-    <div className="p-4 flex flex-col h-full">
+    <div className="p-4 flex flex-col h-full bg-base-100 text-base-content">
       {/* Header */}
       <header className="flex justify-between items-center mb-4">
         {activeProfileData ? (
           <ProfileCard 
             profile={activeProfileData} 
             isImpersonating={isImpersonating}
-            // Guard the onClick so it only works if authProfile is loaded
-            onClick={authProfile ? () => switchProfile(authProfile.id) : undefined}
+            // 🛠️ FIX: Use loggedInParentProfile to ensure we switch back to the correct user
+            onClick={loggedInParentProfile ? () => switchProfile(loggedInParentProfile.id) : undefined}
           />
         ) : (
           <div className="skeleton h-12 w-48"></div>
@@ -271,16 +273,11 @@ function DashboardContent({
 
       {/* Profile Selector */}
       <div className="mb-4">
-        <h2 className="text-sm font-medium text-content-secondary mb-2">Household</h2>
+        <h2 className="font-medium text-lg text-base-content opacity-60 mb-2">Household</h2>
         <div className="flex space-x-2 overflow-x-auto p-1">
-          {authProfile && (
-            <ProfileListItem
-              profile={authProfile}
-              isActive={authProfile.id === activeProfileId}
-              onClick={() => switchProfile(authProfile.id)}
-            />
-          )}
-          {managedProfiles.map(profile => (
+          
+          {/* 🛠️ FIX: Map over *all* parentProfiles */}
+          {parentProfiles.map(profile => (
             <ProfileListItem
               key={profile.id}
               profile={profile}
@@ -289,17 +286,29 @@ function DashboardContent({
             />
           ))}
           
-          {isAdmin && (
+          {/* 🛠️ FIX: Map over *all* childProfiles */}
+          {childProfiles.map(profile => (
+            <ProfileListItem
+              key={profile.id}
+              profile={profile}
+              isActive={profile.id === activeProfileId}
+              onClick={() => switchProfile(profile.id)}
+            />
+          ))}
+          
+          {isParent && (
             <>
               <button 
                 className="btn btn-ghost btn-circle btn-sm bg-base-200"
                 onClick={onOpenCreateProfile}
+                title="Add Child Profile"
               >
                 <UserPlusIcon className="h-5 w-5" />
               </button>
               <button 
                 className="btn btn-ghost btn-circle btn-sm bg-base-200"
                 onClick={onOpenInvite}
+                title="Invite Parent"
               >
                 <Cog6ToothIcon className="h-5 w-5" />
               </button>
@@ -311,8 +320,8 @@ function DashboardContent({
       {/* Task List */}
       <div className="flex-grow flex flex-col">
         <div className="flex justify-between items-center mb-2">
-          <h2 className="text-sm font-medium text-content-secondary">Tasks</h2>
-          {isAdmin && (
+          <h2 className="font-medium text-lg text-base-content opacity-60">Tasks</h2>
+          {isParent && (
             <button 
               className="btn btn-primary btn-sm"
               onClick={() => setIsCreateTaskModalOpen(true)}
@@ -333,14 +342,13 @@ function DashboardContent({
               />
             ))
           ) : (
-            <p className="text-content-secondary text-center p-4">
+            <p className="text-base-content opacity-60 text-center p-4">
               No tasks found.
             </p> 
           )}
         </div>
       </div>
       
-      {/* Self-contained modal */}
       <CreateTaskModal 
         isOpen={isCreateTaskModalOpen}
         onClose={() => setIsCreateTaskModalOpen(false)}
