@@ -1,6 +1,6 @@
-// src/context/AuthContext.jsx (FIXED: Robust profile fetching and loading)
+// src/context/AuthContext.jsx (FIXED: Added 'useRef' guard to prevent fetch race condition)
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabaseClient'; // Ensure this path is correct
 
 const AuthContext = createContext();
@@ -14,23 +14,30 @@ export function AuthProvider({ children }) {
   const [userProfile, setUserProfile] = useState(null);
   const [loading, setLoading] = useState(true); // Start as true
 
-  // This is the ONLY effect managing auth state.
-  // It's much simpler and loop-proof.
+  // 🛠️ FIX: Add a ref to track if a fetch is already in progress.
+  const fetchInProgressRef = useRef(false);
+
   useEffect(() => {
     console.log('AXIOM LOG: [AuthContext] Subscribing to auth state changes.');
     
-    // onAuthStateChange fires *immediately* with the current session
-    // or 'SIGNED_OUT' if there isn't one.
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log(`AXIOM LOG: [AuthContext] onAuthStateChange event: ${event}`);
         const currentUser = session?.user || null;
-        setUser(currentUser);
+        
+        // setUser(currentUser) is fine to call multiple times.
+        setUser(currentUser); 
 
-        if (currentUser) {
+        // 🛠️ FIX: Check the guard rail.
+        // If a fetch is already running, do NOT start another one.
+        if (currentUser && !fetchInProgressRef.current) {
           // User is logged in, fetch their profile
           console.log(`AXIOM LOG: [AuthContext] User found. Fetching profile...`);
-          setLoading(true); // 🛠️ Set loading TRUE while we fetch
+          
+          // 🛠️ FIX: Set the guard rail
+          fetchInProgressRef.current = true;
+          setLoading(true); 
+          
           try {
             const { data, error } = await supabase
               .from('profiles')
@@ -50,13 +57,18 @@ export function AuthProvider({ children }) {
             setUserProfile(null);
           } finally {
             console.log('AXIOM LOG: [AuthContext] Profile fetch complete. Setting loading = false.');
-            setLoading(false); // 🛠️ Set loading FALSE only after fetch is done
+            setLoading(false); 
+            // 🛠️ FIX: Release the guard rail *after* loading is false
+            fetchInProgressRef.current = false;
           }
-        } else {
+        } else if (!currentUser) {
           // User is logged out
           console.log('AXIOM LOG: [AuthContext] No user. Clearing profile and loading.');
           setUserProfile(null);
           setLoading(false);
+          fetchInProgressRef.current = false; // Clear guard rail on logout
+        } else {
+          console.log('AXIOM LOG: [AuthContext] Fetch already in progress. Skipping duplicate request.');
         }
       }
     );
@@ -73,7 +85,6 @@ export function AuthProvider({ children }) {
     userProfile,
     loading,
     signUp: (email, password) => supabase.auth.signUp({ email, password }),
-    // 🛠️ FIX: Use 'login' to match Login.jsx
     login: (email, password) => supabase.auth.signInWithPassword({ email, password }),
     logout: () => supabase.auth.signOut(),
   };
