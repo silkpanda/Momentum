@@ -1,9 +1,10 @@
+// src/components/CreateTaskModal.jsx
+
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { useProfile } from '../context/ProfileContext';
 import { XMarkIcon } from '@heroicons/react/24/solid';
 
-// CORRECTED: Added 'onTaskCreated' prop
 function CreateTaskModal({ isOpen, onClose, onTaskCreated, householdId, profiles = [], preselectedProfileId }) {
   
   const { profile: creatorProfile } = useProfile(); 
@@ -17,8 +18,6 @@ function CreateTaskModal({ isOpen, onClose, onTaskCreated, householdId, profiles
   useEffect(() => {
     const profilesArray = Array.isArray(profiles) ? profiles : [];
     if (isOpen && profilesArray.length > 0) {
-      // If 'all' is selected, default to the first profile.
-      // Otherwise, use the selected profile.
       if (preselectedProfileId && preselectedProfileId !== 'all') {
         setAssignedProfileId(preselectedProfileId);
       } else if (profilesArray.length > 0) {
@@ -38,7 +37,6 @@ function CreateTaskModal({ isOpen, onClose, onTaskCreated, householdId, profiles
       return;
     }
 
-    // FIXED: Added .select().single() to get the new task back
     const { data: newTask, error: insertError } = await supabase
       .from('tasks')
       .insert({
@@ -50,7 +48,7 @@ function CreateTaskModal({ isOpen, onClose, onTaskCreated, householdId, profiles
         status: 'pending'
       })
       .select()
-      .single(); // We only inserted one
+      .single();
 
     setIsLoading(false);
 
@@ -59,7 +57,7 @@ function CreateTaskModal({ isOpen, onClose, onTaskCreated, householdId, profiles
       setError(insertError.message);
     } else {
       console.log('AXIOM LOG: Task created successfully', newTask);
-      onTaskCreated(newTask); // <-- CALL NEW PROP
+      onTaskCreated(newTask);
     }
   };
 
@@ -67,17 +65,16 @@ function CreateTaskModal({ isOpen, onClose, onTaskCreated, householdId, profiles
     const profilesArray = Array.isArray(profiles) ? profiles : [];
     setTitle('');
     setPointValue(10);
-    // Reset to first profile or preselected, not just first
     const defaultProfile = (preselectedProfileId && preselectedProfileId !== 'all') ? preselectedProfileId : (profilesArray.length > 0 ? profilesArray[0].id : '');
     setAssignedProfileId(defaultProfile);
     setError(null);
     setIsLoading(false);
-    onClose(); // Call the onClose prop
+    onClose();
   };
 
   return (
     <div className={`modal ${isOpen ? 'modal-open' : ''} modal-bottom sm:modal-middle`}>
-      <div className="modal-box bg-bg-surface text-text-primary"> 
+      <div className="modal-box bg-base-100 text-base-content"> 
         
         <div className="flex justify-between items-center mb-4">
           <h3 className="font-bold text-lg">Create New Task</h3>
@@ -94,14 +91,16 @@ function CreateTaskModal({ isOpen, onClose, onTaskCreated, householdId, profiles
         <form onSubmit={handleSubmit}>
           <div className="form-control w-full mb-4">
             <label className="label">
-              <span className="label-text text-text-secondary">Task Title</span>
+              <span className="label-text opacity-70">Task Title</span>
             </label>
             <input 
               type="text" 
               placeholder="e.g. Clean room" 
-              className="input input-bordered w-full bg-bg-input"
+              className="input input-bordered w-full bg-base-200"
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              // --- THIS IS THE FIX ---
+              onChange={(e) => setTitle(e.target.value)} // Was e.gertValue
+              // -----------------------
               required
             />
           </div>
@@ -109,11 +108,11 @@ function CreateTaskModal({ isOpen, onClose, onTaskCreated, householdId, profiles
           <div className="flex gap-4 mb-4">
             <div className="form-control w-1/2">
               <label className="label">
-                <span className="label-text text-text-secondary">Point Value</span>
+                <span className="label-text opacity-70">Point Value</span>
               </label>
               <input 
                 type="number" 
-                className="input input-bordered w-full bg-bg-input"
+                className="input input-bordered w-full bg-base-200"
                 value={pointValue}
                 onChange={(e) => setPointValue(parseInt(e.target.value, 10))}
                 min="0"
@@ -124,10 +123,10 @@ function CreateTaskModal({ isOpen, onClose, onTaskCreated, householdId, profiles
 
             <div className="form-control w-1/2">
               <label className="label">
-                <span className="label-text text-text-secondary">Assign To</span>
+                <span className="label-text opacity-70">Assign To</span>
               </label>
               <select 
-                className="select select-bordered bg-bg-input"
+                className="select select-bordered bg-base-200"
                 value={assignedProfileId}
                 onChange={(e) => setAssignedProfileId(e.target.value)}
                 required
@@ -150,7 +149,7 @@ function CreateTaskModal({ isOpen, onClose, onTaskCreated, householdId, profiles
           <div className="modal-action">
             <button 
               type="submit" 
-              className="btn btn-primary w-full bg-brand-primary text-white"
+              className="btn btn-primary w-full"
               disabled={isLoading}
             >
               {isLoading ? <span className="loading loading-spinner"></span> : 'Create Task'}

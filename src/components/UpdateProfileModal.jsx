@@ -2,18 +2,17 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { useProfile } from '../context/ProfileContext'; // Gets its own data
+import { useProfile } from '../context/ProfileContext';
 import { XMarkIcon } from '@heroicons/react/24/solid';
 
-// This modal only needs 'isOpen' and 'onClose'
 function UpdateProfileModal({ isOpen, onClose, onProfileUpdated }) {
-  const { profile: userProfile } = useProfile(); // Get the logged-in user's profile
+  // Use context to get profile AND the refetch function
+  const { profile: userProfile, fetchProfile } = useProfile(); 
   
   const [displayName, setDisplayName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // When the modal opens, populate the form with the user's current name
   useEffect(() => {
     if (isOpen && userProfile) {
       setDisplayName(userProfile.display_name);
@@ -27,7 +26,6 @@ function UpdateProfileModal({ isOpen, onClose, onProfileUpdated }) {
     setError(null);
 
     try {
-      // Update the 'profiles' table where the id matches
       const { data, error: updateError } = await supabase
         .from('profiles')
         .update({ display_name: displayName })
@@ -37,9 +35,11 @@ function UpdateProfileModal({ isOpen, onClose, onProfileUpdated }) {
 
       if (updateError) throw updateError;
 
-      // Tell the dashboard we've updated
+      // Manually trigger a re-fetch in the context
+      await fetchProfile(); 
+      
       onProfileUpdated('Profile updated successfully.');
-      onClose(); // Close the modal
+      // onClose(); // The dashboard handler will close it
 
     } catch (err) {
       console.error('Error updating profile:', err);
@@ -55,7 +55,6 @@ function UpdateProfileModal({ isOpen, onClose, onProfileUpdated }) {
     <div className={`modal ${isOpen ? 'modal-open' : ''} modal-bottom sm:modal-middle`}>
       <div className="modal-box bg-base-100 text-base-content">
         
-        {/* Header */}
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-bold">Edit Your Profile</h2>
           <button 
@@ -74,7 +73,6 @@ function UpdateProfileModal({ isOpen, onClose, onProfileUpdated }) {
         )}
         
         <form onSubmit={handleSubmit}>
-          {/* Display Name Input */}
           <div className="mb-4">
             <label htmlFor="displayName" className="block text-sm font-medium opacity-70 mb-2">Your Display Name</label>
             <input
@@ -87,12 +85,16 @@ function UpdateProfileModal({ isOpen, onClose, onProfileUpdated }) {
             />
           </div>
 
-          {/* Note: We don't include a color picker here,
-              as the admin's color is tied to their auth account
-              or a different setting, not the managed-profile colors.
-          */}
+          {/* --- CLARIFICATION ADDED --- */}
+          <div className="mb-6">
+            <label className="block text-sm font-medium opacity-70 mb-2">Profile Color</label>
+            <p className="text-sm opacity-50">
+              Admin profile colors are managed in your main account settings (coming soon).
+            </p>
+          </div>
+          {/* ------------------------- */}
+          
 
-          {/* Buttons */}
           <div className="modal-action">
             <button
               type="button"

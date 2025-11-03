@@ -15,12 +15,12 @@ import TaskListItem from '../components/TaskListItem';
 import LoadingSpinner from '../components/LoadingSpinner';
 import CreateTaskModal from '../components/CreateTaskModal';
 import EditManagedProfileModal from '../components/EditManagedProfileModal';
-import UpdateProfileModal from '../components/UpdateProfileModal'; // <-- IMPORTED
+import UpdateProfileModal from '../components/UpdateProfileModal';
 // import NotificationBanner from '../components/NotificationBanner'; 
 
 export default function HouseholdDashboard() {
   // This is YOUR (the admin's) profile
-  const { profile: userProfile, fetchProfile } = useProfile(); // Get fetchProfile from context
+  const { profile: userProfile, fetchProfile } = useProfile();
   const householdId = userProfile?.household_id;
 
   const [profiles, setProfiles] = useState([]);
@@ -33,7 +33,6 @@ export default function HouseholdDashboard() {
 
   const [isCreateTaskModalOpen, setIsCreateTaskModalOpen] = useState(false);
   
-  // CORRECTED: Two separate states for the two edit modals
   const [managedProfileToEdit, setManagedProfileToEdit] = useState(null);
   const [isUpdateOwnProfileOpen, setIsUpdateOwnProfileOpen] = useState(false);
 
@@ -112,21 +111,19 @@ export default function HouseholdDashboard() {
     setIsCreateTaskModalOpen(false);
   };
 
-  // This handles the update for a MANAGED profile
   const handleManagedProfileUpdated = (notificationMessage) => {
     console.log('AXIOM LOG: Re-fetching profiles list after managed update.');
-    fetchHouseholdProfiles(); // Re-fetch the list
+    fetchHouseholdProfiles();
     // setNotification(notificationMessage);
-    setManagedProfileToEdit(null); // Close the modal
+    setManagedProfileToEdit(null);
   };
   
-  // This handles the update for YOUR OWN profile
   const handleSelfProfileUpdated = (notificationMessage) => {
     console.log('AXIOM LOG: Re-fetching self-profile and household list after self update.');
-    fetchProfile(); // Re-fetch your personal profile in context
-    fetchHouseholdProfiles(); // Re-fetch the household list
+    fetchProfile(); 
+    fetchHouseholdProfiles();
     // setNotification(notificationMessage);
-    setIsUpdateOwnProfileOpen(false); // Close the modal
+    setIsUpdateOwnProfileOpen(false);
   };
   
   // --- RENDER LOGIC ---
@@ -139,7 +136,15 @@ export default function HouseholdDashboard() {
     );
   }
 
-  // ... (error handling) ...
+  if (profilesError || tasksError) {
+    return (
+      <div className="flex items-center justify-center min-h-screen p-4 text-center bg-bg-canvas text-text-danger">
+        <p>
+          Error loading household data: {profilesError || tasksError}
+        </p>
+      </div>
+    );
+  }
   
   const filteredTasks =
     activeProfileId === 'all'
@@ -173,13 +178,10 @@ export default function HouseholdDashboard() {
                 profile={profile}
                 isActive={activeProfileId === profile.id}
                 onClick={() => setActiveProfileId(profile.id)}
-                // --- THIS IS THE FIX ---
                 onEditClick={() => {
                   if (profile.id === userProfile.id) {
-                    // It's you (the admin)
                     setIsUpdateOwnProfileOpen(true);
                   } else {
-                    // It's a managed profile
                     setManagedProfileToEdit(profile);
                   }
                 }} 
@@ -200,9 +202,20 @@ export default function HouseholdDashboard() {
         </main>
 
         {/* --- Footer / Create Task Button --- */}
-        <footer className="sticky bottom-0 z-10 p-4 bg-bg-surface">
-          {/* ... (button) ... */}
-        </footer>
+        {/* --- THIS IS THE FIX --- */}
+        {/* Check if the LOGGED-IN USER is an admin, not the selected profile */}
+        {userProfile?.is_admin && (
+          <footer className="sticky bottom-0 z-10 p-4 bg-bg-surface">
+            <button
+              onClick={() => setIsCreateTaskModalOpen(true)}
+              // Use daisyUI/Style Guide classes
+              className="btn btn-primary w-full"
+            >
+              <PlusIcon className="w-6 h-6 mr-2" />
+              Create New Task
+            </button>
+          </footer>
+        )}
       </div>
 
       {/* --- MODALS --- */}
@@ -217,10 +230,7 @@ export default function HouseholdDashboard() {
           preselectedProfileId={activeProfileId === 'all' ? null : activeProfileId}
         />
       )}
-
-      {/* CORRECTED: Render the correct modal based on which profile was clicked */}
       
-      {/* The modal for editing MANAGED profiles */}
       {managedProfileToEdit && (
         <EditManagedProfileModal
           isOpen={!!managedProfileToEdit}
@@ -230,7 +240,6 @@ export default function HouseholdDashboard() {
         />
       )}
       
-      {/* The modal for editing YOUR OWN profile */}
       {isUpdateOwnProfileOpen && (
         <UpdateProfileModal
           isOpen={isUpdateOwnProfileOpen}
