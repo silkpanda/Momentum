@@ -1,65 +1,102 @@
-// src/App.jsx (FIXED: Uses 'user' instead of 'currentUser')
-
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider, useAuth } from './context/AuthContext';
+import {
+  Routes,
+  Route,
+  Navigate,
+  Outlet,
+} from 'react-router-dom';
+import { useAuth } from './context/AuthContext';
+import { useProfile } from './context/ProfileContext';
 
 // Views
 import Login from './views/Login';
 import SignUp from './views/SignUp';
 import Dashboard from './views/Dashboard';
-import HouseholdDashboard from './views/HouseholdDashboard';
+
+// Components
 import LoadingSpinner from './components/LoadingSpinner';
 
-// This is the main protected route component
-function ProtectedRoute({ children }) {
-  // 🛠️ FIX: Changed 'currentUser' to 'user' to match the AuthContext
-  const { user, loading } = useAuth();
+/**
+ * A layout component that handles the core loading and auth-checking logic.
+ * This is the new "declarative" way to handle our routes.
+ */
+function AppLayout() {
+  const { currentUser, loading: authLoading } = useAuth();
+  const { profile, loading: profileLoading } = useProfile();
 
-  if (loading) {
-    // Show a top-level spinner while auth is loading
-    return <LoadingSpinner />;
+  // Show a full-screen spinner if auth is loading,
+  // OR if auth is done, we have a user, but we are still loading their profile.
+  if (authLoading || (currentUser && profileLoading)) {
+    console.log(
+      `AppLayout: Loading... Auth: ${authLoading}, Profile: ${profileLoading}`
+    );
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-bg-canvas">
+        <LoadingSpinner />
+      </div>
+    );
   }
 
-  // 🛠️ FIX: Changed 'currentUser' to 'user'
-  if (!user) {
-    // Redirect to login if not authenticated
+  // If auth is done and there's no user, redirect to login
+  if (!currentUser) {
+    console.log('AppLayout: No user, redirecting to /login');
     return <Navigate to="/login" replace />;
   }
 
-  // Render the protected component
-  return children;
+  // If we get here, user is logged in.
+  // The Dashboard component itself will handle the logic for
+  // (profile vs. no-profile) with its modal.
+  console.log('AppLayout: User logged in. Rendering main app.');
+  return <Outlet />;
+}
+
+/**
+ * A component to handle routes that should *only* be visible when logged OUT
+ * (like Login and SignUp)
+ */
+function LoggedOutRoute() {
+  const { currentUser, loading } = useAuth();
+
+  // Show spinner while we check auth state
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-bg-canvas">
+        <LoadingSpinner />
+      </div>
+    );
+  }
+
+  // If user *is* logged in, redirect them away from login page to the dashboard
+  if (currentUser) {
+    console.log('LoggedOutRoute: User is logged in, redirecting to /');
+    return <Navigate to="/" replace />;
+  }
+
+  // If no user, show the child component (Login or SignUp)
+  return <Outlet />;
 }
 
 function App() {
   return (
-    <AuthProvider>
-      <Routes>
+    <Routes>
+      {/* --- Protected Routes (Must be Logged IN) --- */}
+      {/* All logged-in routes are children of AppLayout */}
+      <Route element={<AppLayout />}>
+        {/* Dashboard is now the root.
+          It will handle the logic for "no household" vs "has household"
+        */}
+        <Route path="/" element={<Dashboard />} />
+        
+        {/* Catch-all for logged-in users, redirects to dashboard */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Route>
+
+      {/* --- Public Routes (Must be Logged OUT) --- */}
+      {/* Routes that can only be seen when logged out */}
+      <Route element={<LoggedOutRoute />}>
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<SignUp />} />
-        
-        {/* Protected Routes */}
-        <Route 
-          path="/dashboard" 
-          element={
-            <ProtectedRoute>
-              <Dashboard />
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/household/:householdId" 
-          element={
-            <ProtectedRoute>
-              <HouseholdDashboard />
-            </ProtectedRoute>
-          } 
-        />
-
-        {/* Default route */}
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
-      </Routes>
-    </AuthProvider>
+      </Route>
+    </Routes>
   );
 }
 

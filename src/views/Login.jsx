@@ -1,42 +1,33 @@
-// src/views/Login.jsx (REFACTORED for SUPABASE)
-
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { Link, useNavigate } from 'react-router-dom';
 
-function Login() {
+export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
-  
   const { login } = useAuth();
-  const navigate = useNavigate();
+  const navigate = useNavigate(); // We keep this for the Link to /signup
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    if (!email || !password) {
-      setError('Please fill in all fields.');
-      return;
-    }
-    
+    setError(null);
     setLoading(true);
-    setError('');
+    console.log('Login handleSubmit fired'); // Log line 28
 
     try {
-      console.log('Login handleSubmit fired');
-      // The context now handles the Supabase call
-      await login(email, password); 
-      console.log('Login successful, navigating to dashboard...');
-      navigate('/dashboard');
-
-    } catch (error) {
-      // FIX: The error handling is simplified to use the returned error.message.
-      const message = error.message || 'Login failed. Check credentials.';
-      setError(message);
-      console.error('Login Error:', error);
-      
+      const { error: loginError } = await login(email, password);
+      if (loginError) {
+        throw loginError;
+      }
+      console.log('Login successful. Auth state will now update.'); // MODIFIED
+      // We no longer navigate from here.
+      // The App.jsx component will observe the auth state change and redirect.
+      // navigate('/dashboard'); // <-- REMOVED
+    } catch (err) {
+      console.error('Login Error:', err);
+      setError(err.message || 'Failed to log in');
     } finally {
       setLoading(false);
     }
@@ -44,82 +35,72 @@ function Login() {
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-bg-canvas">
-      {/* FIX: Changed bg-bg-primary to the correct semantic background: bg-bg-surface */}
-      <div className="p-6 max-w-sm w-full bg-bg-surface rounded-lg shadow-xl border border-border-primary">
-        <h2 className="text-xl font-semibold mb-6 text-text-primary text-center">
-          Login to Momentum
+      <div className="w-full max-w-md p-8 space-y-6 bg-bg-surface rounded-lg shadow-lg">
+        <h2 className="text-2xl font-semibold text-center text-text-primary">
+          Log In to Momentum
         </h2>
-        
-        {error && (
-          <div className="bg-signal-error-bg text-signal-error border border-signal-error-border p-3 rounded-md mb-4 text-sm">
-            {error}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit}>
-          {/* Email Field */}
-          <div className="mb-4">
-            <label 
-              htmlFor="email" 
-              className="block text-sm font-medium text-text-secondary mb-1"
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div>
+            <label
+              htmlFor="email"
+              className="block text-sm font-medium text-text-secondary"
             >
-              Email
+              Email Address
             </label>
             <input
-              type="email"
               id="email"
+              name="email"
+              type="email"
+              autoComplete="email"
+              required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-3 py-2 bg-bg-muted border border-border-primary rounded-md focus:outline-none focus:ring-2 focus:ring-action-primary"
-              disabled={loading}
-              required
+              className="w-full px-3 py-2 mt-1 border rounded-md shadow-sm bg-bg-input border-border-default focus:outline-none focus:ring-brand-primary focus:border-brand-primary"
             />
           </div>
-
-          {/* Password Field */}
-          <div className="mb-6">
-            <label 
-              htmlFor="password" 
-              className="block text-sm font-medium text-text-secondary mb-1"
+          <div>
+            <label
+              htmlFor="password"
+              className="block text-sm font-medium text-text-secondary"
             >
               Password
             </label>
             <input
-              type="password"
               id="password"
+              name="password"
+              type="password"
+              autoComplete="current-password"
+              required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-3 py-2 bg-bg-muted border border-border-primary rounded-md focus:outline-none focus:ring-2 focus:ring-action-primary"
-              disabled={loading}
-              required
+              className="w-full px-3 py-2 mt-1 border rounded-md shadow-sm bg-bg-input border-border-default focus:outline-none focus:ring-brand-primary focus:border-brand-primary"
             />
           </div>
 
-          {/* Submit Button */}
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-2 px-4 bg-action-primary text-on-action font-semibold rounded-md hover:bg-action-primary-hover disabled:opacity-50 transition duration-150"
-          >
-            {loading ? 'Logging In...' : 'Log In'}
-          </button>
-        </form>
+          {error && (
+            <p className="text-sm text-center text-red-500">{error}</p>
+          )}
 
-        <div className="mt-4 text-center text-sm">
-          <p className="text-text-secondary">
-            Don't have an account?{' '}
+          <div>
             <button
-              onClick={() => navigate('/signup')}
-              className="text-action-primary hover:underline font-medium"
+              type="submit"
               disabled={loading}
+              className="w-full px-4 py-2 font-medium text-white rounded-md bg-brand-primary hover:bg-brand-primary-hover focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-primary disabled:opacity-50"
             >
-              Sign Up
+              {loading ? 'Logging In...' : 'Log In'}
             </button>
-          </p>
-        </div>
+          </div>
+        </form>
+        <p className="text-sm text-center text-text-secondary">
+          Don't have an account?{' '}
+          <Link
+            to="/signup"
+            className="font-medium text-brand-primary hover:underline"
+          >
+            Sign Up
+          </Link>
+        </p>
       </div>
     </div>
   );
 }
-
-export default Login;

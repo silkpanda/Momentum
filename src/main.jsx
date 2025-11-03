@@ -1,24 +1,21 @@
-// src/main.jsx (CLEANED UP FOR SUPABASE)
-
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
-import App from './App.jsx';
+import App from './App';
+import { AuthProvider } from './context/AuthContext';
+import { ProfileProvider } from './context/ProfileContext'; // 1. IMPORT
 import './index.css';
-import { AuthProvider } from './context/AuthContext.jsx';
-// FIX: Removed import { initializeServices } from "./firebase.js";
 
-console.log("main.jsx: Top-level loading...");
-
-// CRITICAL FIX: The entire async startApp wrapper is no longer needed.
-// The Supabase AuthProvider now handles the session loading state internally.
+console.log('main.jsx: Top-level loading...');
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <BrowserRouter>
       <AuthProvider>
-        <App />
+        <ProfileProvider> {/* 2. WRAP APP */}
+          <App />
+        </ProfileProvider>
       </AuthProvider>
     </BrowserRouter>
-  </React.StrictMode>,
+  </React.StrictMode>
 );

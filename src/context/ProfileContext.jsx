@@ -1,199 +1,95 @@
-// src/context/ProfileContext.jsx (FIXED: Robust initial profile selection)
-
-import React, { 
-  createContext, 
-  useContext, 
-  useState, 
-  useEffect, 
-  useRef,
-  useMemo,
-  useCallback
-} from 'react';
-import { supabase } from '../supabaseClient';
+import { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { useAuth } from './AuthContext';
+import { supabase } from '../supabaseClient'; // CORRECTED: Was 'import supabase from...'
 
 const ProfileContext = createContext();
 
-export function useProfile() {
-  return useContext(ProfileContext);
-}
+export const ProfileProvider = ({ children }) => {
+  const { currentUser, loading: authLoading } = useAuth();
+  const [profile, setProfile] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  
+  // Guard to prevent re-fetching if a fetch is already in progress
+  const isFetching = useRef(false);
 
-const allProfileColors = [
-  { name: 'Blue', class: 'auth-blue' },
-  { name: 'Purple', class: 'auth-purple' },
-  { name: 'Green', class: 'managed-green' },
-  { name: 'Orange', class: 'managed-orange' },
-  { name: 'Red', class: 'managed-red' },
-  { name: 'Teal', class: 'managed-teal' },
-  { name: 'Purple (Managed)', class: 'managed-purple' },
-  { name: 'Blue (Managed)', class: 'managed-blue' },
-];
+  useEffect(() => {
+    console.log(`ProfileContext: useEffect triggered. AuthLoading: ${authLoading}, CurrentUser: ${!!currentUser}`);
 
-export function ProfileProvider({ householdId, children }) {
-  // 🛠️ FIX: Get 'user' and 'userProfile'
-  const { user, userProfile, loading: authLoading } = useAuth();
-  
-  const [profiles, setProfiles] = useState([]);
-  const [activeProfileId, setActiveProfileId] = useState(null);
-  const [isLoading, setIsLoading] = useState(true); // This context's own loading state
-  const [profilesError, setProfilesError] = useState(null);
-  
-  const [updateModal, setUpdateModal] = useState({ isOpen: false, profileId: null });
-  
-  const fetchAttemptedRef = useRef(false);
-
-  // --- Data Fetching ---
-  
-  const fetchProfiles = useCallback(async () => {
-    console.log('AXIOM LOG: [Context] fetchProfiles CALLED.');
-    if (!householdId) {
-      console.error('AXIOM ERROR: [Context] fetchProfiles: No householdId provided.');
-      setProfilesError('No household ID found.');
-      setIsLoading(false);
+    // Do not run if auth is still loading
+    if (authLoading) {
+      console.log('ProfileContext: Waiting for Auth to finish loading.');
       return;
     }
-    
-    if (fetchAttemptedRef.current === false) {
-      setIsLoading(true);
-    }
-    setProfilesError(null);
 
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('household_id', householdId);
-
-    if (error) {
-      console.error('AXIOM ERROR: [Context] fetchProfiles failed:', error);
-      setProfilesError('Failed to load profiles. Check RLS.');
-    } else {
-      console.log(`AXIOM LOG: [Context] fetchProfiles SUCCESS. Found ${data.length} profiles.`);
-      setProfiles(data || []);
-    }
-    
-    setIsLoading(false); // We are done loading profiles
-  }, [householdId]);
-
-  
-  // --- Effects ---
-
-  // Effect 1: Fetch Profiles
-  useEffect(() => {
-    console.log(`AXIOM LOG: [Context] Effect 1 (Data Fetch) RUN. Auth Loading: ${authLoading}, Current User: ${!!user}`);
-    
-    // 1. Wait for Auth to be ready
-    if (authLoading) return; 
-
-    // 2. If auth is done and there's no user, we're done.
-    if (!user) {
-      setIsLoading(false);
+    // If auth is done and there is no user, we are logged out.
+    if (!currentUser) {
+      console.log('ProfileContext: No user. Clearing profile and setting loading to false.');
+      setProfile(null);
+      setLoading(false);
+      isFetching.current = false;
       return;
     }
-    
-    // 3. Auth is done, user exists. Fetch profiles *once*.
-    if (!fetchAttemptedRef.current) {
-      fetchAttemptedRef.current = true;
-      fetchProfiles();
+
+    // If we already have a profile for this user, don't re-fetch
+    if (profile && profile.auth_user_id === currentUser.id) {
+      console.log('ProfileContext: Profile already loaded. Skipping fetch.');
+      setLoading(false);
+      return;
     }
-    
-  }, [user, authLoading, fetchProfiles, householdId]); // 🛠️ FIX: 'user' dependency
 
-  // Effect 2: Select Active Profile
-  useEffect(() => {
-    console.log(`AXIOM LOG: [Context] Effect 2 (ID Select) RUN. activeId: ${activeProfileId}, authLoading: ${authLoading}, userProfile: ${!!userProfile}, profiles: ${profiles.length}, contextLoading: ${isLoading}`);
-    
-    // 1. We only want this to run *once* to set the initial profile.
-    if (activeProfileId) return;
-
-    // 2. Wait for ALL data to be ready.
-    if (authLoading === false && userProfile && isLoading === false && profiles.length > 0) {
-      
-      // 3. All data is ready. Set the initial profile.
-      console.log(`AXIOM LOG: [Context] Effect 2: All data ready. Setting initial profile to ${userProfile.id}`);
-      setActiveProfileId(userProfile.id);
+    // If a fetch is already running, don't start another one
+    if (isFetching.current) {
+      console.log('ProfileContext: Fetch already in progress. Skipping.');
+      return;
     }
-    
-  }, [authLoading, userProfile, profiles, isLoading, activeProfileId]);
 
+    const fetchProfile = async () => {
+      console.log(`ProfileContext: Auth loaded and user found (${currentUser.id}). Setting fetch guard to TRUE.`);
+      isFetching.current = true;
+      setLoading(true);
+      setError(null);
 
-  // --- Public API Functions ---
+      console.log(`ProfileContext: >>> ATTEMPTING PROFILE FETCH for auth_user_id: ${currentUser.id}`);
+      console.log("ProfileContext: Query: supabase.from('profiles').select('*').eq('auth_user_id', currentUser.id).single()");
 
-  const switchProfile = (profileId) => {
-    setActiveProfileId(profileId);
-  };
-  
-  // Modal Controls
-  const openUpdateModal = (profileId) => {
-    setUpdateModal({ isOpen: true, profileId });
-  };
-  
-  const closeUpdateModal = () => {
-    setUpdateModal({ isOpen: false, profileId: null });
-  };
-  
-  // Optimistic Update Function
-  const saveProfileUpdate = async (profileId, newDisplayName, newProfileColor, newIsParent) => {
-    const oldProfiles = profiles;
+      try {
+        const { data, error: fetchError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('auth_user_id', currentUser.id)
+          .single();
 
-    const newProfiles = profiles.map(p => {
-      if (p.id === profileId) {
-        return { 
-          ...p, 
-          display_name: newDisplayName, 
-          profile_color: newProfileColor, 
-          is_admin: newIsParent 
-        };
+        // THIS IS THE LINE WE EXPECT NOT TO REACH
+        console.log('ProfileContext: <<< PROFILE FETCH COMPLETE.');
+
+        if (fetchError) {
+          console.error('ProfileContext: Error fetching profile:', fetchError);
+          setError(fetchError.message);
+          setProfile(null);
+        } else {
+          console.log('ProfileContext: Successfully fetched profile:', data);
+          setProfile(data);
+        }
+      } catch (err) {
+        console.error('ProfileContext: A critical error occurred during fetchProfile:', err);
+        setError(err.message);
+        setProfile(null);
+      } finally {
+        console.log('ProfileContext: Fetch attempt finished. Setting loading to false and fetch guard to FALSE.');
+        setLoading(false);
+        isFetching.current = false;
       }
-      return p;
-    });
+    };
 
-    setProfiles(newProfiles);
+    fetchProfile();
 
-    try {
-      console.log(`AXIOM LOG: Calling 'update_profile' RPC in background...`);
-      const { error: rpcError } = await supabase.rpc('update_profile', {
-        target_profile_id: profileId,
-        new_display_name: newDisplayName,
-        new_profile_color: newProfileColor,
-        new_is_admin: newIsParent
-      });
+  }, [currentUser, authLoading, profile]); // Added profile to dependency array
 
-      if (rpcError) throw rpcError;
-
-      console.log('AXIOM LOG: Background save successful.');
-
-    } catch (error) {
-      console.error('AXIOM ERROR: Optimistic save failed! Rolling back.', error);
-      setProfiles(oldProfiles);
-    }
-  };
-  
-  // Memoize the derived data
-  const activeProfileData = useMemo(() => {
-    return profiles.find(p => p.id === activeProfileId);
-  }, [profiles, activeProfileId]);
-  
-  
   const value = {
-    // State
-    profiles,
-    activeProfileId,
-    activeProfileData,
-    // 🛠️ FIX: The provider is loading if *either* Auth or Profiles is loading.
-    isLoading: authLoading || isLoading, 
-    profilesError,
-    
-    allProfileColors,
-    
-    // Modal State & Functions
-    updateModal,
-    closeUpdateModal,
-    openUpdateModal, 
-
-    // Methods
-    switchProfile,
-    refreshProfiles: fetchProfiles,
-    saveProfileUpdate,
+    profile,
+    loading: loading || authLoading, // Report loading if *either* context is loading
+    error,
   };
 
   return (
@@ -201,4 +97,12 @@ export function ProfileProvider({ householdId, children }) {
       {children}
     </ProfileContext.Provider>
   );
-}
+};
+
+export const useProfile = () => {
+  const context = useContext(ProfileContext);
+  if (context === undefined) {
+    throw new Error('useProfile must be used within a ProfileProvider');
+  }
+  return context;
+};
