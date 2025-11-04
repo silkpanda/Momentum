@@ -1,17 +1,12 @@
 // tailwind.config.js (UPDATED)
 
-// Import the design system tokens from our theme.css file
-// We need to read the theme.css file to get the color definitions
-// Note: This simple import won't work for variables. We'll define colors manually
-// based on the Style Guide.
-
 /** @type {import('tailwindcss').Config} */
 export default {
   content: [
     './index.html',
     './src/**/*.{js,ts,jsx,tsx}', // This scans all our components
   ],
-  
+
   // --- THIS IS THE FIX ---
   // We must "safelist" the dynamic color classes used in EditProfileModal
   // so Tailwind doesn't purge them.
@@ -37,8 +32,7 @@ export default {
   
   theme: {
     extend: {
-      // Extend Tailwind's default theme with our semantic color roles
-      // We must define the colors here so Tailwind can generate the classes
+      // Define our custom colors based on the theme variables
       colors: {
         'bg-canvas': 'var(--color-bg-canvas)',
         'bg-surface-1': 'var(--color-bg-surface-1)',
@@ -66,7 +60,6 @@ export default {
         'managed-indigo': 'var(--color-managed-indigo)',
       },
       fontFamily: {
-        // Assuming 'Inter' from Style Guide
         sans: ['Inter', 'sans-serif'],
       },
     },
