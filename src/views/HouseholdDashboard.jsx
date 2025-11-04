@@ -1,308 +1,395 @@
-import { useState, useEffect } from 'react';
-import { useProfile } from '../context/ProfileContext';
+// src/views/HouseholdDashboard.jsx (FIXED: Moved Edit Profile to Parent View)
+
+import React, { useState, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import { supabase } from '../supabaseClient';
+import InviteMemberForm from '../components/InviteMemberForm';
 
-// --- HEROICONS V2 IMPORTS ---
-import {
-  UserGroupIcon,
-  ClipboardDocumentListIcon,
-  PlusIcon,
-} from '@heroicons/react/24/outline';
-
-// Import the components
-import ProfileCard from '../components/ProfileCard';
-import TaskListItem from '../components/TaskListItem';
-import LoadingSpinner from '../components/LoadingSpinner';
-import CreateTaskModal from '../components/CreateTaskModal';
-import EditManagedProfileModal from '../components/EditManagedProfileModal';
+// Modals
 import UpdateProfileModal from '../components/UpdateProfileModal';
-// import NotificationBanner from '../components/NotificationBanner'; 
+import EditManagedProfileModal from '../components/EditManagedProfileModal';
 
-export default function HouseholdDashboard() {
-  // This is YOUR (the admin's) profile
-  const { profile: userProfile, fetchProfile } = useProfile();
-  const householdId = userProfile?.household_id;
+// Icons
+import { CirclePlus, Users, ShieldCheck, LayoutGrid, Pencil } from 'lucide-react';
 
-  const [profiles, setProfiles] = useState([]);
-  const [isProfilesLoading, setProfilesLoading] = useState(true);
-  const [profilesError, setProfilesError] = useState(null);
+// --- Placeholders for new components we'll build next ---
+const CreateTaskForm = ({ householdId, profiles, creatorProfile }) => (
+  <div className="p-6 bg-bg-surface-2 rounded-lg shadow-md">
+    <h3 className="text-lg font-semibold mb-4 text-text-primary">Create New Task</h3>
+    <p className="text-text-secondary">
+      (Task Creation Form placeholder. We'll build this next! It will allow
+      assigning tasks to one or more profiles.)
+    </p>
+  </div>
+);
 
-  const [tasks, setTasks] = useState([]);
-  const [isTasksLoading, setTasksLoading] = useState(true);
-  const [tasksError, setTasksError] = useState(null);
-
-  const [isCreateTaskModalOpen, setIsCreateTaskModalOpen] = useState(false);
-  
-  const [managedProfileToEdit, setManagedProfileToEdit] = useState(null);
-  const [isUpdateOwnProfileOpen, setIsUpdateOwnProfileOpen] = useState(false);
-
-  const [activeProfileId, setActiveProfileId] = useState('all');
-  
-  // const [notification, setNotification] = useState(null);
-
-  // --- Reusable sort function ---
-  const sortProfiles = (profilesData, adminProfileId) => {
-    if (!Array.isArray(profilesData)) return [];
-    
-    const adminProfile = profilesData.find(p => p.id === adminProfileId);
-    const otherProfiles = profilesData.filter(p => p.id !== adminProfileId);
-    
-    return [adminProfile, ...otherProfiles].filter(Boolean);
-  };
-
-  // --- DATA FETCHING ---
-  
-  // Function to fetch/refresh profiles
-  const fetchHouseholdProfiles = async () => {
-    if (!householdId || !userProfile?.id) return;
-    
-    setProfilesLoading(true);
-    setProfilesError(null);
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('household_id', householdId)
-      .order('created_at', { ascending: true }); 
-
-    if (error) {
-      console.error('Error fetching household profiles:', error);
-      setProfilesError(error.message);
-    } else {
-      setProfiles(sortProfiles(data, userProfile.id));
-    }
-    setProfilesLoading(false);
-  };
-
-  // Initial fetch for profiles
-  useEffect(() => {
-    fetchHouseholdProfiles();
-  }, [householdId, userProfile?.id]);
-
-  // Initial fetch for tasks
-  useEffect(() => {
-    if (!householdId) return;
-
-    const fetchHouseholdTasks = async () => {
-      setTasksLoading(true);
-      setTasksError(null);
-      const { data, error } = await supabase
-        .from('tasks')
-        .select('*')
-        .eq('household_id', householdId)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('Error fetching household tasks:', error);
-        setTasksError(error.message);
-      } else {
-        setTasks(data);
-      }
-      setTasksLoading(false);
-    };
-
-    fetchHouseholdTasks();
-  }, [householdId]);
-
-  // --- OPTIMISTIC UI FUNCTIONS ---
-  
-  const handleTaskCreated = (newTask) => {
-    console.log('AXIOM LOG: Optimistically updating UI with new task', newTask);
-    setTasks(currentTasks => [newTask, ...currentTasks]);
-    setIsCreateTaskModalOpen(false);
-  };
-
-  const handleManagedProfileUpdated = (notificationMessage) => {
-    console.log('AXIOM LOG: Re-fetching profiles list after managed update.');
-    fetchHouseholdProfiles();
-    // setNotification(notificationMessage);
-    setManagedProfileToEdit(null);
-  };
-  
-  const handleSelfProfileUpdated = (notificationMessage) => {
-    console.log('AXIOM LOG: Re-fetching self-profile and household list after self update.');
-    fetchProfile(); 
-    fetchHouseholdProfiles();
-    // setNotification(notificationMessage);
-    setIsUpdateOwnProfileOpen(false);
-  };
-  
-  // --- RENDER LOGIC ---
-
-  if (isProfilesLoading || isTasksLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-bg-canvas">
-        <LoadingSpinner />
-      </div>
-    );
-  }
-
-  if (profilesError || tasksError) {
-    return (
-      <div className="flex items-center justify-center min-h-screen p-4 text-center bg-bg-canvas text-text-danger">
-        <p>
-          Error loading household data: {profilesError || tasksError}
-        </p>
-      </div>
-    );
-  }
-  
-  const filteredTasks =
-    activeProfileId === 'all'
-      ? tasks
-      : tasks.filter((task) => task.assigned_to_profile_id === activeProfileId);
-
-  const activeProfileData =
-    activeProfileId === 'all'
-      ? { display_name: 'All Tasks', profile_color: 'bg-base-300' }
-      : profiles.find((p) => p.id === activeProfileId);
-
+// --- THIS IS THE FIX (Step 1: Simplify ProfileSelector) ---
+// We remove all "Edit" logic from this component.
+const ProfileSelector = ({
+  profiles,
+  selectedProfile,
+  onSelectProfile,
+  userProfile,
+}) => {
+  const sortedProfiles = [...profiles].sort((a, b) => {
+    if (a.id === userProfile.id) return -1;
+    if (b.id === userProfile.id) return 1;
+    if (a.is_admin && !b.is_admin) return -1;
+    if (!a.is_admin && b.is_admin) return 1;
+    return a.display_name.localeCompare(b.display_name);
+  });
 
   return (
-    <>
-      <div className="flex flex-col h-screen bg-bg-canvas text-text-primary">
-        {/* --- Header / Profile Selector --- */}
-        <header className="sticky top-0 z-10 p-4 shadow-lg bg-bg-surface">
-          <h2 className="flex items-center mb-4 text-lg font-medium text-text-secondary">
-            <UserGroupIcon className="w-5 h-5 mr-2" />
-            Family Members
-          </h2>
-          <div className="flex pb-2 space-x-4 overflow-x-auto">
-            <ProfileCard
-              profile={{ display_name: 'All', points: 0, profile_color: 'bg-base-300' }}
-              isActive={activeProfileId === 'all'}
-              onClick={() => setActiveProfileId('all')}
-            />
-            {profiles.map((profile) => (
-              <ProfileCard
-                key={profile.id}
-                profile={profile}
-                isActive={activeProfileId === profile.id}
-                onClick={() => setActiveProfileId(profile.id)}
-                onEditClick={() => {
-                  if (profile.id === userProfile.id) {
-                    setIsUpdateOwnProfileOpen(true);
-                  } else {
-                    setManagedProfileToEdit(profile);
-                  }
-                }} 
-              />
-            ))}
+    <div className="flex flex-wrap gap-4 mb-6">
+      <h3 className="w-full text-lg font-semibold text-text-primary">
+        Who is completing tasks?
+      </h3>
+      {sortedProfiles.map((profile) => (
+        // Button is now the top-level element again. No more 'relative' div.
+        <button
+          key={profile.id}
+          onClick={() => onSelectProfile(profile)}
+          className={`flex flex-col items-center justify-center p-4 rounded-lg w-28 h-32 transition-all duration-150
+            ${
+              selectedProfile && selectedProfile.id === profile.id
+                ? 'bg-action-primary text-text-on-primary shadow-lg ring-2 ring-action-primary-hover'
+                : 'bg-bg-surface-2 hover:bg-bg-surface-hover'
+            }`}
+        >
+          <span className="text-4xl mb-2">{profile.avatar_emoji || '👤'}</span>
+          <span className="font-medium text-sm truncate">
+            {profile.display_name}
+          </span>
+          {profile.is_admin ? (
+            <span className="text-xs text-text-secondary mt-1">(Parent)</span>
+          ) : (
+            <span className="text-xs text-text-secondary mt-1">(Child)</span>
+          )}
+        </button>
+        // Edit button has been removed from here
+      ))}
+    </div>
+  );
+};
+// --- END FIX ---
+
+// --- THIS IS THE FIX (Step 2: Create new component for Parent View) ---
+const ManageProfilesList = ({ profiles, onEditProfile }) => {
+  return (
+    <div className="p-6 bg-bg-surface-2 rounded-lg shadow-md">
+      <h3 className="text-lg font-semibold mb-4 text-text-primary">
+        Manage Profiles
+      </h3>
+      <div className="space-y-3">
+        {profiles.map((profile) => (
+          <div
+            key={profile.id}
+            className="flex items-center justify-between p-3 bg-bg-canvas rounded-lg"
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">{profile.avatar_emoji || '👤'}</span>
+              <div>
+                <span className="font-medium text-text-primary">
+                  {profile.display_name}
+                </span>
+                <span className="block text-xs text-text-secondary">
+                  {profile.is_admin ? 'Parent' : 'Child'}
+                </span>
+              </div>
+            </div>
+            <button
+              onClick={() => onEditProfile(profile)}
+              className="p-2 text-text-secondary rounded-md hover:bg-bg-surface-hover hover:text-action-primary"
+              aria-label={`Edit ${profile.display_name}`}
+            >
+              <Pencil size={16} />
+            </button>
           </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+// --- END FIX ---
+
+const TaskList = ({ householdId, selectedProfile }) => (
+  <div className="mt-6">
+    <h3 className="text-xl font-semibold mb-4 text-text-primary">
+      Tasks for {selectedProfile.display_name}
+    </h3>
+    <div className="p-6 bg-bg-surface-2 rounded-lg shadow-md">
+      <p className="text-text-secondary">
+        (Task List placeholder for {selectedProfile.display_name}. We'll build
+        this next! It will show all 'pending' tasks.)
+      </p>
+    </div>
+  </div>
+);
+// --------------------------------------------------------
+
+function HouseholdDashboard({ householdId }) {
+  console.log('--- HouseholdDashboard component rendered ---');
+  
+  const { currentUser: user } = useAuth();
+
+  // --- State ---
+  const [household, setHousehold] = useState(null);
+  const [profiles, setProfiles] = useState([]);
+  const [userProfile, setUserProfile] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  // View logic
+  const [viewMode, setViewMode] = useState('family');
+  const [selectedProfile, setSelectedProfile] = useState(null);
+
+  // Modal State
+  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
+  const [isEditManagedModalOpen, setIsEditManagedModalOpen] = useState(false);
+  const [selectedProfileForEdit, setSelectedProfileForEdit] = useState(null);
+
+  // Data Fetching
+  const fetchHouseholdData = useCallback(async () => {
+    if (!user || !householdId) {
+      console.log('HouseholdDashboard: Checks failed (no user or householdId).');
+      setIsLoading(false);
+      if (!householdId) setError('Error: No Household ID found in props.');
+      return;
+    }
+    
+    console.log('HouseholdDashboard: Setting loading and fetching...');
+    // Only set loading to true on the *first* fetch
+    // Subsequent refreshes (after edits) will be in the background
+    if (!household) setIsLoading(true);
+    setError('');
+
+    try {
+      // 1. Fetch the household details
+      const { data: householdData, error: householdError } = await supabase
+        .from('households')
+        .select('*')
+        .eq('id', householdId)
+        .single();
+
+      if (householdError) throw householdError;
+      if (!householdData) throw new Error('Household not found.');
+      setHousehold(householdData);
+
+      // 2. Fetch all profiles associated with this household
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('household_id', householdId);
+
+      if (profilesError) throw profilesError;
+      setProfiles(profilesData);
+
+      // 3. Find the logged-in user's specific profile
+      const foundUserProfile = profilesData.find(
+        (p) => p.auth_user_id === user.id
+      );
+
+      if (foundUserProfile) {
+        setUserProfile(foundUserProfile);
+        if (foundUserProfile.is_admin) {
+          setViewMode('parent');
+        } else {
+          setViewMode('family');
+        }
+        if (!selectedProfile) {
+          setSelectedProfile(foundUserProfile);
+        }
+      } else {
+        throw new Error(
+          'Could not find your profile in this household. (User ID: ' +
+            user.id +
+            ')'
+        );
+      }
+      console.log('HouseholdDashboard: Fetch complete.');
+    } catch (err) {
+      console.error('HouseholdDashboard: Failed to fetch data:', err);
+      setError(`Error: Could not load household data. ${err.message}`);
+    } finally {
+      console.log('HouseholdDashboard: Fetch finished. Setting loading to false.');
+      setIsLoading(false);
+    }
+  }, [user, householdId, selectedProfile]); // Note: selectedProfile dependency is correct
+
+  useEffect(() => {
+    console.log('HouseholdDashboard: useEffect triggered.');
+    fetchHouseholdData();
+  }, [fetchHouseholdData]);
+  
+
+  // --- Modal Handlers (No changes needed here) ---
+  const handleOpenEditModal = (profileToEdit) => {
+    console.log('Opening edit modal for:', profileToEdit.display_name);
+    setSelectedProfileForEdit(profileToEdit);
+    
+    if (profileToEdit.id === userProfile.id) {
+      setIsUpdateModalOpen(true);
+    } else {
+      setIsEditManagedModalOpen(true);
+    }
+  };
+
+  const handleCloseModals = () => {
+    setIsUpdateModalOpen(false);
+    setIsEditManagedModalOpen(false);
+    setSelectedProfileForEdit(null);
+  };
+  
+  const handleProfileUpdate = () => {
+    console.log('Profile updated, refreshing household data...');
+    handleCloseModals();
+    fetchHouseholdData(); // Re-fetch all data
+  };
+  // --------------------------------------------------
+
+
+  const handleSelectProfile = (profile) => {
+    setSelectedProfile(profile);
+  };
+
+  const isAdmin = userProfile && userProfile.is_admin;
+
+  // --- Render Logic ---
+
+  if (isLoading) {
+    return <div className="p-8">Loading household...</div>;
+  }
+
+  if (error) {
+    return <div className="p-8 text-signal-error">{error.message}</div>;
+  }
+
+  if (!household || !userProfile) {
+    return (
+      <div className="p-8 text-signal-warning">
+        Could not load household data. (Household or UserProfile is null).
+      </div>
+    );
+  }
+
+  // --- Main Render ---
+  return (
+    <>
+      <div className="w-full min-h-screen p-8 bg-bg-canvas text-text-primary">
+        
+        <header className="mb-8">
+          <h1 className="text-3xl font-semibold mt-2">{household.name}</h1>
         </header>
 
-        {/* --- Task List Content --- */}
-        <main className="flex-1 overflow-y-auto">
-          <DashboardContent
-            isProfilesLoading={isProfilesLoading}
-            isTasksLoading={isTasksLoading}
-            activeProfileData={activeProfileData}
-            filteredTasks={filteredTasks}
-            profiles={profiles}
-          />
-        </main>
-
-        {/* --- Footer / Create Task Button --- */}
-        {/* --- THIS IS THE FIX --- */}
-        {/* Check if the LOGGED-IN USER is an admin, not the selected profile */}
-        {userProfile?.is_admin && (
-          <footer className="sticky bottom-0 z-10 p-4 bg-bg-surface">
+        {/* --- View Mode Toggle (Admins Only) --- */}
+        {isAdmin && (
+          <div className="mb-8 p-2 bg-bg-surface-2 rounded-lg flex max-w-sm">
             <button
-              onClick={() => setIsCreateTaskModalOpen(true)}
-              // Use daisyUI/Style Guide classes
-              className="btn btn-primary w-full"
+              onClick={() => setViewMode('parent')}
+              className={`flex-1 p-2 rounded-md font-semibold flex items-center justify-center gap-2 transition-all
+                ${
+                  viewMode === 'parent'
+                    ? 'bg-bg-canvas shadow-sm text-action-primary'
+                    : 'text-text-secondary hover:text-text-primary'
+                }`}
             >
-              <PlusIcon className="w-6 h-6 mr-2" />
-              Create New Task
+              <ShieldCheck size={18} /> Parent View
             </button>
-          </footer>
+            <button
+              onClick={() => setViewMode('family')}
+              className={`flex-1 p-2 rounded-md font-semibold flex items-center justify-center gap-2 transition-all
+                ${
+                  viewMode === 'family'
+                    ? 'bg-bg-canvas shadow-sm text-action-primary'
+                    : 'text-text-secondary hover:text-text-primary'
+                }`}
+            >
+              <Users size={18} /> Family View
+            </button>
+          </div>
         )}
-      </div>
 
-      {/* --- MODALS --- */}
+        {/* --- Main Content Area --- */}
+        <main className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* --- Parent View --- */}
+          {viewMode === 'parent' && isAdmin && (
+            <>
+              {/* Left Column (Admin Actions) */}
+              <div className="lg:col-span-2 space-y-8">
+                <CreateTaskForm
+                  householdId={householdId}
+                  profiles={profiles}
+                  creatorProfile={userProfile}
+                />
+                
+                <div className="p-6 bg-bg-surface-2 rounded-lg shadow-md">
+                  <h3 className="text-lg font-semibold mb-4 text-text-primary">All Household Tasks</h3>
+                  <p className="text-text-secondary">(Admin Task List placeholder: We'll add a view here to see/edit/approve all tasks.)</p>
+                </div>
+              </div>
+
+              {/* Right Column (Admin Tools) */}
+              <div className="lg:col-span-1 space-y-8">
+                <InviteMemberForm householdId={householdId} />
+                
+                {/* --- THIS IS THE FIX (Step 3: Add new list to Parent View) --- */}
+                <ManageProfilesList
+                  profiles={profiles}
+                  onEditProfile={handleOpenEditModal}
+                />
+                {/* ------------------------------------------------------------- */}
+              </div>
+            </>
+          )}
+
+          {/* --- Family View --- */}
+          {viewMode === 'family' && (
+            <div className="lg-col-span-3">
+              {/* --- THIS IS THE FIX (Step 4: Remove props from this call) --- */}
+              <ProfileSelector
+                profiles={profiles}
+                selectedProfile={selectedProfile}
+                onSelectProfile={handleSelectProfile}
+                userProfile={userProfile}
+              />
+              {/* ------------------------------------------------------------- */}
+
+              {selectedProfile ? (
+                <TaskList
+                  householdId={householdId}
+                  selectedProfile={selectedProfile}
+                />
+              ) : (
+                <div className="p-6 bg-bg-surface-2 rounded-lg text-text-secondary">
+                  Please select a profile to view tasks.
+                </div>
+              )}
+            </div>
+          )}
+        </main>
+      </div>
       
-      {isCreateTaskModalOpen && (
-        <CreateTaskModal
-          isOpen={isCreateTaskModalOpen}
-          onTaskCreated={handleTaskCreated}
-          onClose={() => setIsCreateTaskModalOpen(false)}
-          householdId={householdId}
-          profiles={profiles}
-          preselectedProfileId={activeProfileId === 'all' ? null : activeProfileId}
-        />
-      )}
-      
-      {managedProfileToEdit && (
-        <EditManagedProfileModal
-          isOpen={!!managedProfileToEdit}
-          onClose={() => setManagedProfileToEdit(null)}
-          targetProfile={managedProfileToEdit}
-          onProfileUpdated={handleManagedProfileUpdated}
-        />
-      )}
-      
-      {isUpdateOwnProfileOpen && (
+      {/* --- Modals (No change needed) --- */}
+      {isUpdateModalOpen && (
         <UpdateProfileModal
-          isOpen={isUpdateOwnProfileOpen}
-          onClose={() => setIsUpdateOwnProfileOpen(false)}
-          onProfileUpdated={handleSelfProfileUpdated}
+          isOpen={isUpdateModalOpen}
+          onClose={handleCloseModals}
+          profile={selectedProfileForEdit}
+          onProfileUpdated={handleProfileUpdate}
+        />
+      )}
+      
+      {isEditManagedModalOpen && (
+        <EditManagedProfileModal
+          isOpen={isEditManagedModalOpen}
+          onClose={handleCloseModals}
+          profile={selectedProfileForEdit}
+          onProfileUpdated={handleProfileUpdate}
         />
       )}
     </>
   );
 }
 
-// --- DashboardContent sub-component (no changes) ---
-function DashboardContent({
-  isProfilesLoading,
-  isTasksLoading,
-  activeProfileData,
-  filteredTasks,
-  profiles,
-}) {
-  console.log('AXIOM LOG: [DashboardContent] Render. ', {
-    isProfilesLoading,
-    isTasksLoading,
-    activeProfileData,
-  });
-
-  if (isTasksLoading || isProfilesLoading) {
-    return <LoadingSpinner />;
-  }
-  
-  if (filteredTasks.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full p-4 text-center text-text-secondary">
-        <ClipboardDocumentListIcon className="w-16 h-16" />
-        <h3 className="mt-4 text-xl font-semibold">No tasks found</h3>
-        <p className="mt-1">
-          Try selecting a different family member or create a new task.
-        </p>
-      </div>
-    );
-  }
-
-  const headerColor = activeProfileData?.profile_color || 'bg-base-300';
-  const headerName = activeProfileData?.display_name || 'Tasks';
-  const headerTextColor = activeProfileData?.profile_color ? 'text-base-100' : 'text-base-content';
-
-
-  return (
-    <div className="p-4">
-      <div
-        className={`flex items-center p-4 mb-4 rounded-lg shadow ${headerColor} ${headerTextColor}`}
-      >
-        <h2 className="text-2xl font-bold">{headerName}</h2>
-      </div>
-
-      <div className="space-y-3">
-        {filteredTasks.map((task) => (
-          <TaskListItem
-            key={task.id}
-            task={task}
-            profiles={profiles}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
+export default HouseholdDashboard;

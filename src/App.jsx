@@ -1,3 +1,5 @@
+// src/App.jsx (UPDATED)
+
 import {
   Routes,
   Route,
@@ -11,6 +13,10 @@ import { useProfile } from './context/ProfileContext';
 import Login from './views/Login';
 import SignUp from './views/SignUp';
 import Dashboard from './views/Dashboard';
+// --- THIS IS THE FIX (Step 1) ---
+// Import the component we're trying to route to
+import HouseholdDashboard from './views/HouseholdDashboard'; 
+// --------------------------------
 
 // Components
 import LoadingSpinner from './components/LoadingSpinner';
@@ -86,6 +92,16 @@ function App() {
         */}
         <Route path="/" element={<Dashboard />} />
         
+        {/* --- THIS IS THE FIX (Step 2) --- */}
+        {/* This tells the router that /household/:householdId should load
+            the HouseholdDashboard component. The :householdId part is
+            what useParams() will read. */}
+        <Route
+          path="/household/:householdId"
+          element={<HouseholdDashboard />}
+        />
+        {/* --------------------------------- */}
+
         {/* Catch-all for logged-in users, redirects to dashboard */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
