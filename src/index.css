@@ -1,4 +1,4 @@
-/* src/index.css (UPDATED FOR V4) */
+/* src/index.css (UPDATED FOR V4 + DARK MODE) */
 
 /*
   1. Import the v4 engine.
@@ -22,14 +22,18 @@
   --palette-gray-0: #FFFFFF;
   --palette-gray-50: #F9FAFB;
   --palette-gray-100: #F3F4F6;
+  --palette-gray-200: #E5E7EB; /* Added for dark mode borders */
   --palette-gray-300: #D1D5DB;
   --palette-gray-500: #6B7280;
+  --palette-gray-600: #4B5563; /* Added for dark mode text */
   --palette-gray-700: #374151;
+  --palette-gray-800: #1F2937; /* Added for dark mode surfaces */
   --palette-gray-900: #111827;
   --palette-black: #000000;
 
   /* === 2. Semantic Roles (Signal) === */
   /* These are prefixed with --color- so Tailwind generates classes */
+  /* --- DEFAULT (LIGHT) THEME --- */
   --color-bg-canvas: var(--palette-gray-50);
   --color-bg-surface: var(--palette-gray-0);
   --color-bg-muted: var(--palette-gray-100);
@@ -40,12 +44,22 @@
   --color-border-primary: var(--palette-gray-300);
   --color-border-muted: var(--palette-gray-100);
 
+  /* --- FIX: Added missing input/border vars from Login.jsx --- */
+  --color-bg-input: var(--palette-gray-0); /* Mapped to bg-surface */
+  --color-border-default: var(--palette-gray-300); /* Mapped to border-primary */
+
   /* === 3. Action & State Palette (Spark) === */
   --palette-action-500: #4F46E5;
   --palette-action-600: #4338CA;
   --color-action-primary: var(--palette-action-500);
   --color-action-primary-hover: var(--palette-action-600);
   --color-text-on-action: var(--palette-gray-0);
+
+  /* --- FIX: Added missing brand vars from Login.jsx --- */
+  /* We map "brand" to "action" so they are the same */
+  --color-brand-primary: var(--color-action-primary);
+  --color-brand-primary-hover: var(--color-action-primary-hover);
+
 
   --palette-success-500: #10B981;
   --palette-warning-500: #F59E0B;
@@ -102,4 +116,41 @@
     margin: 0;
     padding: 0;
   }
+}
+
+/*
+  5. --- THIS IS THE DARK MODE FIX ---
+  We use the [data-theme="dark"] selector from your index.html
+  to override the semantic color variables.
+  Tailwind's classes (e.g., bg-bg-canvas) will automatically
+  pick up these new values.
+*/
+html[data-theme="dark"] {
+  /* --- DARK THEME OVERRIDES --- */
+  --color-bg-canvas: var(--palette-gray-900);
+  --color-bg-surface: var(--palette-gray-800);
+  --color-bg-muted: var(--palette-gray-700);
+  --color-text-primary: var(--palette-gray-100);
+  --color-text-secondary: var(--palette-gray-300);
+  --color-text-disabled: var(--palette-gray-600);
+  --color-text-inverted: var(--palette-gray-900);
+  --color-border-primary: var(--palette-gray-600);
+  --color-border-muted: var(--palette-gray-700);
+  
+  /* --- Input/Border Overrides --- */
+  --color-bg-input: var(--palette-gray-800); /* Mapped to bg-surface */
+  --color-border-default: var(--palette-gray-600); /* Mapped to border-primary */
+  
+  /* --- Action Button (Brand) Overrides --- */
+  /* Action colors can stay vibrant in dark mode */
+  --color-action-primary: var(--palette-action-500);
+  --color-action-primary-hover: var(--palette-action-600);
+  --color-text-on-action: var(--palette-gray-0);
+  --color-brand-primary: var(--color-action-primary);
+  --color-brand-primary-hover: var(--color-action-primary-hover);
+
+  /* --- Error State Overrides --- */
+  --color-signal-error: var(--palette-danger-500);
+  --color-signal-error-bg: #450a0a;  /* Darker red background */
+  --color-signal-error-border: #7f1d1d; /* Darker red border */
 }
