@@ -1,4 +1,4 @@
-// src/views/HouseholdDashboard.jsx (FIXED: Moved Edit Profile to Parent View)
+// src/views/HouseholdDashboard.jsx (FIXED: View switching no longer resets)
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
@@ -7,8 +7,7 @@ import { supabase } from '../supabaseClient';
 import InviteMemberForm from '../components/InviteMemberForm';
 
 // Modals
-import UpdateProfileModal from '../components/UpdateProfileModal';
-import EditManagedProfileModal from '../components/EditManagedProfileModal';
+import EditProfileModal from '../components/EditProfileModal';
 
 // Icons
 import { CirclePlus, Users, ShieldCheck, LayoutGrid, Pencil } from 'lucide-react';
@@ -24,8 +23,7 @@ const CreateTaskForm = ({ householdId, profiles, creatorProfile }) => (
   </div>
 );
 
-// --- THIS IS THE FIX (Step 1: Simplify ProfileSelector) ---
-// We remove all "Edit" logic from this component.
+// --- ProfileSelector ---
 const ProfileSelector = ({
   profiles,
   selectedProfile,
@@ -46,7 +44,6 @@ const ProfileSelector = ({
         Who is completing tasks?
       </h3>
       {sortedProfiles.map((profile) => (
-        // Button is now the top-level element again. No more 'relative' div.
         <button
           key={profile.id}
           onClick={() => onSelectProfile(profile)}
@@ -67,14 +64,12 @@ const ProfileSelector = ({
             <span className="text-xs text-text-secondary mt-1">(Child)</span>
           )}
         </button>
-        // Edit button has been removed from here
       ))}
     </div>
   );
 };
-// --- END FIX ---
 
-// --- THIS IS THE FIX (Step 2: Create new component for Parent View) ---
+// --- ManageProfilesList ---
 const ManageProfilesList = ({ profiles, onEditProfile }) => {
   return (
     <div className="p-6 bg-bg-surface-2 rounded-lg shadow-md">
@@ -111,7 +106,6 @@ const ManageProfilesList = ({ profiles, onEditProfile }) => {
     </div>
   );
 };
-// --- END FIX ---
 
 const TaskList = ({ householdId, selectedProfile }) => (
   <div className="mt-6">
@@ -141,12 +135,11 @@ function HouseholdDashboard({ householdId }) {
   const [error, setError] = useState('');
 
   // View logic
-  const [viewMode, setViewMode] = useState('family');
+  const [viewMode, setViewMode] = useState('family'); // Default to family, will be overridden
   const [selectedProfile, setSelectedProfile] = useState(null);
 
   // Modal State
-  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
-  const [isEditManagedModalOpen, setIsEditManagedModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedProfileForEdit, setSelectedProfileForEdit] = useState(null);
 
   // Data Fetching
@@ -160,46 +153,45 @@ function HouseholdDashboard({ householdId }) {
     
     console.log('HouseholdDashboard: Setting loading and fetching...');
     // Only set loading to true on the *first* fetch
-    // Subsequent refreshes (after edits) will be in the background
     if (!household) setIsLoading(true);
     setError('');
 
     try {
-      // 1. Fetch the household details
+      // 1. Fetch household
       const { data: householdData, error: householdError } = await supabase
         .from('households')
         .select('*')
         .eq('id', householdId)
         .single();
-
       if (householdError) throw householdError;
       if (!householdData) throw new Error('Household not found.');
       setHousehold(householdData);
 
-      // 2. Fetch all profiles associated with this household
+      // 2. Fetch all profiles
       const { data: profilesData, error: profilesError } = await supabase
         .from('profiles')
         .select('*')
         .eq('household_id', householdId);
-
       if (profilesError) throw profilesError;
       setProfiles(profilesData);
 
-      // 3. Find the logged-in user's specific profile
+      // 3. Find user's profile
       const foundUserProfile = profilesData.find(
         (p) => p.auth_user_id === user.id
       );
-
       if (foundUserProfile) {
-        setUserProfile(foundUserProfile);
-        if (foundUserProfile.is_admin) {
-          setViewMode('parent');
-        } else {
-          setViewMode('family');
+        // --- THIS IS THE FIX ---
+        // Only set the default view mode and user profile ONCE (on first load)
+        // This stops it from resetting when data is refreshed
+        if (!userProfile) { 
+          console.log('HouseholdDashboard: Setting default view mode and user profile.');
+          setUserProfile(foundUserProfile);
+          if (foundUserProfile.is_admin) setViewMode('parent');
+          else setViewMode('family');
         }
-        if (!selectedProfile) {
-          setSelectedProfile(foundUserProfile);
-        }
+        // --- END FIX ---
+        
+        if (!selectedProfile) setSelectedProfile(foundUserProfile);
       } else {
         throw new Error(
           'Could not find your profile in this household. (User ID: ' +
@@ -215,7 +207,7 @@ function HouseholdDashboard({ householdId }) {
       console.log('HouseholdDashboard: Fetch finished. Setting loading to false.');
       setIsLoading(false);
     }
-  }, [user, householdId, selectedProfile]); // Note: selectedProfile dependency is correct
+  }, [user, householdId, selectedProfile, household, userProfile]); // Added userProfile to dependency array
 
   useEffect(() => {
     console.log('HouseholdDashboard: useEffect triggered.');
@@ -223,21 +215,15 @@ function HouseholdDashboard({ householdId }) {
   }, [fetchHouseholdData]);
   
 
-  // --- Modal Handlers (No changes needed here) ---
+  // --- Modal Handlers ---
   const handleOpenEditModal = (profileToEdit) => {
     console.log('Opening edit modal for:', profileToEdit.display_name);
     setSelectedProfileForEdit(profileToEdit);
-    
-    if (profileToEdit.id === userProfile.id) {
-      setIsUpdateModalOpen(true);
-    } else {
-      setIsEditManagedModalOpen(true);
-    }
+    setIsEditModalOpen(true);
   };
 
   const handleCloseModals = () => {
-    setIsUpdateModalOpen(false);
-    setIsEditManagedModalOpen(false);
+    setIsEditModalOpen(false);
     setSelectedProfileForEdit(null);
   };
   
@@ -333,12 +319,10 @@ function HouseholdDashboard({ householdId }) {
               <div className="lg:col-span-1 space-y-8">
                 <InviteMemberForm householdId={householdId} />
                 
-                {/* --- THIS IS THE FIX (Step 3: Add new list to Parent View) --- */}
                 <ManageProfilesList
                   profiles={profiles}
                   onEditProfile={handleOpenEditModal}
                 />
-                {/* ------------------------------------------------------------- */}
               </div>
             </>
           )}
@@ -346,14 +330,12 @@ function HouseholdDashboard({ householdId }) {
           {/* --- Family View --- */}
           {viewMode === 'family' && (
             <div className="lg-col-span-3">
-              {/* --- THIS IS THE FIX (Step 4: Remove props from this call) --- */}
               <ProfileSelector
                 profiles={profiles}
                 selectedProfile={selectedProfile}
                 onSelectProfile={handleSelectProfile}
                 userProfile={userProfile}
               />
-              {/* ------------------------------------------------------------- */}
 
               {selectedProfile ? (
                 <TaskList
@@ -370,21 +352,13 @@ function HouseholdDashboard({ householdId }) {
         </main>
       </div>
       
-      {/* --- Modals (No change needed) --- */}
-      {isUpdateModalOpen && (
-        <UpdateProfileModal
-          isOpen={isUpdateModalOpen}
+      {/* --- Modal --- */}
+      {isEditModalOpen && (
+        <EditProfileModal
+          isOpen={isEditModalOpen}
           onClose={handleCloseModals}
           profile={selectedProfileForEdit}
-          onProfileUpdated={handleProfileUpdate}
-        />
-      )}
-      
-      {isEditManagedModalOpen && (
-        <EditManagedProfileModal
-          isOpen={isEditManagedModalOpen}
-          onClose={handleCloseModals}
-          profile={selectedProfileForEdit}
+          userProfile={userProfile} // Pass in the user's profile
           onProfileUpdated={handleProfileUpdate}
         />
       )}

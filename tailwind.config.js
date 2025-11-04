@@ -1,110 +1,75 @@
-// tailwind.config.js
+// tailwind.config.js (UPDATED)
 
-import daisyui from 'daisyui';
-import plugin from 'tailwindcss/plugin';
+// Import the design system tokens from our theme.css file
+// We need to read the theme.css file to get the color definitions
+// Note: This simple import won't work for variables. We'll define colors manually
+// based on the Style Guide.
 
 /** @type {import('tailwindcss').Config} */
 export default {
-  content: [
-    "./index.html",
-    "./src/**/*.{js,ts,jsx,tsx}",
-  ],
-  
-  safelist: [
-    'auth-blue',
-    'auth-purple',
-    'managed-green',
-    'managed-orange',
-    'managed-red',
-    'managed-teal',
-    'managed-purple',
-    'managed-blue',
-    
-    // --- ADDED GCAL COLORS TO SAFELIST ---
-    'bg-gcal-red',
-    'bg-gcal-orange',
-    'bg-gcal-yellow',
-    'bg-gcal-green',
-    'bg-gcal-teal',
-    'bg-gcal-blue',
-    'bg-gcal-purple',
-    'bg-gcal-gray',
-  ],
-
-  theme: {
-    extend: {
-      // --- ADDED GCAL COLORS ---
+  content: [
+    './index.html',
+    './src/**/*.{js,ts,jsx,tsx}', // This scans all our components
+  ],
+  
+  // --- THIS IS THE FIX ---
+  // We must "safelist" the dynamic color classes used in EditProfileModal
+  // so Tailwind doesn't purge them.
+  safelist: [
+    'bg-managed-blue',
+    'bg-managed-green',
+    'bg-managed-yellow',
+    'bg-managed-purple',
+    'bg-managed-orange',
+    'bg-managed-teal',
+    'bg-managed-pink',
+    'bg-managed-indigo',
+    'ring-managed-blue',
+    'ring-managed-green',
+    'ring-managed-yellow',
+    'ring-managed-purple',
+    'ring-managed-orange',
+    'ring-managed-teal',
+    'ring-managed-pink',
+    'ring-managed-indigo',
+  ],
+  // --- END FIX ---
+  
+  theme: {
+    extend: {
+      // Extend Tailwind's default theme with our semantic color roles
+      // We must define the colors here so Tailwind can generate the classes
       colors: {
-        'gcal-red': '#D93B26',
-        'gcal-orange': '#F4511E',
-        'gcal-yellow': '#F6BF26',
-        'gcal-green': '#0B8043',
-        'gcal-teal': '#009688', // (gcal 'Peacock')
-        'gcal-blue': '#3367D6',
-        'gcal-purple': '#8E24AA',
-        'gcal-gray': '#616161',
+        'bg-canvas': 'var(--color-bg-canvas)',
+        'bg-surface-1': 'var(--color-bg-surface-1)',
+        'bg-surface-2': 'var(--color-bg-surface-2)',
+        'bg-surface-hover': 'var(--color-bg-surface-hover)',
+        'bg-overlay': 'var(--color-bg-overlay)',
+        'text-primary': 'var(--color-text-primary)',
+        'text-secondary': 'var(--color-text-secondary)',
+        'text-on-primary': 'var(--color-text-on-primary)',
+        'border-default': 'var(--color-border-default)',
+        'action-primary': 'var(--color-action-primary)',
+        'action-primary-hover': 'var(--color-action-primary-hover)',
+        'signal-error': 'var(--color-signal-error)',
+        'signal-success': 'var(--color-signal-success)',
+        'signal-warning': 'var(--color-signal-warning)',
+        
+        // Profile Colors from Style Guide
+        'managed-blue': 'var(--color-managed-blue)',
+        'managed-green': 'var(--color-managed-green)',
+        'managed-yellow': 'var(--color-managed-yellow)',
+        'managed-purple': 'var(--color-managed-purple)',
+        'managed-orange': 'var(--color-managed-orange)',
+        'managed-teal': 'var(--color-managed-teal)',
+        'managed-pink': 'var(--color-managed-pink)',
+        'managed-indigo': 'var(--color-managed-indigo)',
+      },
+      fontFamily: {
+        // Assuming 'Inter' from Style Guide
+        sans: ['Inter', 'sans-serif'],
       },
     },
-  },
-  
-  plugins: [
-    daisyui,
-    
-    plugin(function({ addUtilities }) {
-      addUtilities({
-        '.auth-blue': {
-          'background-color': '#3b82f6', // bg-blue-500
-          'color': '#ffffff', // text-white
-        },
-        '.auth-purple': {
-          'background-color': '#8b5cf6', // bg-violet-500
-          'color': '#ffffff',
-        },
-        '.managed-green': {
-          'background-color': '#22c55e', // bg-green-500
-          'color': '#ffffff',
-        },
-        '.managed-orange': {
-          'background-color': '#f97316', // bg-orange-500
-          'color': '#ffffff',
-        },
-        '.managed-red': {
-          'background-color': '#ef4444', // bg-red-500
-          'color': '#ffffff',
-        },
-        '.managed-teal': {
-          'background-color': '#14b8a6', // bg-teal-500
-          'color': '#ffffff',
-        },
-        '.managed-purple': {
-          'background-color': '#a855f7', // bg-purple-500
-          'color': '#ffffff',
-        },
-        '.managed-blue': {
-          'background-color': '#0ea5e9', // bg-sky-500
-          'color': '#ffffff',
-        },
-      })
-    })
-  ],
-  
-  // DaisyUI theme configuration
-  daisyui: {
-    themes: [
-      {
-        momentum: {
-          "primary": "#661AE6",
-        "secondary": "#D926AA",
-          "accent": "#1FB2A5",
-          "neutral": "#191D24",
-          "base-100": "#2A303C",
-          "base-content": "#ffffff", 
-          "info": "#3ABFF8",
-          "success": "#36D399",
-          "warning": "#FBBD23",
-          "error": "#F87272",
-        },
-      },
-    ],
-  },
+  },
+  plugins: [],
 };
