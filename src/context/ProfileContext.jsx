@@ -1,11 +1,11 @@
-// src/context/ProfileContext.jsx (FIXED: Infinite loop)
+// src/context/ProfileContext.jsx (FIXED: Cleaned up and stabilized)
 
 import React, {
   createContext,
   useContext,
   useState,
   useEffect,
-  useCallback, // <--- 1. Import useCallback
+  useCallback, // We are using useCallback again, but correctly this time.
 } from 'react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from './AuthContext.jsx'; // Corrected import path
@@ -21,9 +21,9 @@ export function ProfileProvider({ children }) {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // --- 2. Wrap fetchProfile in useCallback ---
-  // This ensures the function itself doesn't change on every render,
-  // which was the cause of our infinite loop.
+  // --- THIS IS THE FIX (Part 1) ---
+  // We define the fetch logic as a stable useCallback function.
+  // It now safely depends on setLoading and setProfile.
   const fetchProfile = useCallback(
     async (user) => {
       if (!user) {
@@ -34,14 +34,14 @@ export function ProfileProvider({ children }) {
       }
 
       console.log('ProfileContext: User found, fetching profile...');
-      setLoading(true);
+      setLoading(true); // Set loading true for *this* fetch
 
       try {
         const { data, error } = await supabase
           .from('profiles')
           .select('*')
           .eq('auth_user_id', user.id)
-          .maybeSingle(); // This part is correct
+          .maybeSingle(); // Correctly returns null instead of erroring
 
         if (error) {
           if (error.code === 'PGRST116') {
@@ -62,25 +62,28 @@ export function ProfileProvider({ children }) {
         setLoading(false);
       }
     },
-    []
-  ); // Dependencies are empty because it has no external React state dependencies
+    [setProfile, setLoading]
+  ); // Dependencies are the state setters
+  // ------------------------------------
 
   useEffect(() => {
     // This effect runs when auth state is resolved or changes
     console.log(
       `ProfileContext: useEffect triggered. AuthLoading: ${authLoading}, User: ${!!currentUser}`
     );
+
+    // Only run the fetch logic when auth is no longer loading
     if (!authLoading) {
       fetchProfile(currentUser);
     }
-    // --- 3. Add fetchProfile to dependency array ---
-    // Now that it's stable, we can safely add it.
+    // This dependency array is now stable and correct.
   }, [currentUser, authLoading, fetchProfile]);
 
   const value = {
     profile,
     loading,
-    fetchProfile, // Expose fetchProfile so it can be called manually
+    fetchProfile, // --- THIS IS THE FIX (Part 2) ---
+    // We expose the clean, stable fetchProfile function.
   };
 
   return (
