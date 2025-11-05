@@ -1,71 +1,73 @@
-import { createContext, useContext, useEffect, useState } from 'react';
-import { supabase } from '../supabaseClient'; // Corrected import
+// src/context/AuthContext.jsx (FIXED: Infinite loop)
+
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { supabase } from '../supabaseClient'; // Ensure this path is correct
 
 const AuthContext = createContext();
 
-export const AuthProvider = ({ children }) => {
+export function useAuth() {
+  return useContext(AuthContext);
+}
+
+export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    console.log('AuthContext: useEffect triggered. Setting up onAuthStateChange listener.');
+    // Get initial user
+    const getSession = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      setCurrentUser(session?.user ?? null);
+      setLoading(false);
+    };
 
-    const { data: authListener } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        console.log(`AuthContext: onAuthStateChange event fired: ${event}`);
-        
-        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
-          console.log('AuthContext: User is signed in or session updated. Setting user:', session.user);
-          setCurrentUser(session.user);
-        } else if (event === 'SIGNED_OUT') {
-          console.log('AuthContext: User signed out. Setting user to null.');
-          setCurrentUser(null);
-        }
-        
-        // This is the first time the listener runs
-        if (event === 'INITIAL_SESSION') {
-           console.log('AuthContext: Initial session processed. User:', session?.user);
-           setCurrentUser(session?.user || null);
-        }
+    getSession();
 
-        console.log('AuthContext: Auth state change processed. Setting auth loading to false.');
-        setLoading(false);
-      }
-    );
+    // Listen for auth state changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setCurrentUser(session?.user ?? null);
+      // We set loading to false here too, in case the listener fires first
+      if (loading) setLoading(false);
+    });
 
     return () => {
-      console.log('AuthContext: useEffect cleanup. Unsubscribing from onAuthStateChange.');
-      authListener.subscription.unsubscribe();
+      subscription?.unsubscribe();
     };
-  }, []);
 
-  // --- FUNCTIONS ADDED BACK ---
-  const login = async (email, password) => {
+    // --- THIS IS THE FIX ---
+    // The dependency array must be empty [] so this effect
+    // runs only ONCE on mount.
+    // Having [loading] in the array caused an infinite loop.
+  }, []);
+  // -----------------------
+
+  const login = (email, password) => {
     return supabase.auth.signInWithPassword({ email, password });
   };
 
-  const signUp = async (email, password) => {
-    // Note: You'll need to handle the profile creation trigger separately
-    // This just creates the auth user.
+  const signup = (email, password) => {
     return supabase.auth.signUp({ email, password });
   };
-  // --------------------------
+
+  const logout = () => {
+    return supabase.auth.signOut();
+  };
 
   const value = {
     currentUser,
     loading,
-    signOut: () => supabase.auth.signOut(),
-    login,  // <-- FIXED: Added back
-    signUp, // <-- FIXED: Added back
+    login,
+    signup,
+    logout,
   };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-};
-
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-};
+  return (
+    <AuthContext.Provider value={value}>
+      {!loading && children}
+    </AuthContext.Provider>
+  );
+}

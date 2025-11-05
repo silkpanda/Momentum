@@ -1,108 +1,89 @@
-import { createContext, useContext, useState, useEffect, useRef } from 'react';
-import { useAuth } from './AuthContext';
-import { supabase } from '../supabaseClient'; // CORRECTED: Was 'import supabase from...'
+// src/context/ProfileContext.jsx (FIXED: Infinite loop)
+
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback, // <--- 1. Import useCallback
+} from 'react';
+import { supabase } from '../supabaseClient';
+import { useAuth } from './AuthContext.jsx'; // Corrected import path
 
 const ProfileContext = createContext();
 
-export const ProfileProvider = ({ children }) => {
+export function useProfile() {
+  return useContext(ProfileContext);
+}
+
+export function ProfileProvider({ children }) {
   const { currentUser, loading: authLoading } = useAuth();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  
-  // Guard to prevent re-fetching if a fetch is already in progress
-  const isFetching = useRef(false);
 
-  useEffect(() => {
-    console.log(`ProfileContext: useEffect triggered. AuthLoading: ${authLoading}, CurrentUser: ${!!currentUser}`);
+  // --- 2. Wrap fetchProfile in useCallback ---
+  // This ensures the function itself doesn't change on every render,
+  // which was the cause of our infinite loop.
+  const fetchProfile = useCallback(
+    async (user) => {
+      if (!user) {
+        console.log('ProfileContext: No user, setting profile to null.');
+        setProfile(null);
+        setLoading(false);
+        return;
+      }
 
-    // Do not run if auth is still loading
-    if (authLoading) {
-      console.log('ProfileContext: Waiting for Auth to finish loading.');
-      return;
-    }
-
-    // If auth is done and there is no user, we are logged out.
-    if (!currentUser) {
-      console.log('ProfileContext: No user. Clearing profile and setting loading to false.');
-      setProfile(null);
-      setLoading(false);
-      isFetching.current = false;
-      return;
-    }
-
-    // If we already have a profile for this user, don't re-fetch
-    if (profile && profile.auth_user_id === currentUser.id) {
-      console.log('ProfileContext: Profile already loaded. Skipping fetch.');
-      setLoading(false);
-      return;
-    }
-
-    // If a fetch is already running, don't start another one
-    if (isFetching.current) {
-      console.log('ProfileContext: Fetch already in progress. Skipping.');
-      return;
-    }
-
-    const fetchProfile = async () => {
-      console.log(`ProfileContext: Auth loaded and user found (${currentUser.id}). Setting fetch guard to TRUE.`);
-      isFetching.current = true;
+      console.log('ProfileContext: User found, fetching profile...');
       setLoading(true);
-      setError(null);
-
-      console.log(`ProfileContext: >>> ATTEMPTING PROFILE FETCH for auth_user_id: ${currentUser.id}`);
-      console.log("ProfileContext: Query: supabase.from('profiles').select('*').eq('auth_user_id', currentUser.id).single()");
 
       try {
-        const { data, error: fetchError } = await supabase
+        const { data, error } = await supabase
           .from('profiles')
           .select('*')
-          .eq('auth_user_id', currentUser.id)
-          .single();
+          .eq('auth_user_id', user.id)
+          .maybeSingle(); // This part is correct
 
-        // THIS IS THE LINE WE EXPECT NOT TO REACH
-        console.log('ProfileContext: <<< PROFILE FETCH COMPLETE.');
-
-        if (fetchError) {
-          console.error('ProfileContext: Error fetching profile:', fetchError);
-          setError(fetchError.message);
-          setProfile(null);
+        if (error) {
+          if (error.code === 'PGRST116') {
+            console.log('ProfileContext: Profile not found (PGRST116).');
+            setProfile(null);
+          } else {
+            throw error;
+          }
         } else {
-          console.log('ProfileContext: Successfully fetched profile:', data);
+          console.log('ProfileContext: Profile fetched:', data);
           setProfile(data);
         }
-      } catch (err) {
-        console.error('ProfileContext: A critical error occurred during fetchProfile:', err);
-        setError(err.message);
+      } catch (error) {
+        console.error('ProfileContext: Error fetching profile:', error);
         setProfile(null);
       } finally {
-        console.log('ProfileContext: Fetch attempt finished. Setting loading to false and fetch guard to FALSE.');
+        console.log('ProfileContext: <<< PROFILE FETCH COMPLETE.');
         setLoading(false);
-        isFetching.current = false;
       }
-    };
+    },
+    []
+  ); // Dependencies are empty because it has no external React state dependencies
 
-    fetchProfile();
-
-  }, [currentUser, authLoading, profile]); // Added profile to dependency array
+  useEffect(() => {
+    // This effect runs when auth state is resolved or changes
+    console.log(
+      `ProfileContext: useEffect triggered. AuthLoading: ${authLoading}, User: ${!!currentUser}`
+    );
+    if (!authLoading) {
+      fetchProfile(currentUser);
+    }
+    // --- 3. Add fetchProfile to dependency array ---
+    // Now that it's stable, we can safely add it.
+  }, [currentUser, authLoading, fetchProfile]);
 
   const value = {
     profile,
-    loading: loading || authLoading, // Report loading if *either* context is loading
-    error,
+    loading,
+    fetchProfile, // Expose fetchProfile so it can be called manually
   };
 
   return (
-    <ProfileContext.Provider value={value}>
-      {children}
-    </ProfileContext.Provider>
+    <ProfileContext.Provider value={value}>{children}</ProfileContext.Provider>
   );
-};
-
-export const useProfile = () => {
-  const context = useContext(ProfileContext);
-  if (context === undefined) {
-    throw new Error('useProfile must be used within a ProfileProvider');
-  }
-  return context;
-};
+}

@@ -1,24 +1,24 @@
-// src/views/HouseholdDashboard.jsx (REFACTORED: Now a controller)
+// src/views/HouseholdDashboard.jsx (FIXED: Added Logout Button)
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { useAuth } from '../context/AuthContext';
-import { supabase } from '../supabaseClient';
+import { useAuth } from '../context/AuthContext.jsx'; // Corrected import path
+import { supabase } from '../supabaseClient.js'; // Corrected import path
 
 // Modals
-import EditProfileModal from '../components/EditProfileModal';
+import EditProfileModal from '../components/EditProfileModal.jsx';
 
 // Icons
-import { Users, ShieldCheck } from 'lucide-react';
+import { Users, ShieldCheck, LogOut } from 'lucide-react'; // Added LogOut icon
 
 // --- View Components ---
-import ParentView from './ParentView';
-import FamilyView from './FamilyView';
+import ParentView from './ParentView.jsx';
+import FamilyView from './FamilyView.jsx';
 // -----------------------
 
 function HouseholdDashboard({ householdId }) {
   console.log('--- HouseholdDashboard component rendered ---');
 
-  const { currentUser: user } = useAuth();
+  const { currentUser: user, logout } = useAuth(); // Get logout function
 
   // --- State ---
   const [household, setHousehold] = useState(null);
@@ -26,6 +26,11 @@ function HouseholdDashboard({ householdId }) {
   const [userProfile, setUserProfile] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+
+  // --- NEW STATE for tasks ---
+  const [tasks, setTasks] = useState([]);
+  const [taskAssignments, setTaskAssignments] = useState([]);
+  // ---------------------------
 
   // View logic
   const [viewMode, setViewMode] = useState('family');
@@ -76,8 +81,6 @@ function HouseholdDashboard({ householdId }) {
           if (foundUserProfile.is_admin) setViewMode('parent');
           else setViewMode('family');
         }
-
-        // Select the user's own profile by default
         if (!selectedProfile) setSelectedProfile(foundUserProfile);
       } else {
         throw new Error(
@@ -86,6 +89,24 @@ function HouseholdDashboard({ householdId }) {
             ')'
         );
       }
+
+      // --- 4. NEW: Fetch tasks and assignments ---
+      const { data: tasksData, error: tasksError } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('household_id', householdId)
+        .order('created_at', { ascending: false }); // Show newest first
+      if (tasksError) throw tasksError;
+      setTasks(tasksData);
+
+      const { data: assignmentsData, error: assignmentsError } = await supabase
+        .from('task_assignments')
+        .select('*');
+      // We can't filter by household_id directly, so we'll rely on RLS
+      // or filter client-side if needed. RLS is better.
+      if (assignmentsError) throw assignmentsError;
+      setTaskAssignments(assignmentsData);
+      // -----------------------------------------
     } catch (err) {
       console.error('HouseholdDashboard: Failed to fetch data:', err);
       setError(`Error: Could not load household data. ${err.message}`);
@@ -110,41 +131,54 @@ function HouseholdDashboard({ householdId }) {
   };
 
   const handleProfileUpdate = (updatedProfile) => {
-    console.log('Profile update received, updating state manually.');
-
     if (updatedProfile.deleted) {
-      // Handle deletion
       setProfiles((currentProfiles) =>
         currentProfiles.filter((p) => p.id !== updatedProfile.id)
       );
-      // If the deleted profile was selected, select the user's profile
       if (selectedProfile?.id === updatedProfile.id) {
         setSelectedProfile(userProfile);
       }
     } else {
-      // Handle update
-      // This .map() preserves the 'created_at' order from the state
       setProfiles((currentProfiles) =>
         currentProfiles.map((p) =>
           p.id === updatedProfile.id ? updatedProfile : p
         )
       );
-      // If the updated profile is the one selected, update that state too
       if (selectedProfile?.id === updatedProfile.id) {
         setSelectedProfile(updatedProfile);
       }
-      // Also update userProfile if they edited themselves
       if (userProfile?.id === updatedProfile.id) {
         setUserProfile(updatedProfile);
       }
     }
     handleCloseModals();
   };
-  // --------------------------------------------------
+
+  // --- NEW: Optimistic update handler for tasks ---
+  const handleTaskCreated = (newTask, newAssignments) => {
+    console.log('Optimistically adding new task:', newTask);
+    setTasks((currentTasks) => [newTask, ...currentTasks]);
+    setTaskAssignments((currentAssignments) => [
+      ...currentAssignments,
+      ...newAssignments,
+    ]);
+  };
+  // ----------------------------------------------
 
   const handleSelectProfile = (profile) => {
     setSelectedProfile(profile);
   };
+
+  // --- NEW: Logout Handler ---
+  const handleLogout = async () => {
+    try {
+      await logout();
+      // The onAuthStateChange listener in App.jsx will handle redirecting
+    } catch (error) {
+      console.error('Error logging out:', error);
+    }
+  };
+  // -------------------------
 
   const isAdmin = userProfile && userProfile.is_admin;
 
@@ -172,9 +206,20 @@ function HouseholdDashboard({ householdId }) {
   return (
     <>
       <div className="w-full min-h-screen p-8 bg-bg-canvas text-text-primary">
-        <header className="mb-8">
-          <h1 className="text-3xl font-semibold mt-2">{household.name}</h1>
+        {/* --- THIS IS THE FIX --- */}
+        <header className="mb-8 flex justify-between items-center">
+          <h1 className="text-3xl font-semibold mt-2">
+            {household.name}
+          </h1>
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium bg-bg-surface-2 text-text-secondary hover:bg-bg-muted hover:text-text-primary"
+          >
+            <LogOut size={16} />
+            Logout
+          </button>
         </header>
+        {/* ----------------------- */}
 
         {/* --- View Mode Toggle (Admins Only) --- */}
         {isAdmin && (
@@ -205,10 +250,6 @@ function HouseholdDashboard({ householdId }) {
         )}
 
         {/* --- Main Content Area --- */}
-        {/* This is the new refactored logic.
-          We render the grid layout here, and then pass the props
-          to the correct view component.
-        */}
         <main className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {viewMode === 'parent' && isAdmin ? (
             <ParentView
@@ -216,6 +257,9 @@ function HouseholdDashboard({ householdId }) {
               profiles={profiles}
               userProfile={userProfile}
               onEditProfile={handleOpenEditModal}
+              tasks={tasks} // Pass tasks down
+              taskAssignments={taskAssignments} // Pass assignments down
+              onTaskCreated={handleTaskCreated} // Pass handler down
             />
           ) : (
             <FamilyView
@@ -224,6 +268,8 @@ function HouseholdDashboard({ householdId }) {
               selectedProfile={selectedProfile}
               onSelectProfile={handleSelectProfile}
               userProfile={userProfile}
+              tasks={tasks} // Pass tasks down
+              taskAssignments={taskAssignments} // Pass assignments down
             />
           )}
         </main>
@@ -235,7 +281,7 @@ function HouseholdDashboard({ householdId }) {
           isOpen={isEditModalOpen}
           onClose={handleCloseModals}
           profile={selectedProfileForEdit}
-          userProfile={userProfile} // Pass in the user's profile
+          userProfile={userProfile}
           onProfileUpdated={handleProfileUpdate}
         />
       )}

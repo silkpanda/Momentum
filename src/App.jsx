@@ -1,33 +1,34 @@
-// src/App.jsx (UPDATED)
+// src/App.jsx (FIXED: Simplified layout logic)
 
 import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
-import { useProfile } from './context/ProfileContext';
+// --- THIS IS THE FIX (Part 1) ---
+// We no longer need useProfile here.
+// import { useProfile } from './context/ProfileContext';
 
 // Views
-import Login from './views/Login';
-import SignUp from './views/SignUp';
-import Dashboard from './views/Dashboard';
-import HouseholdDashboard from './views/HouseholdDashboard';
+import Login from './views/Login.jsx';
+import SignUp from './views/SignUp.jsx';
+import Dashboard from './views/Dashboard.jsx';
+// We removed HouseholdDashboard from routes, Dashboard handles it
+// import HouseholdDashboard from './views/HouseholdDashboard';
 
 // Components
-import LoadingSpinner from './components/LoadingSpinner';
+import LoadingSpinner from './components/LoadingSpinner.jsx';
 
-// --- THIS IS THE FIX ---
-// Removed the import for './App.css' which was conflicting
-// with Tailwind and our theme.css file.
-// import './App.css'; 
-// -----------------------
-
+// ------------------------------------
 
 function AppLayout() {
   const { currentUser, loading: authLoading } = useAuth();
-  const { profile, loading: profileLoading } = useProfile();
+  // --- THIS IS THE FIX (Part 2) ---
+  // All profile logic is removed from this component.
+  // AppLayout's ONLY job is to handle AUTH.
+  // The Dashboard component will handle profile state.
+  // const { profile, loading: profileLoading } = useProfile();
 
-  if (authLoading || (currentUser && profileLoading)) {
-    console.log(
-      `AppLayout: Loading... Auth: ${authLoading}, Profile: ${profileLoading}`
-    );
+  if (authLoading) {
+    // We only care if auth is loading.
+    console.log(`AppLayout: Auth Loading...`);
     return (
       <div className="flex items-center justify-center min-h-screen bg-bg-canvas">
         <LoadingSpinner />
@@ -39,21 +40,39 @@ function AppLayout() {
     console.log('AppLayout: No user, redirecting to /login');
     return <Navigate to="/login" replace />;
   }
-  
-  console.log('AppLayout: User logged in. Rendering main app.');
-  
-  // --- THIS IS A BUG-FIX from our previous session ---
-  // If we have a user AND a profile, we render the app.
-  // The Dashboard component will handle the "no household" modal.
-  if (currentUser && profile) {
-    return <Outlet />;
-  }
 
-  // This logic is from an old file, but it's a good safety net
-  // if the profile is somehow missing but the user is logged in.
-  // We'll keep it, but the logic above should be the primary path.
-  console.log('AppLayout: User logged in but profile not found, rendering main app anyway.');
+  // If we have a user, we render the app.
+  // The Dashboard component will decide what to show based on profile.
+  console.log('AppLayout: User logged in. Rendering main app.');
   return <Outlet />;
+
+  // --- THIS IS THE FIX (Part 3) ---
+  // All the old, confusing logic is gone.
+  // if (authLoading || (currentUser && profileLoading)) {
+  //   console.log(
+  //     `AppLayout: Loading... Auth: ${authLoading}, Profile: ${profileLoading}`
+  //   );
+  //   return (
+  //     <div className="flex items-center justify-center min-h-screen bg-bg-canvas">
+  //       <LoadingSpinner />
+  //     </div>
+  //   );
+  // }
+  //
+  // if (!currentUser) {
+  //   console.log('AppLayout: No user, redirecting to /login');
+  //   return <Navigate to="/login" replace />;
+  // }
+  //
+  // console.log('AppLayout: User logged in. Rendering main app.');
+  //
+  // if (currentUser && profile) {
+  //   return <Outlet />;
+  // }
+  //
+  // console.log('AppLayout: User logged in but profile not found, rendering main app anyway.');
+  // return <Outlet />;
+  // ------------------------------------
 }
 
 function LoggedOutRoute() {
@@ -81,21 +100,12 @@ function App() {
       {/* --- Protected Routes (Must be Logged IN) --- */}
       <Route element={<AppLayout />}>
         {/*
-          This is the old route logic from the file you sent (21d2fa8...).
-          It's incorrect because it tries to use HouseholdDashboard as a route.
-          <Route path="/" element={<Dashboard />} />
-          <Route
-            path="/household/:householdId"
-            element={<HouseholdDashboard />}
-          />
+          The Dashboard view is the ONLY route. 
+          It is responsible for showing either the 
+          CreateOrJoinModal OR the HouseholdDashboard
         */}
-        
-        {/* --- This is the CORRECT logic --- */}
-        {/* The Dashboard view is the ONLY route. 
-            It is responsible for showing either the 
-            CreateOrJoinModal OR the HouseholdDashboard */}
         <Route path="/" element={<Dashboard />} />
-        
+
         {/* Catch-all for logged-in users, redirects to dashboard */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
