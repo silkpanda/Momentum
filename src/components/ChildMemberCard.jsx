@@ -1,54 +1,43 @@
-// src/components/ChildMemberCard.jsx (REFACTORED for SUPABASE)
+import { PencilSquareIcon } from '@heroicons/react/24/solid';
 
-import React, { useState, useEffect } from 'react';
-// FIX: Remove all Firestore imports
-// import { db } from '../firebase';
-// import { doc, onSnapshot } from 'firebase/firestore';
-import { supabase } from '../supabaseClient'; 
+export default function ChildMemberCard({ profile, onEdit }) {
+  // --- THIS IS THE FIX (Robustness) ---
+  // We set defaults in case profile.color or profile.display_name are missing
+  const colorClass = profile?.color ? `bg-${profile.color}` : 'bg-managed-gray';
+  const initial = profile?.display_name
+    ? profile.display_name.charAt(0).toUpperCase()
+    : '?';
+  // ------------------------------------
 
-// NOTE: This component is assumed to receive most data via props (member), 
-// but is prepared for any necessary Supabase data lookups.
+  return (
+    <div className="p-4 bg-bg-surface rounded-lg shadow-md flex flex-col items-center space-y-3">
+      {/* --- This code replaces the icon and uses the safe variables --- */}
+      <div
+        className={`w-16 h-16 rounded-full flex items-center justify-center ${colorClass}`}
+      >
+        <span className="text-2xl font-semibold text-white">{initial}</span>
+      </div>
+      {/* --------------------------------------------------------------- */}
 
-function ChildMemberCard({ member }) {
-    // State is simplified to rely on prop data
-    const [points, setPoints] = useState(member.points); 
-    const [loading, setLoading] = useState(false);
-    
-    // NOTE: If this component needs real-time points, you would set up a 
-    // Supabase Realtime listener here:
-    // useEffect(() => {
-    //   const channel = supabase.channel(`member_points:${member.profileId}`);
-    //   channel.on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'household_members', filter: `profile_id=eq.${member.profileId}` }, 
-    //     (payload) => setPoints(payload.new.points)
-    //   ).subscribe();
-    //   return () => supabase.removeChannel(channel);
-    // }, [member.profileId]);
-
-
-    const handleAwardPoints = async () => {
-        // This logic is complex and should use an RPC, so we stub it.
-        setLoading(true);
-        console.log(`[STUB] Awarding points to ${member.displayName}`);
-        await new Promise(resolve => setTimeout(resolve, 500));
-        setPoints(points + 10);
-        setLoading(false);
-    };
-
-    return (
-        <div className="bg-bg-primary p-4 rounded-lg shadow mb-3 flex justify-between items-center">
-            <div>
-                <p className="font-medium text-text-primary">{member.displayName} (Child)</p>
-                <p className="text-sm text-text-secondary">Current Points: {points}</p>
-            </div>
-            <button
-                onClick={handleAwardPoints}
-                disabled={loading}
-                className="px-3 py-1 bg-action-success text-action-primary-inverted text-sm rounded-md hover:bg-action-success-hover disabled:opacity-50 transition duration-150"
-            >
-                {loading ? '...' : '+10 Points (STUB)'}
-            </button>
-        </div>
-    );
+      <h3 className="text-lg font-medium text-text-primary">
+        {/* Also add a fallback here for safety */}
+        {profile?.display_name || '...'}
+      </h3>
+      <div className="flex items-center space-x-2">
+        <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-bg-muted text-text-secondary">
+          Managed Profile
+        </span>
+        <button
+          onClick={() => onEdit(profile)}
+          className="p-1 text-text-secondary hover:text-text-primary"
+          aria-label={`Edit profile for ${profile?.display_name || 'member'}`}
+        >
+          <PencilSquareIcon className="w-4 h-4" />
+        </button>
+      </div>
+      <button className="w-full px-4 py-2 mt-2 text-sm font-medium rounded-md bg-bg-muted text-text-secondary hover:bg-border-primary hover:text-text-primary">
+        View Tasks
+      </button>
+    </div>
+  );
 }
-
-export default ChildMemberCard;

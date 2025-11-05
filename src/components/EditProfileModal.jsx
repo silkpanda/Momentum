@@ -1,247 +1,260 @@
-// src/components/EditProfileModal.jsx (NEW FILE)
-
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { X } from 'lucide-react';
-import LoadingSpinner from './LoadingSpinner';
+import {
+  Check,
+  X,
+  User,
+  Paintbrush, // We'll keep this for the label, but it's less important now
+  ShieldCheck,
+  UserMinus,
+} from 'lucide-react';
 
-// Color palette from our Style Guide
-const PROFILE_COLORS = [
-  'managed-blue',
-  'managed-green',
-  'managed-yellow',
-  'managed-purple',
+// Color definitions (as they are in your safelist)
+const profileColors = [
+  'managed-red',
   'managed-orange',
+  'managed-yellow',
+  'managed-green',
   'managed-teal',
-  'managed-pink',
-  'managed-indigo',
+  'managed-blue',
+  'managed-purple',
+  'managed-gray',
 ];
-
-// Reusable color swatch component
-const ColorSwatch = ({ color, isSelected, onClick }) => {
-  const bgColorClass = `bg-${color}`;
-  const ringColorClass = `ring-${color}`;
-
-  return (
-    <button
-      type="button"
-      onClick={() => onClick(color)}
-      className={`w-10 h-10 rounded-full transition-all ${bgColorClass}
-        ${
-          isSelected
-            ? `ring-4 ring-offset-2 ring-offset-bg-surface-2 ${ringColorClass}`
-            : 'hover:scale-110'
-        }`}
-      aria-label={`Select ${color}`}
-    />
-  );
-};
 
 export default function EditProfileModal({
   isOpen,
   onClose,
   profile,
-  userProfile, // We need this to know what fields to show
+  userProfile,
   onProfileUpdated,
 }) {
-  // === State ===
-  const [formData, setFormData] = useState({
-    display_name: '',
-    profile_color: '',
-    auth_user_id: '', // Email field
-  });
-  const [isLoading, setIsLoading] = useState(false);
+  const [name, setName] = useState('');
+  const [selectedColor, setSelectedColor] = useState('');
+  const [isAdmin, setIsAdmin] = useState(false);
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  // === Logic ===
-  const isEditingSelf = profile.id === userProfile.id;
-  const isEditingManagedProfile = !profile.is_admin && !profile.auth_user_id;
+  const isUserAdmin = userProfile?.is_admin || false;
+  const isEditingSelf = userProfile?.id === profile?.id;
 
-  // Load profile data into form when modal opens
   useEffect(() => {
     if (profile) {
-      setFormData({
-        display_name: profile.display_name || '',
-        profile_color: profile.profile_color || 'managed-blue',
-        auth_user_id: profile.auth_user_id || '', // (email)
-      });
+      setName(profile.display_name || '');
+      setSelectedColor(profile.color || 'managed-gray');
+      setIsAdmin(profile.is_admin || false);
     }
-  }, [profile, isOpen]);
+  }, [profile]);
 
-  if (!isOpen || !profile) {
-    return null;
-  }
+  if (!isOpen || !profile) return null;
 
-  // Handle text input changes
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-  };
-
-  // Handle color selection
-  const handleColorSelect = (color) => {
-    setFormData((prev) => ({
-      ...prev,
-      profile_color: color,
-    }));
-  };
-
-  // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setIsLoading(true);
+    setLoading(true);
     setError('');
 
-    // 1. Prepare the data to update
+    if (!name.trim()) {
+      setError('Display name cannot be empty.');
+      setLoading(false);
+      return;
+    }
+
     const updateData = {
-      display_name: formData.display_name,
-      profile_color: formData.profile_color,
+      display_name: name,
+      color: selectedColor,
     };
 
-    // 2. Add 'auth_user_id' (email) to the update ONLY if:
-    //    - We are NOT editing a managed (child) profile
-    //    - AND the email has actually changed
-    if (!isEditingManagedProfile && formData.auth_user_id !== profile.auth_user_id) {
-       // We only allow this for other 'admin' (parent) profiles
-       // or for managed profiles that *have* an email
-      updateData.auth_user_id = formData.auth_user_id;
+    if (isUserAdmin && !isEditingSelf) {
+      updateData.is_admin = isAdmin;
     }
 
     try {
-      // 3. Run the Supabase update
-      const { error: updateError } = await supabase
+      const { data, error } = await supabase
         .from('profiles')
         .update(updateData)
-        .eq('id', profile.id);
+        .eq('id', profile.id)
+        .select()
+        .single();
 
-      if (updateError) throw updateError;
+      if (error) throw error;
 
-      // 4. Success! Tell the dashboard to refresh
-      onProfileUpdated();
+      console.log('Profile updated successfully:', data);
+      onProfileUpdated(data);
     } catch (err) {
       console.error('Error updating profile:', err);
       setError(`Failed to update profile: ${err.message}`);
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
-  // === Render ===
+  const handleDelete = async () => {
+    if (
+      !window.confirm(
+        `Are you sure you want to remove "${profile.display_name}" from the household? This cannot be undone.`
+      )
+    ) {
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+
+    try {
+      const { error: rpcError } = await supabase.rpc(
+        'remove_profile_from_household',
+        {
+          profile_id_to_remove: profile.id,
+        }
+      );
+
+      if (rpcError) throw rpcError;
+
+      console.log('Profile removed successfully.');
+      onProfileUpdated({ id: profile.id, deleted: true });
+    } catch (err) {
+      console.error('Error removing profile:', err);
+      setError(
+        `Failed to remove profile: ${err.message}. (You may need to create the 'remove_profile_from_household' RPC function in Supabase.)`
+      );
+      setLoading(false);
+    }
+  };
+
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-bg-overlay"
-      aria-labelledby="modal-title"
-      role="dialog"
-      aria-modal="true"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+      onClick={onClose}
     >
-      <div className="relative w-full max-w-lg p-6 bg-bg-surface-2 rounded-lg shadow-xl">
-        {/* Close Button */}
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 p-2 text-text-secondary rounded-full hover:bg-bg-surface-hover hover:text-text-primary"
-          aria-label="Close modal"
-        >
-          <X size={20} />
-        </button>
-
-        {/* Header */}
-        <h2 id="modal-title" className="text-xl font-semibold text-text-primary mb-4">
-          Edit Profile: {profile.display_name}
-        </h2>
-
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Display Name */}
-          <div>
-            <label
-              htmlFor="display_name"
-              className="block text-sm font-medium text-text-secondary mb-1"
+      <div
+        className="bg-bg-surface rounded-lg shadow-xl w-full max-w-md"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <form onSubmit={handleSubmit}>
+          {/* Header */}
+          <div className="flex items-center justify-between p-4 border-b border-border-muted">
+            <h2 className="text-xl font-semibold text-text-primary">
+              Edit Profile
+            </h2>
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-1 rounded-full text-text-secondary hover:bg-bg-muted"
             >
-              Display Name
-            </label>
-            <input
-              type="text"
-              id="display_name"
-              name="display_name"
-              value={formData.display_name}
-              onChange={handleChange}
-              required
-              className="w-full p-2 bg-bg-canvas border border-border-default rounded-md text-text-primary"
-            />
+              <X className="w-6 h-6" />
+            </button>
           </div>
 
-          {/* Email (auth_user_id) Field */}
-          {/* Show this field ONLY IF the profile is NOT a managed (child) profile */}
-          {!isEditingManagedProfile && (
-            <div>
+          {/* Body */}
+          <div className="p-6 space-y-6">
+            {/* Display Name */}
+            <div className="space-y-2">
               <label
-                htmlFor="auth_user_id"
-                className="block text-sm font-medium text-text-secondary mb-1"
+                htmlFor="displayName"
+                className="block text-sm font-medium text-text-secondary"
               >
-                Email (Auth User)
+                Display Name
               </label>
-              <input
-                type="email"
-                id="auth_user_id"
-                name="auth_user_id"
-                value={formData.auth_user_id}
-                onChange={handleChange}
-                // Parents can't edit their own email, but can edit other parents'
-                readOnly={isEditingSelf}
-                disabled={isEditingSelf}
-                className={`w-full p-2 bg-bg-canvas border border-border-default rounded-md text-text-primary
-                  ${isEditingSelf ? 'opacity-60 cursor-not-allowed' : ''}
-                `}
-              />
-              {isEditingSelf && (
-                 <p className="text-xs text-text-secondary mt-1">
-                   Email addresses are tied to your login and cannot be changed here.
-                 </p>
-              )}
-            </div>
-          )}
-          
-          {/* Profile Color */}
-          <div>
-            <label className="block text-sm font-medium text-text-secondary mb-2">
-              Profile Color
-            </label>
-            <div className="flex flex-wrap gap-3">
-              {PROFILE_COLORS.map((color) => (
-                <ColorSwatch
-                  key={color}
-                  color={color}
-                  isSelected={formData.profile_color === color}
-                  onClick={handleColorSelect}
+              <div className="relative">
+                <User className="absolute w-5 h-5 left-3 top-1/2 -translate-y-1/2 text-text-disabled" />
+                <input
+                  type="text"
+                  id="displayName"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 rounded-md border border-border-default bg-bg-input text-text-primary focus:ring-2 focus:ring-action-primary focus:border-action-primary"
+                  required
                 />
-              ))}
+              </div>
             </div>
+
+            {/* --- THIS IS THE FIX --- */}
+            {/* Profile Color (Replaced dropdown with visual grid) */}
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-text-secondary">
+                Profile Color
+              </label>
+              <div className="flex flex-wrap gap-3 p-3 rounded-md bg-bg-input border border-border-default">
+                {profileColors.map((color) => (
+                  <button
+                    key={color}
+                    type="button" // Prevent form submission
+                    onClick={() => setSelectedColor(color)}
+                    className={`w-9 h-9 rounded-full transition-all ${`bg-${color}`}`}
+                    aria-label={color.replace('managed-', '')}
+                  >
+                    {/* Add a visual indicator for the selected color */}
+                    {selectedColor === color && (
+                      <div className="flex items-center justify-center w-full h-full rounded-full bg-black/30">
+                        <Check className="w-5 h-5 text-white" />
+                      </div>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {/* ----------------------- */}
+
+            {/* Admin Toggle */}
+            {isUserAdmin && !isEditingSelf && (
+              <div className="flex items-center justify-between p-4 rounded-md bg-bg-muted border border-border-muted">
+                <div className="flex items-center space-x-3">
+                  <ShieldCheck className="w-6 h-6 text-action-primary" />
+                  <div>
+                    <h4 className="font-medium text-text-primary">
+                      Household Admin
+                    </h4>
+                    <p className="text-sm text-text-secondary">
+                      Admins can invite users and manage profiles.
+                    </p>
+                  </div>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={isAdmin}
+                  onChange={(e) => setIsAdmin(e.target.checked)}
+                  className="toggle toggle-primary"
+                />
+              </div>
+            )}
           </div>
 
-          <hr className="border-border-default" />
-
-          {/* Footer & Submit */}
-          <div className="flex items-center justify-between">
-            {error && <p className="text-sm text-signal-error">{error}</p>}
-            
-            <div className="flex gap-4 ml-auto">
+          {/* Footer */}
+          <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between p-4 bg-bg-muted rounded-b-lg">
+            {/* Delete Button (Admins only, not on self) */}
+            {isUserAdmin && !isEditingSelf ? (
               <button
                 type="button"
-                onClick={onClose}
-                disabled={isLoading}
-                className="px-4 py-2 text-sm font-medium rounded-md text-text-primary bg-bg-surface-hover hover:bg-bg-surface-hover"
+                onClick={handleDelete}
+                disabled={loading}
+                className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium rounded-md text-signal-danger hover:bg-signal-error-bg disabled:opacity-50 sm:w-auto w-full mt-2 sm:mt-0"
               >
-                Cancel
+                <UserMinus className="w-4 h-4" />
+                Remove from Household
               </button>
+            ) : (
+              <div /> // Empty div to maintain layout
+            )}
+
+            {/* Error and Save */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:gap-4 w-full sm:w-auto">
+              {error && (
+                <p className="text-sm text-signal-error text-center sm:text-right mb-2 sm:mb-0">
+                  {error}
+                </p>
+              )}
               <button
                 type="submit"
-                disabled={isLoading}
-                className="px-4 py-2 text-sm font-medium rounded-md text-text-on-primary bg-action-primary hover:bg-action-primary-hover flex items-center gap-2"
+                disabled={loading}
+                className="flex items-center justify-center gap-2 w-full sm:w-auto px-6 py-2 font-semibold rounded-md text-text-on-action bg-action-primary hover:bg-action-primary-hover disabled:opacity-50"
               >
-                {isLoading ? <LoadingSpinner /> : 'Save Changes'}
+                {loading ? (
+                  'Saving...'
+                ) : (
+                  <>
+                    <Check className="w-5 h-5" />
+                    Save
+                  </>
+                )}
               </button>
             </div>
           </div>
