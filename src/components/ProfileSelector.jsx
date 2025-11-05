@@ -1,4 +1,4 @@
-// src/components/ProfileSelector.jsx (FIXED: "Managed Profiles" is now "Children")
+// src/components/ProfileSelector.jsx (Logs added)
 
 import React from 'react';
 
@@ -8,14 +8,12 @@ export default function ProfileSelector({
   onSelectProfile,
   userProfile,
 }) {
-  // We create a sort logic that puts the current user first
   const sortLogic = (a, b) => {
     if (a.id === userProfile.id) return -1;
     if (b.id === userProfile.id) return 1;
     return a.display_name.localeCompare(b.display_name);
   };
 
-  // We split the profiles into two groups and sort them
   const adminProfiles = profiles.filter((p) => p.is_admin).sort(sortLogic);
   const managedProfiles = profiles.filter((p) => !p.is_admin).sort(sortLogic);
 
@@ -38,6 +36,12 @@ export default function ProfileSelector({
             const initial = profile?.display_name
               ? profile.display_name.charAt(0).toUpperCase()
               : '?';
+
+            // --- ADDED LOG ---
+            console.log(
+              `ProfileSelector: Rendering '${profile.display_name}' with color '${profile.color}'. Applying class: '${colorClass}'`
+            );
+            // -----------------
 
             return (
               <button
@@ -72,11 +76,9 @@ export default function ProfileSelector({
       {/* --- Render Children Group --- */}
       {managedProfiles.length > 0 && (
         <div className="w-full contents">
-          {/* --- THIS IS THE FIX --- */}
           <h4 className="w-full text-base font-medium text-text-secondary mb-2 mt-4">
             Children
           </h4>
-          {/* ----------------------- */}
           {managedProfiles.map((profile) => {
             const colorClass = profile?.color
               ? `bg-${profile.color}`
@@ -84,6 +86,12 @@ export default function ProfileSelector({
             const initial = profile?.display_name
               ? profile.display_name.charAt(0).toUpperCase()
               : '?';
+
+            // --- ADDED LOG ---
+            console.log(
+              `ProfileSelector: Rendering '${profile.display_name}' with color '${profile.color}'. Applying class: '${colorClass}'`
+            );
+            // -----------------
 
             return (
               <button

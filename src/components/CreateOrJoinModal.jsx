@@ -1,10 +1,10 @@
-// src/components/CreateOrJoinModal.jsx (FIXED: Import paths)
+// src/components/CreateOrJoinModal.jsx (FIXED: Removed .jsx from imports)
 
 import React, { useState } from 'react';
 import { supabase } from '../supabaseClient.js';
-// --- THIS IS THE FIX (Part 1) ---
-import LoadingSpinner from './LoadingSpinner.jsx';
-import CreateManagedProfileForm from './CreateManagedProfileForm.jsx';
+// --- THIS IS THE FIX (Part 2) ---
+import LoadingSpinner from './LoadingSpinner';
+import CreateManagedProfileForm from './CreateManagedProfileForm';
 // --------------------------------
 
 export default function CreateOrJoinModal({ user, onSuccess }) {

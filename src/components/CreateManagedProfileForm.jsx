@@ -1,9 +1,9 @@
-// src/components/CreateManagedProfileForm.jsx (FIXED: Import path)
+// src/components/CreateManagedProfileForm.jsx (FIXED: Removed .jsx from imports)
 
 import React, { useState } from 'react';
 import { supabase } from '../supabaseClient.js';
-// --- THIS IS THE FIX (Part 2) ---
-import LoadingSpinner from './LoadingSpinner.jsx';
+// --- THIS IS THE FIX (Part 3) ---
+import LoadingSpinner from './LoadingSpinner';
 // --------------------------------
 
 export default function CreateManagedProfileForm({ user, onHouseholdCreated }) {
