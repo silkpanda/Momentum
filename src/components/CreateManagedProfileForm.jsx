@@ -1,4 +1,4 @@
-// src/components/CreateManagedProfileForm.jsx (FIXED: Removed .jsx from imports)
+// src/components/CreateManagedProfileForm.jsx (FIXED: Added default profile colors to RPC call)
 
 import React, { useState } from 'react';
 import { supabase } from '../supabaseClient.js';
@@ -27,6 +27,11 @@ export default function CreateManagedProfileForm({ user, onHouseholdCreated }) {
     setLoading(true);
     setError(null);
 
+    // --- CRITICAL FIX: Add default colors for the new profiles ---
+    const ADMIN_COLOR = 'managed-blue'; // A default color for the Admin
+    const CHILD_COLOR = 'managed-red';  // A default color for the first Child
+    // -------------------------------------------------------------
+
     try {
       // Call the RPC function
       const { data, error: rpcError } = await supabase.rpc(
@@ -35,6 +40,9 @@ export default function CreateManagedProfileForm({ user, onHouseholdCreated }) {
           household_name: householdName,
           admin_profile_name: adminProfileName,
           child_profile_name: childProfileName,
+          // PASSING THE COLORS TO THE SUPABASE FUNCTION
+          admin_profile_color: ADMIN_COLOR,
+          child_profile_color: CHILD_COLOR,
         }
       );
 

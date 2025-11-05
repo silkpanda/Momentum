@@ -11,9 +11,8 @@ export default function ManageProfilesList({ profiles, onEditProfile }) {
 
   // Helper function to render the list item
   const renderProfileItem = (profile) => {
-    const colorClass = profile?.color
-      ? `bg-${profile.color}`
-      : 'bg-managed-gray';
+    // FIX: Refactored to define only the color, using the fallback.
+    const color = profile?.color || 'managed-gray';
     const initial = profile?.display_name
       ? profile.display_name.charAt(0).toUpperCase()
       : '?';
@@ -25,7 +24,8 @@ export default function ManageProfilesList({ profiles, onEditProfile }) {
       >
         <div className="flex items-center gap-3">
           <div
-            className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${colorClass}`}
+            // FIX: Concatenating the full class string in the JSX for best static analysis.
+            className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center bg-${color}`}
           >
             <span className="text-lg font-semibold text-white">{initial}</span>
           </div>

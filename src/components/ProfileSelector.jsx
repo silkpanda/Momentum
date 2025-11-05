@@ -30,16 +30,16 @@ export default function ProfileSelector({
             Parents
           </h4>
           {adminProfiles.map((profile) => {
-            const colorClass = profile?.color
-              ? `bg-${profile.color}`
-              : 'bg-managed-gray';
+            // FIX: Refactored to define only the color, using the fallback.
+            const color = profile?.color || 'managed-gray';
             const initial = profile?.display_name
               ? profile.display_name.charAt(0).toUpperCase()
               : '?';
 
             // --- ADDED LOG ---
+            // FIX: Updated log to reflect the new `color` variable name.
             console.log(
-              `ProfileSelector: Rendering '${profile.display_name}' with color '${profile.color}'. Applying class: '${colorClass}'`
+              `ProfileSelector: Rendering '${profile.display_name}' with color '${color}'. Applying class: 'bg-${color}'`
             );
             // -----------------
 
@@ -55,7 +55,8 @@ export default function ProfileSelector({
                 }`}
               >
                 <div
-                  className={`w-16 h-16 rounded-full flex items-center justify-center ${colorClass} mb-2`}
+                  // FIX: Concatenating the full class string in the JSX for best static analysis.
+                  className={`w-16 h-16 rounded-full flex items-center justify-center bg-${color} mb-2`}
                 >
                   <span className="text-2xl font-semibold text-white">
                     {initial}
@@ -80,16 +81,16 @@ export default function ProfileSelector({
             Children
           </h4>
           {managedProfiles.map((profile) => {
-            const colorClass = profile?.color
-              ? `bg-${profile.color}`
-              : 'bg-managed-gray';
+            // FIX: Refactored to define only the color, using the fallback.
+            const color = profile?.color || 'managed-gray';
             const initial = profile?.display_name
               ? profile.display_name.charAt(0).toUpperCase()
               : '?';
 
             // --- ADDED LOG ---
+            // FIX: Updated log to reflect the new `color` variable name.
             console.log(
-              `ProfileSelector: Rendering '${profile.display_name}' with color '${profile.color}'. Applying class: '${colorClass}'`
+              `ProfileSelector: Rendering '${profile.display_name}' with color '${color}'. Applying class: 'bg-${color}'`
             );
             // -----------------
 
@@ -105,7 +106,8 @@ export default function ProfileSelector({
                 }`}
               >
                 <div
-                  className={`w-16 h-16 rounded-full flex items-center justify-center ${colorClass} mb-2`}
+                  // FIX: Concatenating the full class string in the JSX for best static analysis.
+                  className={`w-16 h-16 rounded-full flex items-center justify-center bg-${color} mb-2`}
                 >
                   <span className="text-2xl font-semibold text-white">
                     {initial}

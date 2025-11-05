@@ -167,7 +167,6 @@ export default function EditProfileModal({
               </div>
             </div>
 
-            {/* --- THIS IS THE FIX --- */}
             {/* Profile Color (Replaced dropdown with visual grid) */}
             <div className="space-y-2">
               <label className="block text-sm font-medium text-text-secondary">
@@ -179,7 +178,8 @@ export default function EditProfileModal({
                     key={color}
                     type="button" // Prevent form submission
                     onClick={() => setSelectedColor(color)}
-                    className={`w-9 h-9 rounded-full transition-all ${`bg-${color}`}`}
+                    // FIX: Simplified the class string concatenation to ensure JIT/v4 compiler correctly recognizes the full class name.
+                    className={`w-9 h-9 rounded-full transition-all bg-${color}`}
                     aria-label={color.replace('managed-', '')}
                   >
                     {/* Add a visual indicator for the selected color */}
