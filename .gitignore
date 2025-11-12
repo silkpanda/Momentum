@@ -12,6 +12,7 @@ web-build/
 android/build/
 ios/build/
 *.tsbuildinfo
+/.next/
 
 # Debug Files
 *.log

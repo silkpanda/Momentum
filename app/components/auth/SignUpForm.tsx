@@ -1,6 +1,9 @@
 // =========================================================
 // silkpanda/momentum-web/components/auth/SignUpForm.tsx
 // Parent Sign-Up Form Component (Phase 2.1)
+//
+// [FIX] Moved FormInput component definition outside
+// SignUpForm to prevent re-rendering and focus loss.
 // =========================================================
 'use client';
 
@@ -10,11 +13,63 @@ import { Mail, Lock, User, AlertTriangle, Loader, CheckCircle } from 'lucide-rea
 import { useRouter } from 'next/navigation'; // For redirection after success
 
 // Interface for the form state
+// [FIX] Moved outside component to be accessible by FormInput
 interface FormState {
     firstName: string;
     email: string;
     password: string;
 }
+
+// --- Reusable Input Component Props ---
+// [FIX] Added dedicated props interface for the FormInput component
+interface FormInputProps {
+    id: string;
+    name: keyof FormState;
+    type?: string;
+    label: string;
+    Icon: React.ElementType;
+    placeholder: string;
+    value: string; // [FIX] Explicitly pass value
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) => void; // [FIX] Explicitly pass onChange
+}
+
+// --- Reusable Input Component ---
+// [FIX] Moved component definition outside of SignUpForm
+const FormInput: React.FC<FormInputProps> = ({
+    id,
+    name,
+    type = 'text',
+    label,
+    Icon,
+    placeholder,
+    value,
+    onChange,
+}) => (
+    <div className="space-y-1">
+        {/* Label Styling (Source: Style Guide, 5. Component Design, Forms) */}
+        <label htmlFor={id} className="block text-sm font-medium text-text-secondary">
+            {label}
+        </label>
+        <div className="relative rounded-md shadow-sm">
+            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                {/* Icon using Lucide */}
+                <Icon className="h-5 w-5 text-text-secondary" aria-hidden="true" />
+            </div>
+            <input
+                id={id}
+                name={name}
+                type={type}
+                value={value} // [FIX] Use prop
+                onChange={onChange} // [FIX] Use prop
+                required
+                placeholder={placeholder}
+                // Input Field Styling (Source: Style Guide, 5. Component Design, Forms)
+                className="block w-full rounded-md border border-border-subtle p-3 pl-10 text-text-primary bg-bg-surface
+                 placeholder:text-text-secondary/70 focus:border-action-primary focus:ring-action-primary transition duration-150 sm:text-sm"
+            />
+        </div>
+    </div>
+);
 
 const SignUpForm: React.FC = () => {
     const [formData, setFormData] = useState<FormState>({
@@ -81,41 +136,6 @@ const SignUpForm: React.FC = () => {
         }
     };
 
-    // --- Reusable Input Component ---
-    const FormInput = ({ id, name, type = 'text', label, Icon, placeholder }: {
-        id: string;
-        name: keyof FormState;
-        type?: string;
-        label: string;
-        Icon: React.ElementType;
-        placeholder: string;
-    }) => (
-        <div className="space-y-1">
-            {/* Label Styling (Source: Style Guide, 5. Component Design, Forms) */}
-            <label htmlFor={id} className="block text-sm font-medium text-text-secondary">
-                {label}
-            </label>
-            <div className="relative rounded-md shadow-sm">
-                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                    {/* Icon using Lucide */}
-                    <Icon className="h-5 w-5 text-text-secondary" aria-hidden="true" />
-                </div>
-                <input
-                    id={id}
-                    name={name}
-                    type={type}
-                    value={formData[name]}
-                    onChange={handleInputChange}
-                    required
-                    placeholder={placeholder}
-                    // Input Field Styling (Source: Style Guide, 5. Component Design, Forms)
-                    className="block w-full rounded-md border border-border-subtle p-3 pl-10 text-text-primary bg-bg-surface
-                     placeholder:text-text-secondary/70 focus:border-action-primary focus:ring-action-primary transition duration-150 sm:text-sm"
-                />
-            </div>
-        </div>
-    );
-
     return (
         <div className="w-full max-w-lg">
             <h2 className="text-3xl font-semibold text-text-primary text-center mb-6">
@@ -145,6 +165,8 @@ const SignUpForm: React.FC = () => {
                     label="Your First Name"
                     Icon={User}
                     placeholder="e.g., Jessica"
+                    value={formData.firstName} // [FIX] Pass state value
+                    onChange={handleInputChange} // [FIX] Pass handler
                 />
 
                 <FormInput
@@ -154,6 +176,8 @@ const SignUpForm: React.FC = () => {
                     label="Email Address"
                     Icon={Mail}
                     placeholder="you@example.com"
+                    value={formData.email} // [FIX] Pass state value
+                    onChange={handleInputChange} // [FIX] Pass handler
                 />
 
                 <FormInput
@@ -163,6 +187,8 @@ const SignUpForm: React.FC = () => {
                     label="Password"
                     Icon={Lock}
                     placeholder="Min. 8 characters"
+                    value={formData.password} // [FIX] Pass state value
+                    onChange={handleInputChange} // [FIX] Pass handler
                 />
 
                 {/* Primary Button: Sign Up */}
