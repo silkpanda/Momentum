@@ -1,0 +1,36 @@
+{
+    "name": "momentum-web",
+    "version": "1.0.0",
+    "private": true,
+    "description": "Next.js Web Frontend for Parent Control Surface and Auth.",
+    "scripts": {
+        "dev": "next dev",
+        "build": "next build",
+        "start": "next start",
+        "lint": "next lint",
+        "format": "prettier --write \"{app,components,lib}/**/*.{ts,tsx,js,jsx}\"",
+        "lint-fix": "eslint \"{app,components,lib}/**/*.{ts,tsx,js,jsx}\" --fix"
+    },
+    "dependencies": {
+        "@tailwindcss/vite": "^4.1.17",
+        "lucide-react": "^0.395.0",
+        "next": "14.2.4",
+        "react": "18.3.1",
+        "react-dom": "18.3.1"
+    },
+    "devDependencies": {
+        "@types/node": "^20.14.2",
+        "@types/react": "^18.3.3",
+        "@types/react-dom": "^18.3.0",
+        "@typescript-eslint/eslint-plugin": "^7.11.0",
+        "@typescript-eslint/parser": "^7.11.0",
+        "eslint": "^8.57.0",
+        "eslint-config-next": "14.2.4",
+        "eslint-config-prettier": "^9.1.0",
+        "eslint-plugin-prettier": "^5.1.3",
+        "postcss": "^8.4.38",
+        "prettier": "^3.2.5",
+        "tailwindcss": "^4.1.2",
+        "typescript": "^5.4.5"
+    }
+}
