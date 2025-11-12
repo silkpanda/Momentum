@@ -42,10 +42,8 @@ const DashboardLayout: React.FC<React.PropsWithChildren> = ({ children }) => {
     const router = useRouter();
 
     useEffect(() => {
-        // 1. Simulate fetching JWT from secure storage (e.g., cookie or local storage)
-        // NOTE: In a real app, this should be done securely via HTTP-only cookies.
-        // Placeholder JWT for demonstration:
-        const token = 'YOUR_MOCK_JWT_TOKEN_HERE';
+        // 1. [FIX] Get the REAL token from localStorage
+        const token = localStorage.getItem('momentum_token');
 
         if (!token) {
             // If no token, redirect to login immediately
@@ -56,6 +54,8 @@ const DashboardLayout: React.FC<React.PropsWithChildren> = ({ children }) => {
         // 2. Fetch authenticated user data
         const fetchUser = async () => {
             try {
+                // NOTE: The request URL /api/v1/auth/me is correct.
+                // The next.config.mjs rewrite will proxy this to http://localhost:3000
                 const response = await fetch('/api/v1/auth/me', {
                     headers: {
                         'Authorization': `Bearer ${token}`,
