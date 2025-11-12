@@ -1,5 +1,5 @@
 // =========================================================
-// silkpanda/momentum/momentum-aed7f8804ec93e3a89b85f13a44796c67e349b99/app/components/auth/SignUpForm.tsx
+// silkpanda/momentum/momentum-fac69d659346d6b7b01871d803baa24f6dfaccee/app/components/auth/SignUpForm.tsx
 // REFACTORED to meet new API (v3) signup requirements
 // =========================================================
 'use client';
@@ -8,7 +8,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { Mail, Lock, User, AlertTriangle, Loader, CheckCircle, Home, Palette, CheckIcon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import FormInput from '../layout/FormInput'; // Using your corrected path
+import FormInput from '../layout/FormInput'; // Your path
 
 // Interface for the form state
 interface FormState {
