@@ -1,5 +1,5 @@
 // =========================================================
-// silkpanda/momentum-web/app/components/tasks/TaskList.tsx
+// silkpanda/momentum/momentum-aed7f8804ec93e3a89b85f13a44796c67e349b99/app/components/tasks/TaskList.tsx
 // REFACTORED for Unified Task Assignment Model (API v3)
 // =========================================================
 'use client';
@@ -60,7 +60,7 @@ const TaskItem: React.FC<{
                                     key={member._id} // Use the sub-document _id
                                     title={member.displayName}
                                     className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white"
-                                    style={{ backgroundColor: member.profileColor || '#808080' }} // Add fallback color
+                                    style={{ backgroundColor: member.profileColor || '#808080' }} // Add fallback
                                 >
                                     {getInitials(member.displayName)}
                                 </div>
@@ -127,14 +127,15 @@ const TaskList: React.FC = () => {
                 fetch('/api/v1/tasks', {
                     headers: { 'Authorization': `Bearer ${token}` },
                 }),
-                // 2. Fetch Household (to get members for assignment)
-                fetch(`/api/v1/households/${householdId}`, {
+                // 2. FIX: Fetch Household using the new route
+                //
+                fetch(`/api/v1/households`, {
                     headers: { 'Authorization': `Bearer ${token}` },
                 })
             ]);
 
             if (!taskResponse.ok) throw new Error('Failed to fetch tasks.');
-            if (!householdResponse.ok) throw new Error('Failed to fetch household members.');
+            if (!householdResponse.ok) throw new Error('Failed to fetch household members.'); // This was failing (404)
 
             const taskData = await taskResponse.json();
             const householdData = await householdResponse.json();
@@ -155,11 +156,11 @@ const TaskList: React.FC = () => {
             setError(null); // Clear error on success
 
         } catch (e: any) {
-            setError(e.message);
+            setError(e.message); // This is where "Could not retrieve data" is being set
         } finally {
             setLoading(false);
         }
-    }, [token, householdId]); // Add householdId dependency
+    }, [token, householdId]);
 
     useEffect(() => {
         fetchData();

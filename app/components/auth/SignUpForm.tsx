@@ -1,82 +1,45 @@
 // =========================================================
-// silkpanda/momentum-web/components/auth/SignUpForm.tsx
-// Parent Sign-Up Form Component (Phase 2.1)
-//
-// [FIX] Moved FormInput component definition outside
-// SignUpForm to prevent re-rendering and focus loss.
+// silkpanda/momentum/momentum-aed7f8804ec93e3a89b85f13a44796c67e349b99/app/components/auth/SignUpForm.tsx
+// REFACTORED to meet new API (v3) signup requirements
 // =========================================================
 'use client';
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { Mail, Lock, User, AlertTriangle, Loader, CheckCircle } from 'lucide-react';
-import { useRouter } from 'next/navigation'; // For redirection after success
+import { Mail, Lock, User, AlertTriangle, Loader, CheckCircle, Home, Palette, CheckIcon } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import FormInput from '../layout/FormInput'; // Using your corrected path
 
 // Interface for the form state
-// [FIX] Moved outside component to be accessible by FormInput
 interface FormState {
     firstName: string;
+    lastName: string; // ADDED
     email: string;
     password: string;
+    householdName: string; // ADDED
+    userDisplayName: string; // ADDED
 }
 
-// --- Reusable Input Component Props ---
-// [FIX] Added dedicated props interface for the FormInput component
-interface FormInputProps {
-    id: string;
-    name: keyof FormState;
-    type?: string;
-    label: string;
-    Icon: React.ElementType;
-    placeholder: string;
-    value: string; // [FIX] Explicitly pass value
-    onChange: (e: React.ChangeEvent<HTMLInputElement>) => void; // [FIX] Explicitly pass onChange
-}
-
-// --- Reusable Input Component ---
-// [FIX] Moved component definition outside of SignUpForm
-const FormInput: React.FC<FormInputProps> = ({
-    id,
-    name,
-    type = 'text',
-    label,
-    Icon,
-    placeholder,
-    value,
-    onChange,
-}) => (
-    <div className="space-y-1">
-        {/* Label Styling (Source: Style Guide, 5. Component Design, Forms) */}
-        <label htmlFor={id} className="block text-sm font-medium text-text-secondary">
-            {label}
-        </label>
-        <div className="relative rounded-md shadow-sm">
-            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                {/* Icon using Lucide */}
-                <Icon className="h-5 w-5 text-text-secondary" aria-hidden="true" />
-            </div>
-            <input
-                id={id}
-                name={name}
-                type={type}
-                value={value} // [FIX] Use prop
-                onChange={onChange} // [FIX] Use prop
-                required
-                placeholder={placeholder}
-                // Input Field Styling (Source: Style Guide, 5. Component Design, Forms)
-                className="block w-full rounded-md border border-border-subtle p-3 pl-10 text-text-primary bg-bg-surface
-                 placeholder:text-text-secondary/70 focus:border-action-primary focus:ring-action-primary transition duration-150 sm:text-sm"
-            />
-        </div>
-    </div>
-);
+// Profile colors from Governance Doc
+const PROFILE_COLORS = [
+    { name: 'Blueberry', hex: '#4285F4' }, { name: 'Celtic Blue', hex: '#1967D2' },
+    { name: 'Selective Yellow', hex: '#FBBC04' }, { name: 'Pigment Red', hex: '#F72A25' },
+    { name: 'Sea Green', hex: '#34A853' }, { name: 'Dark Spring Green', hex: '#188038' },
+    { name: 'Tangerine', hex: '#FF8C00' }, { name: 'Grape', hex: '#8E24AA' },
+    { name: 'Flamingo', hex: '#E67C73' }, { name: 'Peacock', hex: '#039BE5' },
+];
 
 const SignUpForm: React.FC = () => {
     const [formData, setFormData] = useState<FormState>({
         firstName: '',
+        lastName: '',
         email: '',
         password: '',
+        householdName: '',
+        userDisplayName: '',
     });
+    // Add state for color picker
+    const [selectedColor, setSelectedColor] = useState<string>(PROFILE_COLORS[0].hex);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState(false);
@@ -92,38 +55,32 @@ const SignUpForm: React.FC = () => {
         setError(null);
         setIsLoading(true);
 
-        // Basic client-side validation
-        if (!formData.firstName || !formData.email || !formData.password) {
-            setError('Please fill in all mandatory fields.');
+        // Update validation to check all new fields
+        if (
+            !formData.firstName || !formData.lastName || !formData.email ||
+            !formData.password || !formData.householdName || !formData.userDisplayName
+        ) {
+            setError('Please fill in all fields.');
             setIsLoading(false);
             return;
         }
 
         try {
-            // FIX: Explicitly target the API server on port 3000 to resolve the 404 error from the frontend's dev server on 3001.
-            const response = await fetch('http://localhost:3000/api/v1/auth/signup', {
+            //
+            const response = await fetch('/api/v1/auth/signup', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify(formData),
+                body: JSON.stringify({
+                    ...formData,
+                    userProfileColor: selectedColor, // Add the selected color
+                }),
             });
 
-            // FIX: Safely parse JSON data, handling potential empty/non-JSON responses.
-            const text = await response.text();
-            let data;
-
-            if (text) {
-                // Attempt to parse text as JSON
-                data = JSON.parse(text);
-            } else {
-                // If text is empty, create a default error structure for the logic below
-                data = { status: 'error', message: 'Received empty response from server.' };
-            }
-
+            const data = await response.json();
 
             if (!response.ok || data.status === 'fail' || data.status === 'error') {
-                // Handle API errors (e.g., 409 Conflict for duplicate email)
                 const message = data.message || 'An unknown error occurred during sign-up.';
                 setError(message);
                 setIsLoading(false);
@@ -131,15 +88,14 @@ const SignUpForm: React.FC = () => {
             }
 
             // Success logic
+            setSuccess(true);
+
+            // Save the token from the response
             if (data.token) {
                 localStorage.setItem('momentum_token', data.token);
             }
-            setSuccess(true);
 
-            // In a real app, we would store the JWT token (data.token) and redirect.
-            // For this step, we simulate success and redirect to the dashboard/home.
             setTimeout(() => {
-                // Redirect to a dashboard or a success page
                 router.push('/dashboard');
             }, 1500);
 
@@ -153,7 +109,7 @@ const SignUpForm: React.FC = () => {
     return (
         <div className="w-full max-w-lg">
             <h2 className="text-3xl font-semibold text-text-primary text-center mb-6">
-                Sign Up for Momentum
+                Create Your Household
             </h2>
 
             {/* Status Indicators */}
@@ -172,15 +128,53 @@ const SignUpForm: React.FC = () => {
 
             {/* Sign Up Form */}
             <form onSubmit={handleSubmit} className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormInput
+                        id="firstName"
+                        name="firstName"
+                        type="text"
+                        label="Your First Name"
+                        Icon={User}
+                        placeholder="e.g., Jessica"
+                        value={formData.firstName}
+                        onChange={handleInputChange}
+                    />
+
+                    {/* Add lastName Input */}
+                    <FormInput
+                        id="lastName"
+                        name="lastName"
+                        type="text"
+                        label="Your Last Name"
+                        Icon={User}
+                        placeholder="e.g., Smith"
+                        value={formData.lastName}
+                        onChange={handleInputChange}
+                    />
+                </div>
+
+                {/* Add householdName Input */}
                 <FormInput
-                    id="firstName"
-                    name="firstName"
+                    id="householdName"
+                    name="householdName"
                     type="text"
-                    label="Your First Name"
+                    label="Household Name"
+                    Icon={Home}
+                    placeholder="e.g., 'The Smith Family'"
+                    value={formData.householdName}
+                    onChange={handleInputChange}
+                />
+
+                {/* Add userDisplayName Input */}
+                <FormInput
+                    id="userDisplayName"
+                    name="userDisplayName"
+                    type="text"
+                    label="Your Display Name"
                     Icon={User}
-                    placeholder="e.g., Jessica"
-                    value={formData.firstName} // [FIX] Pass state value
-                    onChange={handleInputChange} // [FIX] Pass handler
+                    placeholder="e.g., 'Mom' or 'Jessica'"
+                    value={formData.userDisplayName}
+                    onChange={handleInputChange}
                 />
 
                 <FormInput
@@ -190,8 +184,8 @@ const SignUpForm: React.FC = () => {
                     label="Email Address"
                     Icon={Mail}
                     placeholder="you@example.com"
-                    value={formData.email} // [FIX] Pass state value
-                    onChange={handleInputChange} // [FIX] Pass handler
+                    value={formData.email}
+                    onChange={handleInputChange}
                 />
 
                 <FormInput
@@ -201,16 +195,38 @@ const SignUpForm: React.FC = () => {
                     label="Password"
                     Icon={Lock}
                     placeholder="Min. 8 characters"
-                    value={formData.password} // [FIX] Pass state value
-                    onChange={handleInputChange} // [FIX] Pass handler
+                    value={formData.password}
+                    onChange={handleInputChange}
                 />
+
+                {/* Add Color Picker */}
+                <div className="space-y-1">
+                    <label className="block text-sm font-medium text-text-secondary">
+                        Your Profile Color
+                    </label>
+                    <div className="flex flex-wrap gap-2 p-2 bg-bg-canvas rounded-lg border border-border-subtle">
+                        {PROFILE_COLORS.map((color) => (
+                            <button
+                                type="button"
+                                key={color.hex}
+                                title={color.name}
+                                onClick={() => setSelectedColor(color.hex)}
+                                className={`w-8 h-8 rounded-full border-2 transition-all
+                          ${selectedColor === color.hex ? 'border-action-primary ring-2 ring-action-primary/50 scale-110' : 'border-transparent opacity-70 hover:opacity-100'}`}
+                                style={{ backgroundColor: color.hex }}
+                            >
+                                {selectedColor === color.hex && <CheckIcon className="w-5 h-5 text-white m-auto" />}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+                {/* --- End of new fields --- */}
 
                 {/* Primary Button: Sign Up */}
                 <div>
                     <button
                         type="submit"
                         disabled={isLoading || success}
-                        // Uses Mandated Primary Button Styling (Source: Style Guide, 5. Component Design)
                         className={`w-full flex justify-center items-center rounded-lg py-3 px-4 text-base font-medium shadow-sm 
                         text-white transition-all duration-200 
                         ${isLoading || success ? 'bg-action-primary/60 cursor-not-allowed' : 'bg-action-primary hover:bg-action-hover transform hover:scale-[1.005] focus:ring-4 focus:ring-action-primary/50'}`}

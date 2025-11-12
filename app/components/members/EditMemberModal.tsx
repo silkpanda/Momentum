@@ -1,5 +1,5 @@
 // =========================================================
-// silkpanda/momentum-web/app/components/members/EditMemberModal.tsx
+// silkpanda/momentum/momentum-aed7f8804ec93e3a89b85f13a44796c67e349b99/app/components/members/EditMemberModal.tsx
 // REFACTORED for Unified Membership Model (API v3)
 // =========================================================
 'use client';
@@ -7,14 +7,14 @@
 import React, { useState, useEffect } from 'react';
 import { User, Loader, X, AlertTriangle, Check, Palette, Mail } from 'lucide-react';
 import { useSession } from '../layout/SessionContext';
-import { IHouseholdMemberProfile } from './MemberList'; // Import new interface
+import { IHouseholdMemberProfile } from './MemberList';
 
 interface EditMemberModalProps {
-    member: IHouseholdMemberProfile; // Use new interface
+    member: IHouseholdMemberProfile;
     householdId: string;
     onClose: () => void;
-    onMemberUpdated: () => void; // Function to trigger a re-fetch
-    usedColors: string[]; // This is still needed for children
+    onMemberUpdated: () => void;
+    usedColors: string[];
 }
 
 // Profile colors from Governance Doc
@@ -30,7 +30,6 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
     member, householdId, onClose, onMemberUpdated, usedColors
 }) => {
     const [displayName, setDisplayName] = useState(member.displayName);
-    // Handle optional profileColor
     const [selectedColor, setSelectedColor] = useState(member.profileColor || null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);

@@ -1,5 +1,5 @@
 // =========================================================
-// silkpanda/momentum-web/app/components/members/MemberList.tsx
+// silkpanda/momentum/momentum-aed7f8804ec93e3a89b85f13a44796c67e349b99/app/components/members/MemberList.tsx
 // REFACTORED for Unified Membership Model (API v3)
 // =========================================================
 'use client';
@@ -116,13 +116,15 @@ const MemberList: React.FC = () => {
 
         setLoading(true);
         try {
+            // CRITICAL FIX: The API endpoint no longer takes an :id.
+            // It uses the token to find the user's household.
             //
-            const response = await fetch(`/api/v1/households/${householdId}`, {
+            const response = await fetch(`/api/v1/households`, {
                 headers: { 'Authorization': `Bearer ${token}` },
             });
 
             if (!response.ok) {
-                throw new Error('Failed to fetch household data.');
+                throw new Error('Failed to fetch household data.'); // This will be caught
             }
             const data = await response.json();
             if (data.status === 'success') {
@@ -131,10 +133,10 @@ const MemberList: React.FC = () => {
                 setMemberProfiles(data.data.household.memberProfiles || []);
                 setError(null);
             } else {
-                throw new Error(data.message || 'Could not retrieve data.');
+                throw new Error(data.message || 'Could not retrieve data.'); // This is the error you are seeing
             }
         } catch (e: any) {
-            setError(e.message);
+            setError(e.message); // The 404 error was caught here
         } finally {
             setLoading(false);
         }
