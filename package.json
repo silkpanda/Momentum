@@ -4,7 +4,7 @@
     "private": true,
     "description": "Next.js Web Frontend for Parent Control Surface and Auth.",
     "scripts": {
-        "dev": "next dev",
+        "dev": "next dev -p 3001",
         "build": "next build",
         "start": "next start",
         "lint": "next lint",

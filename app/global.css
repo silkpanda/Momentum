@@ -1,0 +1,53 @@
+/* ========================================================= */
+/* silkpanda/momentum-web/app/globals.css */
+/* Tailwind CSS-First Configuration & Semantic Color Roles */
+/* ========================================================= */
+
+/* Base Tailwind Directives */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 1. Define the semantic color variables (Default: Calm Light Theme) */
+:root {
+  /* Backgrounds (Source: Style Guide, 3.2 Default Themes) */
+  --color-bg-canvas: #F9FAFB;      /* bg-gray-50 */
+  --color-bg-surface: #FFFFFF;     /* bg-white */
+  
+  /* Text (Source: Style Guide, 3.2 Default Themes) */
+  --color-text-primary: #111827;   /* text-gray-900 */
+  --color-text-secondary: #4B5563; /* text-gray-600 */
+  
+  /* Actions/Borders (Source: Style Guide, 3.2 Default Themes) */
+  --color-action-primary: #4F46E5;  /* bg-indigo-600 */
+  --color-action-hover: #4338CA;   /* bg-indigo-700 (Approx) */
+  --color-border-subtle: #E5E7EB;  /* border-gray-200 */
+
+  /* Signals (Source: Style Guide, 3.2 Default Themes) */
+  --color-signal-success: #16A34A; /* text-green-600 */
+  --color-signal-alert: #DC2626;   /* text-red-600 */
+  --color-signal-focus: #FACC15;   /* bg-yellow-400 */
+}
+
+/* 2. Map the variables to Tailwind utility classes using @theme */
+@theme {
+  colors: {
+    'bg-canvas': 'var(--color-bg-canvas)',
+    'bg-surface': 'var(--color-bg-surface)',
+    'text-primary': 'var(--color-text-primary)',
+    'text-secondary': 'var(--color-text-secondary)',
+    'action-primary': 'var(--color-action-primary)',
+    'action-hover': 'var(--color-action-hover)',
+    'border-subtle': 'var(--color-border-subtle)',
+    'signal-success': 'var(--color-signal-success)',
+    'signal-alert': 'var(--color-signal-alert)',
+    'signal-focus': 'var(--color-signal-focus)',
+  }
+}
+
+/* 3. Apply custom font to all elements (Source: Style Guide, 2. Typography) */
+body {
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  /* Apply canvas background to body */
+  @apply bg-bg-canvas;
+}
