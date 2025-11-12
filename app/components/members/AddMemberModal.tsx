@@ -1,0 +1,209 @@
+// =========================================================
+// silkpanda/momentum-web/app/components/members/AddMemberModal.tsx
+// Modal for creating a new child profile (Phase 2.2)
+// =========================================================
+'use client';
+
+import React, { useState } from 'react';
+// FIX: Added UserPlus to the import list
+import { User, Loader, X, AlertTriangle, Check, Palette, UserPlus } from 'lucide-react';
+import { useSession } from '../layout/SessionContext';
+
+// --- Interfaces ---
+interface IChildProfile {
+    memberRefId: { _id: string; firstName: string; };
+    profileColor: string;
+    pointsTotal: number;
+    _id: string;
+}
+
+interface AddMemberModalProps {
+    householdId: string;
+    onClose: () => void;
+    onMemberAdded: (newProfile: IChildProfile) => void;
+    usedColors: string[];
+}
+
+// Profile colors MUST come from the Governance Doc
+//
+const PROFILE_COLORS = [
+    { name: 'Blueberry', hex: '#4285F4' },
+    { name: 'Celtic Blue', hex: '#1967D2' },
+    { name: 'Selective Yellow', hex: '#FBBC04' },
+    { name: 'Pigment Red', hex: '#F72A25' },
+    { name: 'Sea Green', hex: '#34A853' },
+    { name: 'Dark Spring Green', hex: '#188038' },
+    { name: 'Tangerine', hex: '#FF8C00' },
+    { name: 'Grape', hex: '#8E24AA' },
+    { name: 'Flamingo', hex: '#E67C73' },
+    { name: 'Peacock', hex: '#039BE5' },
+];
+
+const AddMemberModal: React.FC<AddMemberModalProps> = ({
+    householdId, onClose, onMemberAdded, usedColors
+}) => {
+    const [firstName, setFirstName] = useState('');
+    const [selectedColor, setSelectedColor] = useState<string | null>(null);
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const { token } = useSession();
+
+    // Get the first available color as a default
+    const availableColors = PROFILE_COLORS.filter(c => !usedColors.includes(c.hex));
+    const defaultColor = availableColors.length > 0 ? availableColors[0].hex : PROFILE_COLORS[0].hex;
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (firstName.trim() === '') {
+            setError('First Name is required.');
+            return;
+        }
+
+        setIsLoading(true);
+        setError(null);
+
+        const colorToSubmit = selectedColor || defaultColor;
+
+        try {
+            // POST to the 'addFamilyMember' endpoint
+            const response = await fetch(`/api/v1/households/${householdId}/members`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                    firstName: firstName,
+                    profileColor: colorToSubmit,
+                }),
+            });
+
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.message || 'Failed to add member.');
+            }
+
+            // --- CRITICAL FIX: Manually construct the populated profile ---
+            // The API response (data.data.household) is not populated,
+            // but it contains the newly created unpopulated child profile.
+            // We find it and use our form data to "mock" the populated state
+            // to prevent the 'charAt' error in the list.
+
+            const newHousehold = data.data.household;
+            const unpopulatedProfile = newHousehold.childProfiles[newHousehold.childProfiles.length - 1];
+
+            const newPopulatedProfile: IChildProfile = {
+                ...unpopulatedProfile, // This includes the new _id and pointsTotal
+                memberRefId: {
+                    _id: unpopulatedProfile.memberRefId, // This is just the ID string
+                    firstName: firstName, // We add the firstName from our form state
+                }
+            };
+
+            onMemberAdded(newPopulatedProfile);
+            // --------------------------------------------------------
+
+            onClose(); // Close the modal on success
+
+        } catch (err: any) {
+            setError(err.message);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    return (
+        // Modal Backdrop
+        <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+            onClick={onClose}
+        >
+            {/* Modal Content */}
+            <div
+                className="relative w-full max-w-md p-6 bg-bg-surface rounded-xl shadow-xl border border-border-subtle"
+                onClick={(e) => e.stopPropagation()}
+            >
+                <button
+                    onClick={onClose}
+                    className="absolute top-4 right-4 p-1 rounded-full text-text-secondary hover:bg-border-subtle"
+                >
+                    <X className="w-5 h-5" />
+                </button>
+
+                <form onSubmit={handleSubmit} className="flex flex-col space-y-4">
+                    <h3 className="text-xl font-medium text-text-primary">Add New Family Member</h3>
+                    <p className="text-sm text-text-secondary pb-2">
+                        This will create a new 'Child' profile in your household.
+                    </p>
+
+                    {/* First Name Input */}
+                    <div className="space-y-1">
+                        <label htmlFor="firstName" className="block text-sm font-medium text-text-secondary">
+                            Child's First Name
+                        </label>
+                        <div className="relative rounded-md shadow-sm">
+                            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                                <User className="h-5 w-5 text-text-secondary" />
+                            </div>
+                            <input
+                                id="firstName"
+                                name="firstName"
+                                type="text"
+                                value={firstName}
+                                onChange={(e) => {
+                                    setFirstName(e.target.value);
+                                    if (error) setError(null);
+                                }}
+                                placeholder="e.g., 'Alex'"
+                                className="block w-full rounded-md border border-border-subtle p-3 pl-10 text-text-primary bg-bg-surface"
+                            />
+                        </div>
+                    </div>
+
+                    {/* Color Picker */}
+                    <div className="space-y-1">
+                        <label className="block text-sm font-medium text-text-secondary">
+                            Profile Color
+                        </label>
+                        <div className="flex flex-wrap gap-2 p-2 bg-bg-canvas rounded-lg border border-border-subtle">
+                            {availableColors.map((color) => (
+                                <button
+                                    type="button"
+                                    key={color.hex}
+                                    title={color.name}
+                                    onClick={() => setSelectedColor(color.hex)}
+                                    className={`w-8 h-8 rounded-full border-2 transition-all
+                            ${(selectedColor || defaultColor) === color.hex ? 'border-action-primary ring-2 ring-action-primary/50 scale-110' : 'border-transparent opacity-70 hover:opacity-100'}`}
+                                    style={{ backgroundColor: color.hex }}
+                                >
+                                    {(selectedColor || defaultColor) === color.hex && <Check className="w-5 h-5 text-white m-auto" />}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Error Display */}
+                    {error && (
+                        <div className="flex items-center text-sm text-signal-alert">
+                            <AlertTriangle className="w-4 h-4 mr-1.5" /> {error}
+                        </div>
+                    )}
+
+                    {/* Submit Button */}
+                    <button
+                        type="submit"
+                        disabled={isLoading}
+                        className={`w-full flex justify-center items-center rounded-lg py-3 px-4 text-base font-medium shadow-sm 
+                        text-white transition-colors
+                        ${isLoading ? 'bg-action-primary/60' : 'bg-action-primary hover:bg-action-hover'}`}
+                    >
+                        {isLoading ? <Loader className="w-5 h-5 animate-spin" /> : <UserPlus className="w-5 h-5 mr-2" />}
+                        Add Member
+                    </button>
+                </form>
+            </div>
+        </div>
+    );
+};
+
+export default AddMemberModal;
