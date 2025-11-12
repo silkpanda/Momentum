@@ -100,8 +100,8 @@ const SignUpForm: React.FC = () => {
         }
 
         try {
-            // NOTE: Replace '/api' with your actual API base URL in production, e.g., 'https://momentum-api.com/api/v1/auth/signup'
-            const response = await fetch('/api/v1/auth/signup', {
+            // FIX: Explicitly target the API server on port 3000 to resolve the 404 error from the frontend's dev server on 3001.
+            const response = await fetch('http://localhost:3000/api/v1/auth/signup', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -109,7 +109,18 @@ const SignUpForm: React.FC = () => {
                 body: JSON.stringify(formData),
             });
 
-            const data = await response.json();
+            // FIX: Safely parse JSON data, handling potential empty/non-JSON responses.
+            const text = await response.text();
+            let data;
+            
+            if (text) {
+                // Attempt to parse text as JSON
+                data = JSON.parse(text);
+            } else {
+                // If text is empty, create a default error structure for the logic below
+                data = { status: 'error', message: 'Received empty response from server.' };
+            }
+
 
             if (!response.ok || data.status === 'fail' || data.status === 'error') {
                 // Handle API errors (e.g., 409 Conflict for duplicate email)

@@ -98,8 +98,8 @@ const LoginForm: React.FC = () => {
         }
 
         try {
-            // Targets the existing API endpoint: /api/v1/auth/login
-            const response = await fetch('/api/v1/auth/login', {
+            // FIX: Explicitly target the API server on port 3000 to resolve potential 404/SyntaxError issues.
+            const response = await fetch('http://localhost:3000/api/v1/auth/login', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -107,7 +107,18 @@ const LoginForm: React.FC = () => {
                 body: JSON.stringify(formData),
             });
 
-            const data = await response.json();
+            // FIX: Safely parse JSON data, handling potential empty/non-JSON responses.
+            const text = await response.text();
+            let data;
+            
+            if (text) {
+                // Attempt to parse text as JSON
+                data = JSON.parse(text);
+            } else {
+                // If text is empty, create a default error structure for the logic below
+                data = { status: 'error', message: 'Received empty response from server.' };
+            }
+
 
             if (!response.ok || data.status === 'fail' || data.status === 'error') {
                 // Handle API errors (e.g., 401 Unauthorized for incorrect credentials)
