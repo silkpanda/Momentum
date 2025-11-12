@@ -1,7 +1,6 @@
 // =========================================================
 // silkpanda/momentum-web/app/components/tasks/TaskList.tsx
-// Renders the list of tasks and handles CRUD operations.
-// NOW INCLUDES ASSIGNMENT FUNCTIONALITY
+// REFACTORED for Unified Task Assignment Model (API v3)
 // =========================================================
 'use client';
 
@@ -11,19 +10,23 @@ import CreateTaskModal from './CreateTaskModal';
 import { useSession } from '../layout/SessionContext';
 import EditTaskModal from './EditTaskModal';
 import DeleteTaskModal from './DeleteTaskModal';
-// Import the member profile interface
-import { IChildProfile } from '../members/MemberList';
+import { IHouseholdMemberProfile } from '../members/MemberList'; // Use new unified interface
 
 // --- Task Interface ---
-// Based on the ITask interface from the API
+//
 export interface ITask {
     _id: string;
     taskName: string;
     description: string;
     pointsValue: number;
     isCompleted: boolean;
-    // This field is populated by the API
-    assignedToRefs: { _id: string; firstName: string; profileColor: string }[];
+    // This is the NEW field, populated by the API
+    //
+    assignedToProfileIds: {
+        _id: string; // This is the memberProfile sub-document ID
+        displayName: string;
+        profileColor?: string;
+    }[];
     householdRefId: string;
 }
 
@@ -35,7 +38,7 @@ const TaskItem: React.FC<{
 }> = ({ task, onEdit, onDelete }) => {
 
     // Helper to get initials
-    const getInitials = (name: string) => name.charAt(0).toUpperCase();
+    const getInitials = (name: string) => name ? name.charAt(0).toUpperCase() : '?';
 
     return (
         <li className="flex items-center justify-between p-4 bg-bg-surface rounded-lg shadow border border-border-subtle">
@@ -49,17 +52,17 @@ const TaskItem: React.FC<{
                     <p className="text-sm text-text-secondary">{task.description || 'No description'}</p>
 
                     {/* Display assigned member avatars */}
-                    {task.assignedToRefs && task.assignedToRefs.length > 0 && (
+                    {task.assignedToProfileIds && task.assignedToProfileIds.length > 0 && (
                         <div className="flex items-center space-x-1 mt-2">
                             <span className="text-xs text-text-secondary mr-1">Assigned:</span>
-                            {task.assignedToRefs.map(member => (
+                            {task.assignedToProfileIds.map(member => (
                                 <div
-                                    key={member._id}
-                                    title={member.firstName}
+                                    key={member._id} // Use the sub-document _id
+                                    title={member.displayName}
                                     className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white"
-                                    style={{ backgroundColor: member.profileColor }}
+                                    style={{ backgroundColor: member.profileColor || '#808080' }} // Add fallback color
                                 >
-                                    {getInitials(member.firstName)}
+                                    {getInitials(member.displayName)}
                                 </div>
                             ))}
                         </div>
@@ -97,7 +100,7 @@ const TaskItem: React.FC<{
 const TaskList: React.FC = () => {
     const [tasks, setTasks] = useState<ITask[]>([]);
     // State to hold the list of members for assignment
-    const [householdMembers, setHouseholdMembers] = useState<IChildProfile[]>([]);
+    const [householdMembers, setHouseholdMembers] = useState<IHouseholdMemberProfile[]>([]); // Use new interface
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -143,7 +146,8 @@ const TaskList: React.FC = () => {
             }
 
             if (householdData.status === 'success') {
-                setHouseholdMembers(householdData.data.household.childProfiles);
+                // Use the new unified memberProfiles array
+                setHouseholdMembers(householdData.data.household.memberProfiles);
             } else {
                 throw new Error(householdData.message || 'Could not retrieve members.');
             }

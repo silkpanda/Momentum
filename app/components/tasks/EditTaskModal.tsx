@@ -1,21 +1,20 @@
 // =========================================================
 // silkpanda/momentum-web/app/components/tasks/EditTaskModal.tsx
-// Modal for editing an existing task (Phase 2.4)
-// NOW INCLUDES TASK ASSIGNMENT
+// REFACTORED for Unified Task Assignment Model (API v3)
 // =========================================================
 'use client';
 
 import React, { useState } from 'react';
 import { Award, Check, Loader, Type, X, AlertTriangle, UserCheck } from 'lucide-react';
 import { useSession } from '../layout/SessionContext';
-import { ITask } from './TaskList'; // Import interface from TaskList
-import { IChildProfile } from '../members/MemberList'; // Import member interface
+import { ITask } from './TaskList';
+import { IHouseholdMemberProfile } from '../members/MemberList';
 
 interface EditTaskModalProps {
     task: ITask; // The task being edited
     onClose: () => void;
     onTaskUpdated: () => void; // Function to trigger a re-fetch
-    householdMembers: IChildProfile[]; // Accept the list of members
+    householdMembers: IHouseholdMemberProfile[];
 }
 
 const EditTaskModal: React.FC<EditTaskModalProps> = ({
@@ -25,9 +24,9 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
     const [taskName, setTaskName] = useState(task.taskName);
     const [description, setDescription] = useState(task.description);
     const [pointsValue, setPointsValue] = useState(task.pointsValue);
-    // Pre-fill assigned IDs from the populated task object
-    const [assignedIds, setAssignedIds] = useState<string[]>(
-        () => task.assignedToRefs.map(member => member._id)
+    // Use new field name and populated data
+    const [assignedProfileIds, setAssignedProfileIds] = useState<string[]>(
+        () => task.assignedToProfileIds.map(member => member._id)
     );
 
     const [isLoading, setIsLoading] = useState(false);
@@ -61,7 +60,7 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
                     taskName,
                     description,
                     pointsValue,
-                    assignedToRefs: assignedIds, // Send the updated array
+                    assignedToProfileIds: assignedProfileIds, // Send new field
                 }),
             });
 
@@ -82,12 +81,12 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
     };
 
     // Helper function to toggle member assignment
-    const toggleAssignment = (memberId: string) => {
-        setAssignedIds(prevIds => {
-            if (prevIds.includes(memberId)) {
-                return prevIds.filter(id => id !== memberId); // Remove ID
+    const toggleAssignment = (profileId: string) => { // Use profileId
+        setAssignedProfileIds(prevIds => {
+            if (prevIds.includes(profileId)) {
+                return prevIds.filter(id => id !== profileId); // Remove ID
             } else {
-                return [...prevIds, memberId]; // Add ID
+                return [...prevIds, profileId]; // Add ID
             }
         });
     };
@@ -177,27 +176,27 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
                             {householdMembers.length > 0 ? householdMembers.map((member) => (
                                 <button
                                     type="button"
-                                    key={member.memberRefId._id}
-                                    title={`Assign to ${member.memberRefId.firstName}`}
-                                    onClick={() => toggleAssignment(member.memberRefId._id)}
+                                    key={member._id} // Use sub-document _id
+                                    title={`Assign to ${member.displayName}`}
+                                    onClick={() => toggleAssignment(member._id)} // Use sub-document _id
                                     className={`flex items-center space-x-2 p-2 pr-3 rounded-full border transition-all
-                            ${assignedIds.includes(member.memberRefId._id)
+                            ${assignedProfileIds.includes(member._id) // Check new field
                                             ? 'bg-action-primary/10 border-action-primary text-action-primary'
                                             : 'bg-bg-surface border-border-subtle text-text-secondary hover:bg-border-subtle'}`}
                                 >
                                     <div
                                         className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white"
-                                        style={{ backgroundColor: member.profileColor }}
+                                        style={{ backgroundColor: member.profileColor || '#808080' }} // Add fallback
                                     >
-                                        {member.memberRefId.firstName.charAt(0).toUpperCase()}
+                                        {member.displayName.charAt(0).toUpperCase()}
                                     </div>
-                                    <span className="text-sm font-medium">{member.memberRefId.firstName}</span>
-                                    {assignedIds.includes(member.memberRefId._id) && (
+                                    <span className="text-sm font-medium">{member.displayName}</span>
+                                    {assignedProfileIds.includes(member._id) && ( // Check new field
                                         <UserCheck className="w-4 h-4" />
                                     )}
                                 </button>
                             )) : (
-                                <p className="text-sm text-text-secondary p-2">No child profiles available to assign.</p>
+                                <p className="text-sm text-text-secondary p-2">No members available to assign.</p>
                             )}
                         </div>
                     </div>

@@ -26,6 +26,12 @@ export interface IHouseholdMemberProfile {
     pointsTotal: number;
 }
 
+export interface IHousehold {
+    _id: string;
+    householdName: string;
+    memberProfiles: IHouseholdMemberProfile[]; // Use the new unified array
+}
+
 // --- Unified Member Item Component ---
 const MemberItem: React.FC<{
     member: IHouseholdMemberProfile;
@@ -87,8 +93,7 @@ const MemberItem: React.FC<{
 
 // --- Main Member List Component ---
 const MemberList: React.FC = () => {
-    // CRITICAL FIX: State must be initialized to an empty array ([])
-    // to prevent .length calls on 'undefined'.
+    // State now holds the single, unified array from the API
     const [memberProfiles, setMemberProfiles] = useState<IHouseholdMemberProfile[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -96,10 +101,12 @@ const MemberList: React.FC = () => {
 
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-    const [selectedMember, setSelectedMember] = useState<IHouseholdMemberProfile | null>(null);
+    const [selectedMember, setSelectedMember] = useState<IHouseholdMemberProfile | null>(null); // Use new interface
 
-    const { user, householdId, token } = useSession();
+    // Use the session context to get the householdId and token
+    const { user, householdId, token } = useSession(); // Get logged-in user
 
+    // Wrap fetch in useCallback so it can be reused
     const fetchHouseholdData = useCallback(async () => {
         if (!householdId || !token) {
             setError('Session invalid. Please log in again.');
@@ -109,6 +116,7 @@ const MemberList: React.FC = () => {
 
         setLoading(true);
         try {
+            //
             const response = await fetch(`/api/v1/households/${householdId}`, {
                 headers: { 'Authorization': `Bearer ${token}` },
             });
@@ -118,7 +126,8 @@ const MemberList: React.FC = () => {
             }
             const data = await response.json();
             if (data.status === 'success') {
-                // Ensure we always set an array, even if API returns null/undefined
+                // The controller now populates 'memberProfiles.familyMemberId'
+                //
                 setMemberProfiles(data.data.household.memberProfiles || []);
                 setError(null);
             } else {
@@ -132,19 +141,20 @@ const MemberList: React.FC = () => {
     }, [householdId, token]);
 
     useEffect(() => {
-        fetchHouseholdData();
+        fetchHouseholdData(); // Call fetch on initial load
     }, [fetchHouseholdData]);
 
     const handleMemberAdded = (newProfile: IHouseholdMemberProfile) => {
+        // Add to state directly to avoid re-fetch
         setMemberProfiles(current => [...current, newProfile]);
     };
 
     const handleMemberUpdated = () => {
-        fetchHouseholdData();
+        fetchHouseholdData(); // Re-fetch to get updated, populated data
     };
 
     const handleMemberDeleted = () => {
-        fetchHouseholdData();
+        fetchHouseholdData(); // Re-fetch to get updated list
     };
 
     // Click Handlers for opening modals
@@ -158,7 +168,6 @@ const MemberList: React.FC = () => {
         setIsDeleteModalOpen(true);
     };
 
-    // This guard now safely checks .length on an initialized array
     if (loading && memberProfiles.length === 0) {
         return (
             <div className="flex justify-center items-center p-8 bg-bg-surface rounded-lg shadow-md border border-border-subtle">
@@ -182,10 +191,10 @@ const MemberList: React.FC = () => {
             {/* Header and "Add Member" Button */}
             <div className="flex justify-between items-center mb-4">
                 <h2 className="text-lg font-medium text-text-secondary">
-                    {/* This line (188) is now safe */}
                     {memberProfiles.length} Total Member(s)
                     {loading && <Loader className="w-4 h-4 ml-2 inline animate-spin" />}
                 </h2>
+                {/* Mandated Button: Icon + Text Label */}
                 <button
                     onClick={() => setIsAddModalOpen(true)}
                     className="inline-flex items-center rounded-lg py-2 px-4 text-sm font-medium shadow-sm 
@@ -200,13 +209,18 @@ const MemberList: React.FC = () => {
             {/* Render Unified Member List */}
             {memberProfiles.length > 0 ? (
                 <ul className="space-y-4">
+                    {/* Sort to show Parents first, then Children */}
                     {[...memberProfiles]
-                        .sort((a, b) => (a.role === 'Parent' ? -1 : 1))
+                        .sort((a, b) => {
+                            if (a.role === 'Parent' && b.role !== 'Parent') return -1;
+                            if (a.role !== 'Parent' && b.role === 'Parent') return 1;
+                            return 0;
+                        })
                         .map((member) => (
                             <MemberItem
-                                key={member._id}
+                                key={member._id} // Use sub-document ID
                                 member={member}
-                                isSelf={member.familyMemberId._id === user?._id}
+                                isSelf={member.familyMemberId._id === user?._id} // Check if self
                                 onEdit={() => openEditModal(member)}
                                 onDelete={() => openDeleteModal(member)}
                             />
@@ -223,9 +237,10 @@ const MemberList: React.FC = () => {
             {/* Conditionally render the modal */}
             {isAddModalOpen && (
                 <AddMemberModal
-                    householdId={householdId!}
+                    householdId={householdId!} // householdId is guaranteed to exist here
                     onClose={() => setIsAddModalOpen(false)}
                     onMemberAdded={handleMemberAdded}
+                    // Pass the list of already used colors
                     usedColors={memberProfiles.map(p => p.profileColor).filter(Boolean) as string[]}
                 />
             )}

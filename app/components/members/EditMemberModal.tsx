@@ -1,6 +1,6 @@
 // =========================================================
 // silkpanda/momentum-web/app/components/members/EditMemberModal.tsx
-// REFACTORED: Modal now handles the unified IHouseholdMemberProfile
+// REFACTORED for Unified Membership Model (API v3)
 // =========================================================
 'use client';
 
@@ -29,7 +29,7 @@ const PROFILE_COLORS = [
 const EditMemberModal: React.FC<EditMemberModalProps> = ({
     member, householdId, onClose, onMemberUpdated, usedColors
 }) => {
-    const [displayName, setDisplayName] = useState(member.displayName); // Edit displayName
+    const [displayName, setDisplayName] = useState(member.displayName);
     // Handle optional profileColor
     const [selectedColor, setSelectedColor] = useState(member.profileColor || null);
     const [isLoading, setIsLoading] = useState(false);
@@ -52,6 +52,7 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
         setError(null);
 
         try {
+            // PATCH to the 'updateMemberProfile' endpoint
             // The API endpoint uses the sub-document _id
             //
             const response = await fetch(`/api/v1/households/members/${member._id}`, {
@@ -139,7 +140,7 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
                                     id="email"
                                     name="email"
                                     type="email"
-                                    value={member.familyMemberId.email}
+                                    value={member.familyMemberId.email || 'N/A'}
                                     disabled
                                     className="block w-full rounded-md border border-border-subtle p-3 pl-10 text-text-secondary bg-bg-canvas"
                                 />

@@ -7,10 +7,10 @@
 import React, { useState } from 'react';
 import { Loader, X, AlertTriangle, Trash } from 'lucide-react';
 import { useSession } from '../layout/SessionContext';
-import { IHouseholdMemberProfile } from './MemberList'; // Import new interface
+import { IHouseholdMemberProfile } from './MemberList';
 
 interface DeleteMemberModalProps {
-    member: IHouseholdMemberProfile; // Use new interface
+    member: IHouseholdMemberProfile;
     householdId: string;
     onClose: () => void;
     onMemberDeleted: () => void; // Function to trigger a re-fetch

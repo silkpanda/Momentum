@@ -1,20 +1,19 @@
 // =========================================================
 // silkpanda/momentum-web/app/components/tasks/CreateTaskModal.tsx
-// Modal for creating a new task (Phase 2.4)
-// REFACTORED: All fields are on a single page
+// REFACTORED for Unified Task Assignment Model (API v3)
 // =========================================================
 'use client';
 
 import React, { useState } from 'react';
 import { Award, Check, Loader, Type, X, AlertTriangle, UserCheck } from 'lucide-react';
-import { ITask } from './TaskList'; // We will export ITask from TaskList
-import { IChildProfile } from '../members/MemberList'; // Import member interface
+import { ITask } from './TaskList';
+import { IHouseholdMemberProfile } from '../members/MemberList';
 
 // Define the props the modal will accept
 interface CreateTaskModalProps {
     onClose: () => void;
     onTaskCreated: (newTask: ITask) => void;
-    householdMembers: IChildProfile[]; // Accept the list of members
+    householdMembers: IHouseholdMemberProfile[]; // Accept the list of members
 }
 
 // Define the state for the form data
@@ -22,7 +21,7 @@ interface TaskFormState {
     taskName: string;
     description: string;
     pointsValue: number;
-    assignedToRefs: string[]; // Add state for assignments
+    assignedToProfileIds: string[]; // Use new field name
 }
 
 const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ onClose, onTaskCreated, householdMembers }) => {
@@ -30,7 +29,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ onClose, onTaskCreate
         taskName: '',
         description: '',
         pointsValue: 10, // Default points
-        assignedToRefs: [], // Initialize as empty array
+        assignedToProfileIds: [], // Use new field name
     });
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -65,7 +64,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ onClose, onTaskCreate
                     taskName: formData.taskName,
                     description: formData.description,
                     pointsValue: formData.pointsValue,
-                    assignedToRefs: formData.assignedToRefs, // Send assigned IDs
+                    assignedToProfileIds: formData.assignedToProfileIds, // Send new field
                 }),
             });
 
@@ -86,15 +85,15 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ onClose, onTaskCreate
     };
 
     // Helper function to toggle member assignment
-    const toggleAssignment = (memberId: string) => {
+    const toggleAssignment = (profileId: string) => { // Use profileId
         setFormData(prevData => {
-            const currentAssigned = prevData.assignedToRefs;
-            if (currentAssigned.includes(memberId)) {
+            const currentAssigned = prevData.assignedToProfileIds;
+            if (currentAssigned.includes(profileId)) {
                 // Remove ID
-                return { ...prevData, assignedToRefs: currentAssigned.filter(id => id !== memberId) };
+                return { ...prevData, assignedToProfileIds: currentAssigned.filter(id => id !== profileId) };
             } else {
                 // Add ID
-                return { ...prevData, assignedToRefs: [...currentAssigned, memberId] };
+                return { ...prevData, assignedToProfileIds: [...currentAssigned, profileId] };
             }
         });
     };
@@ -194,27 +193,27 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ onClose, onTaskCreate
                             {householdMembers.length > 0 ? householdMembers.map((member) => (
                                 <button
                                     type="button"
-                                    key={member.memberRefId._id}
-                                    title={`Assign to ${member.memberRefId.firstName}`}
-                                    onClick={() => toggleAssignment(member.memberRefId._id)}
+                                    key={member._id} // Use sub-document _id
+                                    title={`Assign to ${member.displayName}`}
+                                    onClick={() => toggleAssignment(member._id)} // Use sub-document _id
                                     className={`flex items-center space-x-2 p-2 pr-3 rounded-full border transition-all
-                            ${formData.assignedToRefs.includes(member.memberRefId._id)
+                            ${formData.assignedToProfileIds.includes(member._id) // Check new field
                                             ? 'bg-action-primary/10 border-action-primary text-action-primary'
                                             : 'bg-bg-surface border-border-subtle text-text-secondary hover:bg-border-subtle'}`}
                                 >
                                     <div
                                         className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white"
-                                        style={{ backgroundColor: member.profileColor }}
+                                        style={{ backgroundColor: member.profileColor || '#808080' }} // Add fallback
                                     >
-                                        {member.memberRefId.firstName.charAt(0).toUpperCase()}
+                                        {member.displayName.charAt(0).toUpperCase()}
                                     </div>
-                                    <span className="text-sm font-medium">{member.memberRefId.firstName}</span>
-                                    {formData.assignedToRefs.includes(member.memberRefId._id) && (
+                                    <span className="text-sm font-medium">{member.displayName}</span>
+                                    {formData.assignedToProfileIds.includes(member._id) && ( // Check new field
                                         <UserCheck className="w-4 h-4" />
                                     )}
                                 </button>
                             )) : (
-                                <p className="text-sm text-text-secondary p-2">No child profiles available to assign.</p>
+                                <p className="text-sm text-text-secondary p-2">No members available to assign.</p>
                             )}
                         </div>
                     </div>

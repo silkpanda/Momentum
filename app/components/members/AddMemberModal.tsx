@@ -1,6 +1,5 @@
 // =========================================================
 // silkpanda/momentum-web/app/components/members/AddMemberModal.tsx
-// Modal for creating a new child profile (Phase 2.2)
 // REFACTORED for Unified Membership Model (API v3)
 // =========================================================
 'use client';
@@ -8,12 +7,12 @@
 import React, { useState } from 'react';
 import { User, Loader, X, AlertTriangle, Check, Palette, UserPlus } from 'lucide-react';
 import { useSession } from '../layout/SessionContext';
-import { IHouseholdMemberProfile } from './MemberList'; // Import new interface
+import { IHouseholdMemberProfile } from './MemberList';
 
 interface AddMemberModalProps {
     householdId: string;
     onClose: () => void;
-    onMemberAdded: (newProfile: IHouseholdMemberProfile) => void; // Use new interface
+    onMemberAdded: (newProfile: IHouseholdMemberProfile) => void;
     usedColors: string[];
 }
 
@@ -117,7 +116,7 @@ const AddMemberModal: React.FC<AddMemberModalProps> = ({
                     {/* First Name Input */}
                     <div className="space-y-1">
                         <label htmlFor="firstName" className="block text-sm font-medium text-text-secondary">
-                            Child's First Name (this will be their login)
+                            Child's First Name (this will be their login & display name)
                         </label>
                         <div className="relative rounded-md shadow-sm">
                             <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
