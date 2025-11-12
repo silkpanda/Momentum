@@ -1,0 +1,27 @@
+/* app/global.css */
+
+/* --- 1. Import Inter Font --- */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+
+/* --- 2. Import Tailwind v4 --- */
+@import "tailwindcss";
+
+/* --- 3. Define Base Styles --- */
+body {
+  font-family: 'Inter', sans-serif;
+}
+
+/* --- 4. Define Custom Theme (from Step 3 Guide & page.tsx) --- */
+@theme {
+  /* These are sensible placeholders based on the names.
+    We can replace them with the real Style Guide hex codes.
+  */
+  --color-text-primary: oklch(0.1 0 0);       /* Dark Gray/Black */
+  --color-text-secondary: oklch(0.4 0 0);    /* Medium Gray */
+  --color-action-primary: oklch(0.6 0.2 260); /* A nice Blue */
+  --color-action-hover: oklch(0.5 0.2 260);   /* A darker Blue */
+  --color-signal-success: oklch(0.7 0.2 145); /* Green */
+  
+  --color-bg-surface: oklch(1 0 0);           /* White */
+  --color-border-subtle: oklch(0.9 0 0);      /* Light Gray */
+}
