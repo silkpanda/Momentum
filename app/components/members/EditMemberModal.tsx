@@ -1,20 +1,20 @@
 // =========================================================
 // silkpanda/momentum-web/app/components/members/EditMemberModal.tsx
-// Modal for editing an existing child profile (Phase 2.2)
+// REFACTORED: Modal now handles both Parent and Child profiles
 // =========================================================
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { User, Loader, X, AlertTriangle, Check, Palette } from 'lucide-react';
+import { User, Loader, X, AlertTriangle, Check, Palette, Mail } from 'lucide-react';
 import { useSession } from '../layout/SessionContext';
-import { IChildProfile } from './MemberList'; // Import interface from MemberList
+import { IMemberDisplay } from './MemberList'; // Import unified interface
 
 interface EditMemberModalProps {
-    member: IChildProfile; // The member being edited
+    member: IMemberDisplay; // Use unified interface
     householdId: string;
     onClose: () => void;
     onMemberUpdated: () => void; // Function to trigger a re-fetch
-    usedColors: string[];
+    usedColors: string[]; // This is still needed for children
 }
 
 // Profile colors from Governance Doc
@@ -29,8 +29,9 @@ const PROFILE_COLORS = [
 const EditMemberModal: React.FC<EditMemberModalProps> = ({
     member, householdId, onClose, onMemberUpdated, usedColors
 }) => {
-    const [firstName, setFirstName] = useState(member.memberRefId.firstName);
-    const [selectedColor, setSelectedColor] = useState(member.profileColor);
+    const [firstName, setFirstName] = useState(member.firstName);
+    // Handle optional profileColor
+    const [selectedColor, setSelectedColor] = useState(member.profileColor || null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const { token } = useSession();
@@ -53,16 +54,19 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
         try {
             // PATCH to the 'updateFamilyMember' endpoint
             //
-            const response = await fetch(`/api/v1/households/${householdId}/members/${member.memberRefId._id}`, {
+            // Use memberId from the unified interface
+            const response = await fetch(`/api/v1/households/${householdId}/members/${member.memberId}`, {
                 method: 'PATCH',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`,
                 },
-                body: JSON.stringify({
-                    firstName: firstName,
-                    profileColor: selectedColor,
-                }),
+                // Build conditional request body
+                body: JSON.stringify(
+                    member.role === 'Parent'
+                        ? { firstName: firstName } // Parents can only update firstName
+                        : { firstName: firstName, profileColor: selectedColor } // Children can update both
+                ),
             });
 
             const data = await response.json();
@@ -98,12 +102,14 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
                 </button>
 
                 <form onSubmit={handleSubmit} className="flex flex-col space-y-4">
-                    <h3 className="text-xl font-medium text-text-primary">Edit Family Member</h3>
+                    <h3 className="text-xl font-medium text-text-primary">
+                        {member.role === 'Parent' ? 'Edit Your Profile' : 'Edit Family Member'}
+                    </h3>
 
                     {/* First Name Input */}
                     <div className="space-y-1">
                         <label htmlFor="firstName" className="block text-sm font-medium text-text-secondary">
-                            Child's First Name
+                            First Name
                         </label>
                         <div className="relative rounded-md shadow-sm">
                             <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
@@ -120,27 +126,51 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
                         </div>
                     </div>
 
-                    {/* Color Picker */}
-                    <div className="space-y-1">
-                        <label className="block text-sm font-medium text-text-secondary">
-                            Profile Color
-                        </label>
-                        <div className="flex flex-wrap gap-2 p-2 bg-bg-canvas rounded-lg border border-border-subtle">
-                            {availableColors.map((color) => (
-                                <button
-                                    type="button"
-                                    key={color.hex}
-                                    title={color.name}
-                                    onClick={() => setSelectedColor(color.hex)}
-                                    className={`w-8 h-8 rounded-full border-2 transition-all
-                            ${selectedColor === color.hex ? 'border-action-primary ring-2 ring-action-primary/50 scale-110' : 'border-transparent opacity-70 hover:opacity-100'}`}
-                                    style={{ backgroundColor: color.hex }}
-                                >
-                                    {selectedColor === color.hex && <Check className="w-5 h-5 text-white m-auto" />}
-                                </button>
-                            ))}
+                    {/* Conditionally show Email for Parents */}
+                    {member.role === 'Parent' && (
+                        <div className="space-y-1">
+                            <label htmlFor="email" className="block text-sm font-medium text-text-secondary">
+                                Email (Cannot be changed)
+                            </label>
+                            <div className="relative rounded-md">
+                                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                                    <Mail className="h-5 w-5 text-text-secondary/70" />
+                                </div>
+                                <input
+                                    id="email"
+                                    name="email"
+                                    type="email"
+                                    value={member.email}
+                                    disabled
+                                    className="block w-full rounded-md border border-border-subtle p-3 pl-10 text-text-secondary bg-bg-canvas"
+                                />
+                            </div>
                         </div>
-                    </div>
+                    )}
+
+                    {/* Conditionally show Color Picker for Children */}
+                    {member.role === 'Child' && (
+                        <div className="space-y-1">
+                            <label className="block text-sm font-medium text-text-secondary">
+                                Profile Color
+                            </label>
+                            <div className="flex flex-wrap gap-2 p-2 bg-bg-canvas rounded-lg border border-border-subtle">
+                                {availableColors.map((color) => (
+                                    <button
+                                        type="button"
+                                        key={color.hex}
+                                        title={color.name}
+                                        onClick={() => setSelectedColor(color.hex)}
+                                        className={`w-8 h-8 rounded-full border-2 transition-all
+                              ${selectedColor === color.hex ? 'border-action-primary ring-2 ring-action-primary/50 scale-110' : 'border-transparent opacity-70 hover:opacity-100'}`}
+                                        style={{ backgroundColor: color.hex }}
+                                    >
+                                        {selectedColor === color.hex && <Check className="w-5 h-5 text-white m-auto" />}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
 
                     {/* Error Display */}
                     {error && (

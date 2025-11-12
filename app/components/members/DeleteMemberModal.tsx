@@ -1,16 +1,17 @@
 // =========================================================
 // silkpanda/momentum-web/app/components/members/DeleteMemberModal.tsx
 // Modal for deleting a child profile (Phase 2.2)
+// REFACTORED: Uses unified IMemberDisplay interface
 // =========================================================
 'use client';
 
 import React, { useState } from 'react';
 import { Loader, X, AlertTriangle, Trash } from 'lucide-react';
 import { useSession } from '../layout/SessionContext';
-import { IChildProfile } from './MemberList';
+import { IMemberDisplay } from './MemberList'; // Import unified interface
 
 interface DeleteMemberModalProps {
-    member: IChildProfile;
+    member: IMemberDisplay; // Use unified interface
     householdId: string;
     onClose: () => void;
     onMemberDeleted: () => void; // Function to trigger a re-fetch
@@ -30,7 +31,7 @@ const DeleteMemberModal: React.FC<DeleteMemberModalProps> = ({
         try {
             // DELETE to the 'deleteFamilyMember' endpoint
             //
-            const response = await fetch(`/api/v1/households/${householdId}/members/${member.memberRefId._id}`, {
+            const response = await fetch(`/api/v1/households/${householdId}/members/${member.memberId}`, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -72,7 +73,7 @@ const DeleteMemberModal: React.FC<DeleteMemberModalProps> = ({
                     Delete Member?
                 </h3>
                 <p className="text-sm text-text-secondary text-center mt-2">
-                    Are you sure you want to delete <strong className="text-text-primary">{member.memberRefId.firstName}</strong>?
+                    Are you sure you want to delete <strong className="text-text-primary">{member.firstName}</strong>?
                     This will remove them from this household. This action cannot be undone.
                 </p>
 

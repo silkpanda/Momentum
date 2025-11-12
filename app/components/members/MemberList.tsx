@@ -1,20 +1,20 @@
 // =========================================================
 // silkpanda/momentum-web/app/components/members/MemberList.tsx
 // Renders the list of family members (Phase 2.2)
-// NOW INCLUDES EDIT AND DELETE FUNCTIONALITY
+// REFACTORED: Displays Parents and Children in a unified list
 // =========================================================
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Loader, AlertTriangle, UserPlus, Trash, Edit, User } from 'lucide-react';
-import { useSession } from '../layout/SessionContext'; // Import our new hook
-import AddMemberModal from './AddMemberModal'; // Import the new modal
-import EditMemberModal from './EditMemberModal';   // Import Edit Modal
-import DeleteMemberModal from './DeleteMemberModal'; // Import Delete Modal
+import { useSession } from '../layout/SessionContext';
+import AddMemberModal from './AddMemberModal';
+import EditMemberModal from './EditMemberModal';
+import DeleteMemberModal from './DeleteMemberModal';
 
 // --- Interfaces ---
-// Based on API Model
-export interface IChildProfile { // Export interface for use in modals
+//
+export interface IChildProfile {
     memberRefId: {
         _id: string;
         firstName: string;
@@ -24,7 +24,7 @@ export interface IChildProfile { // Export interface for use in modals
     _id: string; // Sub-document ID
 }
 
-interface IParentRef {
+export interface IParentRef {
     _id: string;
     firstName: string;
     email: string;
@@ -37,38 +37,69 @@ export interface IHousehold {
     childProfiles: IChildProfile[];
 }
 
-// --- Member Item Component ---
+// --- Unified Member Display Interface ---
+export interface IMemberDisplay {
+    memberId: string;      // The FamilyMember _id
+    firstName: string;
+    role: 'Parent' | 'Child';
+    email?: string;          // Only for parents
+    profileColor?: string;   // Only for children
+    pointsTotal?: number;    // Only for children
+    isSelf: boolean;         // Is this the logged-in user?
+}
+
+// --- Unified Member Item Component ---
 const MemberItem: React.FC<{
-    member: IChildProfile;
-    onEdit: () => void;      // Add onEdit handler
-    onDelete: () => void;    // Add onDelete handler
+    member: IMemberDisplay;
+    onEdit: () => void;
+    onDelete: () => void;
 }> = ({ member, onEdit, onDelete }) => (
     <li className="flex items-center justify-between p-4 bg-bg-surface rounded-lg shadow border border-border-subtle">
         <div className="flex items-center space-x-4">
-            {/* Profile Color from Governance Doc */}
-            <div
-                className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-white"
-                style={{ backgroundColor: member.profileColor }}
-            >
-                {member.memberRefId.firstName.charAt(0).toUpperCase()}
-            </div>
+            {/* Conditional Avatar: Color for child, icon for parent */}
+            {member.profileColor ? (
+                <div
+                    className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-white"
+                    style={{ backgroundColor: member.profileColor }}
+                >
+                    {member.firstName.charAt(0).toUpperCase()}
+                </div>
+            ) : (
+                <div
+                    className="w-10 h-10 rounded-full flex items-center justify-center font-bold bg-border-subtle text-text-secondary"
+                >
+                    <User className="w-5 h-5" />
+                </div>
+            )}
             <div>
-                <p className="text-base font-medium text-text-primary">{member.memberRefId.firstName}</p>
-                <p className="text-sm text-text-secondary">Child Profile</p>
+                <p className="text-base font-medium text-text-primary">
+                    {member.firstName} {member.isSelf && '(You)'}
+                </p>
+                <p className="text-sm text-text-secondary">
+                    {member.role === 'Parent' ? member.email : 'Child Profile'}
+                </p>
             </div>
         </div>
         <div className="flex items-center space-x-4">
-            {/* Points Total */}
-            <div className="text-center">
-                <p className="text-lg font-semibold text-action-primary">{member.pointsTotal}</p>
-                <p className="text-xs text-text-secondary">Points</p>
-            </div>
+            {/* Conditional Points: Only show for children */}
+            {member.role === 'Child' && (
+                <div className="text-center">
+                    <p className="text-lg font-semibold text-action-primary">{member.pointsTotal}</p>
+                    <p className="text-xs text-text-secondary">Points</p>
+                </div>
+            )}
 
             {/* Actions */}
             <button onClick={onEdit} className="p-2 text-text-secondary hover:text-action-primary transition-colors" title="Edit Member">
                 <Edit className="w-4 h-4" />
             </button>
-            <button onClick={onDelete} className="p-2 text-text-secondary hover:text-signal-alert transition-colors" title="Remove Member">
+            {/* Disable delete button for parents (and self) */}
+            <button
+                onClick={onDelete}
+                className="p-2 text-text-secondary transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                title={member.role === 'Parent' ? 'Parents cannot be removed from this screen' : 'Remove Member'}
+                disabled={member.role === 'Parent'}
+            >
                 <Trash className="w-4 h-4" />
             </button>
         </div>
@@ -77,28 +108,29 @@ const MemberItem: React.FC<{
 
 // --- Main Member List Component ---
 const MemberList: React.FC = () => {
-    const [household, setHousehold] = useState<IHousehold | null>(null);
+    // Store the normalized, combined list of members
+    const [allMembers, setAllMembers] = useState<IMemberDisplay[]>([]);
+    const [childMembers, setChildMembers] = useState<IChildProfile[]>([]); // Keep for color logic
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [isAddModalOpen, setIsAddModalOpen] = useState(false); // Renamed state
+    const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
-    // Add state for Edit and Delete Modals
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-    const [selectedMember, setSelectedMember] = useState<IChildProfile | null>(null);
+    const [selectedMember, setSelectedMember] = useState<IMemberDisplay | null>(null); // Unified state
 
     // Use the session context to get the householdId and token
-    const { householdId, token } = useSession();
+    const { user, householdId, token } = useSession(); // Get logged-in user
 
     // Wrap fetch in useCallback so it can be reused
     const fetchHouseholdData = useCallback(async () => {
-        if (!householdId || !token) {
+        if (!householdId || !token || !user) {
             setError('Session invalid. Please log in again.');
             setLoading(false);
             return;
         }
 
-        setLoading(true); // Set loading true on re-fetch
+        setLoading(true);
         try {
             // Fetch the full household data, which includes the list of members
             //
@@ -111,9 +143,34 @@ const MemberList: React.FC = () => {
             }
             const data = await response.json();
             if (data.status === 'success') {
-                // API returns populated data on GET
-                setHousehold(data.data.household);
-                setError(null); // Clear previous errors
+                const household: IHousehold = data.data.household;
+
+                // --- Normalize Data ---
+                const parents: IMemberDisplay[] = household.parentRefs.map(p => ({
+                    memberId: p._id,
+                    firstName: p.firstName,
+                    role: 'Parent',
+                    email: p.email,
+                    isSelf: p._id === user._id, // Check if this is the logged-in user
+                }));
+
+                const children: IMemberDisplay[] = household.childProfiles.map(c => ({
+                    memberId: c.memberRefId._id,
+                    firstName: c.memberRefId.firstName,
+                    role: 'Child',
+                    profileColor: c.profileColor,
+                    pointsTotal: c.pointsTotal,
+                    isSelf: false, // Children cannot be the logged-in user
+                }));
+
+                // Combine lists, putting "self" first
+                setAllMembers([
+                    ...parents.filter(p => p.isSelf),
+                    ...parents.filter(p => !p.isSelf),
+                    ...children,
+                ]);
+                setChildMembers(household.childProfiles); // Store for color logic
+                setError(null);
             } else {
                 throw new Error(data.message || 'Could not retrieve data.');
             }
@@ -122,40 +179,36 @@ const MemberList: React.FC = () => {
         } finally {
             setLoading(false);
         }
-    }, [householdId, token]);
+    }, [householdId, token, user]); // Add user dependency
 
     useEffect(() => {
         fetchHouseholdData(); // Call fetch on initial load
     }, [fetchHouseholdData]);
 
-    // Handler to add the new member to the list instantly
-    // Modified to trigger a full re-fetch to ensure data is correct
     const handleMemberAdded = () => {
         fetchHouseholdData();
     };
 
-    // Handler for when an edit is successful
     const handleMemberUpdated = () => {
-        fetchHouseholdData(); // Re-fetch to get updated, populated data
+        fetchHouseholdData();
     };
 
-    // Handler for when a delete is successful
     const handleMemberDeleted = () => {
-        fetchHouseholdData(); // Re-fetch to get updated list
+        fetchHouseholdData();
     };
 
     // Click Handlers for opening modals
-    const openEditModal = (member: IChildProfile) => {
+    const openEditModal = (member: IMemberDisplay) => {
         setSelectedMember(member);
         setIsEditModalOpen(true);
     };
 
-    const openDeleteModal = (member: IChildProfile) => {
+    const openDeleteModal = (member: IMemberDisplay) => {
         setSelectedMember(member);
         setIsDeleteModalOpen(true);
     };
 
-    if (loading && !household) { // Only show full load if no household data exists yet
+    if (loading && allMembers.length === 0) { // Update loading check
         return (
             <div className="flex justify-center items-center p-8 bg-bg-surface rounded-lg shadow-md border border-border-subtle">
                 <Loader className="w-6 h-6 text-action-primary animate-spin" />
@@ -173,14 +226,12 @@ const MemberList: React.FC = () => {
         );
     }
 
-    if (!household) return null; // Should be covered by loading/error
-
     return (
         <div className="w-full">
             {/* Header and "Add Member" Button */}
             <div className="flex justify-between items-center mb-4">
                 <h2 className="text-lg font-medium text-text-secondary">
-                    {household.childProfiles.length} Child Profile(s)
+                    {allMembers.length} Total Member(s)
                     {loading && <Loader className="w-4 h-4 ml-2 inline animate-spin" />}
                 </h2>
                 {/* Mandated Button: Icon + Text Label */}
@@ -195,12 +246,12 @@ const MemberList: React.FC = () => {
                 </button>
             </div>
 
-            {/* Member List */}
-            {household.childProfiles.length > 0 ? (
+            {/* Render Unified Member List */}
+            {allMembers.length > 0 ? (
                 <ul className="space-y-4">
-                    {household.childProfiles.map((member) => (
+                    {allMembers.map((member) => (
                         <MemberItem
-                            key={member.memberRefId._id}
+                            key={member.memberId}
                             member={member}
                             onEdit={() => openEditModal(member)}
                             onDelete={() => openDeleteModal(member)}
@@ -218,11 +269,11 @@ const MemberList: React.FC = () => {
             {/* Conditionally render the modal */}
             {isAddModalOpen && (
                 <AddMemberModal
-                    householdId={householdId}
+                    householdId={householdId!} // householdId is guaranteed to exist here
                     onClose={() => setIsAddModalOpen(false)}
                     onMemberAdded={handleMemberAdded}
                     // Pass the list of already used colors
-                    usedColors={household.childProfiles.map(p => p.profileColor)}
+                    usedColors={childMembers.map(p => p.profileColor)}
                 />
             )}
 
@@ -230,10 +281,10 @@ const MemberList: React.FC = () => {
             {isEditModalOpen && selectedMember && (
                 <EditMemberModal
                     member={selectedMember}
-                    householdId={householdId}
+                    householdId={householdId!}
                     onClose={() => setIsEditModalOpen(false)}
                     onMemberUpdated={handleMemberUpdated}
-                    usedColors={household.childProfiles.map(p => p.profileColor)}
+                    usedColors={childMembers.map(p => p.profileColor)}
                 />
             )}
 
@@ -241,7 +292,7 @@ const MemberList: React.FC = () => {
             {isDeleteModalOpen && selectedMember && (
                 <DeleteMemberModal
                     member={selectedMember}
-                    householdId={householdId}
+                    householdId={householdId!}
                     onClose={() => setIsDeleteModalOpen(false)}
                     onMemberDeleted={handleMemberDeleted}
                 />
