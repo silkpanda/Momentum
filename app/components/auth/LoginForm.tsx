@@ -110,7 +110,7 @@ const LoginForm: React.FC = () => {
             // FIX: Safely parse JSON data, handling potential empty/non-JSON responses.
             const text = await response.text();
             let data;
-            
+
             if (text) {
                 // Attempt to parse text as JSON
                 data = JSON.parse(text);
@@ -131,6 +131,10 @@ const LoginForm: React.FC = () => {
             // Success logic
             // In a production app: The JWT token (data.token) would be stored in cookies/localStorage here.
             // The token is critical for authenticating subsequent API requests.
+            if (data.token) {
+                localStorage.setItem('momentum_token', data.token);
+            }
+
             setSuccess(true);
 
             setTimeout(() => {

@@ -112,7 +112,7 @@ const SignUpForm: React.FC = () => {
             // FIX: Safely parse JSON data, handling potential empty/non-JSON responses.
             const text = await response.text();
             let data;
-            
+
             if (text) {
                 // Attempt to parse text as JSON
                 data = JSON.parse(text);
@@ -131,6 +131,9 @@ const SignUpForm: React.FC = () => {
             }
 
             // Success logic
+            if (data.token) {
+                localStorage.setItem('momentum_token', data.token);
+            }
             setSuccess(true);
 
             // In a real app, we would store the JWT token (data.token) and redirect.
