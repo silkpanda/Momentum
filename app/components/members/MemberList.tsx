@@ -1,7 +1,6 @@
 // =========================================================
 // silkpanda/momentum-web/app/components/members/MemberList.tsx
-// Renders the list of family members (Phase 2.2)
-// REFACTORED: Displays Parents and Children in a unified list
+// REFACTORED for Unified Membership Model (API v3)
 // =========================================================
 'use client';
 
@@ -14,46 +13,26 @@ import DeleteMemberModal from './DeleteMemberModal';
 
 // --- Interfaces ---
 //
-export interface IChildProfile {
-    memberRefId: {
+export interface IHouseholdMemberProfile {
+    _id: string; // This is the sub-document ID
+    familyMemberId: {
         _id: string;
         firstName: string;
+        email?: string; // Populated for parents
     };
-    profileColor: string;
-    pointsTotal: number;
-    _id: string; // Sub-document ID
-}
-
-export interface IParentRef {
-    _id: string;
-    firstName: string;
-    email: string;
-}
-
-export interface IHousehold {
-    _id: string;
-    householdName: string;
-    parentRefs: IParentRef[];
-    childProfiles: IChildProfile[];
-}
-
-// --- Unified Member Display Interface ---
-export interface IMemberDisplay {
-    memberId: string;      // The FamilyMember _id
-    firstName: string;
+    displayName: string;
     role: 'Parent' | 'Child';
-    email?: string;          // Only for parents
-    profileColor?: string;   // Only for children
-    pointsTotal?: number;    // Only for children
-    isSelf: boolean;         // Is this the logged-in user?
+    profileColor?: string; // Optional: only for children
+    pointsTotal: number;
 }
 
 // --- Unified Member Item Component ---
 const MemberItem: React.FC<{
-    member: IMemberDisplay;
+    member: IHouseholdMemberProfile;
+    isSelf: boolean;
     onEdit: () => void;
     onDelete: () => void;
-}> = ({ member, onEdit, onDelete }) => (
+}> = ({ member, isSelf, onEdit, onDelete }) => (
     <li className="flex items-center justify-between p-4 bg-bg-surface rounded-lg shadow border border-border-subtle">
         <div className="flex items-center space-x-4">
             {/* Conditional Avatar: Color for child, icon for parent */}
@@ -62,7 +41,7 @@ const MemberItem: React.FC<{
                     className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-white"
                     style={{ backgroundColor: member.profileColor }}
                 >
-                    {member.firstName.charAt(0).toUpperCase()}
+                    {member.displayName.charAt(0).toUpperCase()}
                 </div>
             ) : (
                 <div
@@ -73,10 +52,10 @@ const MemberItem: React.FC<{
             )}
             <div>
                 <p className="text-base font-medium text-text-primary">
-                    {member.firstName} {member.isSelf && '(You)'}
+                    {member.displayName} {isSelf && '(You)'}
                 </p>
                 <p className="text-sm text-text-secondary">
-                    {member.role === 'Parent' ? member.email : 'Child Profile'}
+                    {member.role === 'Parent' ? member.familyMemberId.email : 'Child Profile'}
                 </p>
             </div>
         </div>
@@ -108,23 +87,21 @@ const MemberItem: React.FC<{
 
 // --- Main Member List Component ---
 const MemberList: React.FC = () => {
-    // Store the normalized, combined list of members
-    const [allMembers, setAllMembers] = useState<IMemberDisplay[]>([]);
-    const [childMembers, setChildMembers] = useState<IChildProfile[]>([]); // Keep for color logic
+    // CRITICAL FIX: State must be initialized to an empty array ([])
+    // to prevent .length calls on 'undefined'.
+    const [memberProfiles, setMemberProfiles] = useState<IHouseholdMemberProfile[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-    const [selectedMember, setSelectedMember] = useState<IMemberDisplay | null>(null); // Unified state
+    const [selectedMember, setSelectedMember] = useState<IHouseholdMemberProfile | null>(null);
 
-    // Use the session context to get the householdId and token
-    const { user, householdId, token } = useSession(); // Get logged-in user
+    const { user, householdId, token } = useSession();
 
-    // Wrap fetch in useCallback so it can be reused
     const fetchHouseholdData = useCallback(async () => {
-        if (!householdId || !token || !user) {
+        if (!householdId || !token) {
             setError('Session invalid. Please log in again.');
             setLoading(false);
             return;
@@ -132,8 +109,6 @@ const MemberList: React.FC = () => {
 
         setLoading(true);
         try {
-            // Fetch the full household data, which includes the list of members
-            //
             const response = await fetch(`/api/v1/households/${householdId}`, {
                 headers: { 'Authorization': `Bearer ${token}` },
             });
@@ -143,33 +118,8 @@ const MemberList: React.FC = () => {
             }
             const data = await response.json();
             if (data.status === 'success') {
-                const household: IHousehold = data.data.household;
-
-                // --- Normalize Data ---
-                const parents: IMemberDisplay[] = household.parentRefs.map(p => ({
-                    memberId: p._id,
-                    firstName: p.firstName,
-                    role: 'Parent',
-                    email: p.email,
-                    isSelf: p._id === user._id, // Check if this is the logged-in user
-                }));
-
-                const children: IMemberDisplay[] = household.childProfiles.map(c => ({
-                    memberId: c.memberRefId._id,
-                    firstName: c.memberRefId.firstName,
-                    role: 'Child',
-                    profileColor: c.profileColor,
-                    pointsTotal: c.pointsTotal,
-                    isSelf: false, // Children cannot be the logged-in user
-                }));
-
-                // Combine lists, putting "self" first
-                setAllMembers([
-                    ...parents.filter(p => p.isSelf),
-                    ...parents.filter(p => !p.isSelf),
-                    ...children,
-                ]);
-                setChildMembers(household.childProfiles); // Store for color logic
+                // Ensure we always set an array, even if API returns null/undefined
+                setMemberProfiles(data.data.household.memberProfiles || []);
                 setError(null);
             } else {
                 throw new Error(data.message || 'Could not retrieve data.');
@@ -179,14 +129,14 @@ const MemberList: React.FC = () => {
         } finally {
             setLoading(false);
         }
-    }, [householdId, token, user]); // Add user dependency
+    }, [householdId, token]);
 
     useEffect(() => {
-        fetchHouseholdData(); // Call fetch on initial load
+        fetchHouseholdData();
     }, [fetchHouseholdData]);
 
-    const handleMemberAdded = () => {
-        fetchHouseholdData();
+    const handleMemberAdded = (newProfile: IHouseholdMemberProfile) => {
+        setMemberProfiles(current => [...current, newProfile]);
     };
 
     const handleMemberUpdated = () => {
@@ -198,17 +148,18 @@ const MemberList: React.FC = () => {
     };
 
     // Click Handlers for opening modals
-    const openEditModal = (member: IMemberDisplay) => {
+    const openEditModal = (member: IHouseholdMemberProfile) => {
         setSelectedMember(member);
         setIsEditModalOpen(true);
     };
 
-    const openDeleteModal = (member: IMemberDisplay) => {
+    const openDeleteModal = (member: IHouseholdMemberProfile) => {
         setSelectedMember(member);
         setIsDeleteModalOpen(true);
     };
 
-    if (loading && allMembers.length === 0) { // Update loading check
+    // This guard now safely checks .length on an initialized array
+    if (loading && memberProfiles.length === 0) {
         return (
             <div className="flex justify-center items-center p-8 bg-bg-surface rounded-lg shadow-md border border-border-subtle">
                 <Loader className="w-6 h-6 text-action-primary animate-spin" />
@@ -219,7 +170,7 @@ const MemberList: React.FC = () => {
 
     if (error) {
         return (
-            <div className="flex items-center p-4 bg-signal-alert/10 text-signal-alert rounded-lg border border-signal-alert/30">
+            <div className="flex items-center p-4 bg-signal-alert/10 text-signal-alert rounded-lg border border-border-subtle">
                 <AlertTriangle className="w-5 h-5 mr-3" />
                 <p className="text-sm font-medium">{error}</p>
             </div>
@@ -231,10 +182,10 @@ const MemberList: React.FC = () => {
             {/* Header and "Add Member" Button */}
             <div className="flex justify-between items-center mb-4">
                 <h2 className="text-lg font-medium text-text-secondary">
-                    {allMembers.length} Total Member(s)
+                    {/* This line (188) is now safe */}
+                    {memberProfiles.length} Total Member(s)
                     {loading && <Loader className="w-4 h-4 ml-2 inline animate-spin" />}
                 </h2>
-                {/* Mandated Button: Icon + Text Label */}
                 <button
                     onClick={() => setIsAddModalOpen(true)}
                     className="inline-flex items-center rounded-lg py-2 px-4 text-sm font-medium shadow-sm 
@@ -247,16 +198,19 @@ const MemberList: React.FC = () => {
             </div>
 
             {/* Render Unified Member List */}
-            {allMembers.length > 0 ? (
+            {memberProfiles.length > 0 ? (
                 <ul className="space-y-4">
-                    {allMembers.map((member) => (
-                        <MemberItem
-                            key={member.memberId}
-                            member={member}
-                            onEdit={() => openEditModal(member)}
-                            onDelete={() => openDeleteModal(member)}
-                        />
-                    ))}
+                    {[...memberProfiles]
+                        .sort((a, b) => (a.role === 'Parent' ? -1 : 1))
+                        .map((member) => (
+                            <MemberItem
+                                key={member._id}
+                                member={member}
+                                isSelf={member.familyMemberId._id === user?._id}
+                                onEdit={() => openEditModal(member)}
+                                onDelete={() => openDeleteModal(member)}
+                            />
+                        ))}
                 </ul>
             ) : (
                 <div className="text-center p-8 bg-bg-surface rounded-lg shadow-md border border-border-subtle">
@@ -269,11 +223,10 @@ const MemberList: React.FC = () => {
             {/* Conditionally render the modal */}
             {isAddModalOpen && (
                 <AddMemberModal
-                    householdId={householdId!} // householdId is guaranteed to exist here
+                    householdId={householdId!}
                     onClose={() => setIsAddModalOpen(false)}
                     onMemberAdded={handleMemberAdded}
-                    // Pass the list of already used colors
-                    usedColors={childMembers.map(p => p.profileColor)}
+                    usedColors={memberProfiles.map(p => p.profileColor).filter(Boolean) as string[]}
                 />
             )}
 
@@ -284,7 +237,7 @@ const MemberList: React.FC = () => {
                     householdId={householdId!}
                     onClose={() => setIsEditModalOpen(false)}
                     onMemberUpdated={handleMemberUpdated}
-                    usedColors={childMembers.map(p => p.profileColor)}
+                    usedColors={memberProfiles.map(p => p.profileColor).filter(Boolean) as string[]}
                 />
             )}
 

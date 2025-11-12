@@ -1,17 +1,16 @@
 // =========================================================
 // silkpanda/momentum-web/app/components/members/DeleteMemberModal.tsx
-// Modal for deleting a child profile (Phase 2.2)
-// REFACTORED: Uses unified IMemberDisplay interface
+// REFACTORED for Unified Membership Model (API v3)
 // =========================================================
 'use client';
 
 import React, { useState } from 'react';
 import { Loader, X, AlertTriangle, Trash } from 'lucide-react';
 import { useSession } from '../layout/SessionContext';
-import { IMemberDisplay } from './MemberList'; // Import unified interface
+import { IHouseholdMemberProfile } from './MemberList'; // Import new interface
 
 interface DeleteMemberModalProps {
-    member: IMemberDisplay; // Use unified interface
+    member: IHouseholdMemberProfile; // Use new interface
     householdId: string;
     onClose: () => void;
     onMemberDeleted: () => void; // Function to trigger a re-fetch
@@ -29,9 +28,10 @@ const DeleteMemberModal: React.FC<DeleteMemberModalProps> = ({
         setError(null);
 
         try {
-            // DELETE to the 'deleteFamilyMember' endpoint
+            // DELETE to the 'deleteMemberProfile' endpoint
+            // The API endpoint uses the sub-document _id
             //
-            const response = await fetch(`/api/v1/households/${householdId}/members/${member.memberId}`, {
+            const response = await fetch(`/api/v1/households/members/${member._id}`, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -73,7 +73,7 @@ const DeleteMemberModal: React.FC<DeleteMemberModalProps> = ({
                     Delete Member?
                 </h3>
                 <p className="text-sm text-text-secondary text-center mt-2">
-                    Are you sure you want to delete <strong className="text-text-primary">{member.firstName}</strong>?
+                    Are you sure you want to delete <strong className="text-text-primary">{member.displayName}</strong>?
                     This will remove them from this household. This action cannot be undone.
                 </p>
 

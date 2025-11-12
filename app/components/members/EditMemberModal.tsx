@@ -1,16 +1,16 @@
 // =========================================================
 // silkpanda/momentum-web/app/components/members/EditMemberModal.tsx
-// REFACTORED: Modal now handles both Parent and Child profiles
+// REFACTORED: Modal now handles the unified IHouseholdMemberProfile
 // =========================================================
 'use client';
 
 import React, { useState, useEffect } from 'react';
 import { User, Loader, X, AlertTriangle, Check, Palette, Mail } from 'lucide-react';
 import { useSession } from '../layout/SessionContext';
-import { IMemberDisplay } from './MemberList'; // Import unified interface
+import { IHouseholdMemberProfile } from './MemberList'; // Import new interface
 
 interface EditMemberModalProps {
-    member: IMemberDisplay; // Use unified interface
+    member: IHouseholdMemberProfile; // Use new interface
     householdId: string;
     onClose: () => void;
     onMemberUpdated: () => void; // Function to trigger a re-fetch
@@ -29,7 +29,7 @@ const PROFILE_COLORS = [
 const EditMemberModal: React.FC<EditMemberModalProps> = ({
     member, householdId, onClose, onMemberUpdated, usedColors
 }) => {
-    const [firstName, setFirstName] = useState(member.firstName);
+    const [displayName, setDisplayName] = useState(member.displayName); // Edit displayName
     // Handle optional profileColor
     const [selectedColor, setSelectedColor] = useState(member.profileColor || null);
     const [isLoading, setIsLoading] = useState(false);
@@ -43,8 +43,8 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (firstName.trim() === '') {
-            setError('First Name is required.');
+        if (displayName.trim() === '') {
+            setError('Display Name is required.');
             return;
         }
 
@@ -52,10 +52,9 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
         setError(null);
 
         try {
-            // PATCH to the 'updateFamilyMember' endpoint
+            // The API endpoint uses the sub-document _id
             //
-            // Use memberId from the unified interface
-            const response = await fetch(`/api/v1/households/${householdId}/members/${member.memberId}`, {
+            const response = await fetch(`/api/v1/households/members/${member._id}`, {
                 method: 'PATCH',
                 headers: {
                     'Content-Type': 'application/json',
@@ -64,8 +63,8 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
                 // Build conditional request body
                 body: JSON.stringify(
                     member.role === 'Parent'
-                        ? { firstName: firstName } // Parents can only update firstName
-                        : { firstName: firstName, profileColor: selectedColor } // Children can update both
+                        ? { displayName: displayName } // Parents can only update displayName
+                        : { displayName: displayName, profileColor: selectedColor } // Children can update both
                 ),
             });
 
@@ -103,13 +102,13 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
 
                 <form onSubmit={handleSubmit} className="flex flex-col space-y-4">
                     <h3 className="text-xl font-medium text-text-primary">
-                        {member.role === 'Parent' ? 'Edit Your Profile' : 'Edit Family Member'}
+                        Edit {member.role === 'Parent' ? 'Your Profile' : 'Member Profile'}
                     </h3>
 
-                    {/* First Name Input */}
+                    {/* Display Name Input */}
                     <div className="space-y-1">
                         <label htmlFor="firstName" className="block text-sm font-medium text-text-secondary">
-                            First Name
+                            Display Name
                         </label>
                         <div className="relative rounded-md shadow-sm">
                             <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
@@ -119,14 +118,14 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
                                 id="firstName"
                                 name="firstName"
                                 type="text"
-                                value={firstName}
-                                onChange={(e) => setFirstName(e.target.value)}
+                                value={displayName}
+                                onChange={(e) => setDisplayName(e.target.value)}
                                 className="block w-full rounded-md border border-border-subtle p-3 pl-10 text-text-primary bg-bg-surface"
                             />
                         </div>
                     </div>
 
-                    {/* Conditionally show Email for Parents */}
+                    {/* Conditionally show Email (read-only) for Parents */}
                     {member.role === 'Parent' && (
                         <div className="space-y-1">
                             <label htmlFor="email" className="block text-sm font-medium text-text-secondary">
@@ -140,7 +139,7 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
                                     id="email"
                                     name="email"
                                     type="email"
-                                    value={member.email}
+                                    value={member.familyMemberId.email}
                                     disabled
                                     className="block w-full rounded-md border border-border-subtle p-3 pl-10 text-text-secondary bg-bg-canvas"
                                 />

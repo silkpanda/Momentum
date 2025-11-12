@@ -1,42 +1,30 @@
 // =========================================================
 // silkpanda/momentum-web/app/components/members/AddMemberModal.tsx
 // Modal for creating a new child profile (Phase 2.2)
+// REFACTORED for Unified Membership Model (API v3)
 // =========================================================
 'use client';
 
 import React, { useState } from 'react';
-// FIX: Added UserPlus to the import list
 import { User, Loader, X, AlertTriangle, Check, Palette, UserPlus } from 'lucide-react';
 import { useSession } from '../layout/SessionContext';
-
-// --- Interfaces ---
-interface IChildProfile {
-    memberRefId: { _id: string; firstName: string; };
-    profileColor: string;
-    pointsTotal: number;
-    _id: string;
-}
+import { IHouseholdMemberProfile } from './MemberList'; // Import new interface
 
 interface AddMemberModalProps {
     householdId: string;
     onClose: () => void;
-    onMemberAdded: (newProfile: IChildProfile) => void;
+    onMemberAdded: (newProfile: IHouseholdMemberProfile) => void; // Use new interface
     usedColors: string[];
 }
 
 // Profile colors MUST come from the Governance Doc
 //
 const PROFILE_COLORS = [
-    { name: 'Blueberry', hex: '#4285F4' },
-    { name: 'Celtic Blue', hex: '#1967D2' },
-    { name: 'Selective Yellow', hex: '#FBBC04' },
-    { name: 'Pigment Red', hex: '#F72A25' },
-    { name: 'Sea Green', hex: '#34A853' },
-    { name: 'Dark Spring Green', hex: '#188038' },
-    { name: 'Tangerine', hex: '#FF8C00' },
-    { name: 'Grape', hex: '#8E24AA' },
-    { name: 'Flamingo', hex: '#E67C73' },
-    { name: 'Peacock', hex: '#039BE5' },
+    { name: 'Blueberry', hex: '#4285F4' }, { name: 'Celtic Blue', hex: '#1967D2' },
+    { name: 'Selective Yellow', hex: '#FBBC04' }, { name: 'Pigment Red', hex: '#F72A25' },
+    { name: 'Sea Green', hex: '#34A853' }, { name: 'Dark Spring Green', hex: '#188038' },
+    { name: 'Tangerine', hex: '#FF8C00' }, { name: 'Grape', hex: '#8E24AA' },
+    { name: 'Flamingo', hex: '#E67C73' }, { name: 'Peacock', hex: '#039BE5' },
 ];
 
 const AddMemberModal: React.FC<AddMemberModalProps> = ({
@@ -65,8 +53,9 @@ const AddMemberModal: React.FC<AddMemberModalProps> = ({
         const colorToSubmit = selectedColor || defaultColor;
 
         try {
-            // POST to the 'addFamilyMember' endpoint
-            const response = await fetch(`/api/v1/households/${householdId}/members`, {
+            // POST to the NEW 'createChildProfile' endpoint
+            //
+            const response = await fetch(`/api/v1/households/members/child`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -74,35 +63,24 @@ const AddMemberModal: React.FC<AddMemberModalProps> = ({
                 },
                 body: JSON.stringify({
                     firstName: firstName,
+                    displayName: firstName, // Use firstName as default displayName
                     profileColor: colorToSubmit,
                 }),
             });
 
             const data = await response.json();
             if (!response.ok) {
-                throw new Error(data.message || 'Failed to add member.');
+                throw new Error(data.message || 'Failed to create child profile.');
             }
 
-            // --- CRITICAL FIX: Manually construct the populated profile ---
-            // The API response (data.data.household) is not populated,
-            // but it contains the newly created unpopulated child profile.
-            // We find it and use our form data to "mock" the populated state
-            // to prevent the 'charAt' error in the list.
+            // The new API controller returns the new profile object directly
+            //
+            const newProfile = data.data.profile;
 
-            const newHousehold = data.data.household;
-            const unpopulatedProfile = newHousehold.childProfiles[newHousehold.childProfiles.length - 1];
-
-            const newPopulatedProfile: IChildProfile = {
-                ...unpopulatedProfile, // This includes the new _id and pointsTotal
-                memberRefId: {
-                    _id: unpopulatedProfile.memberRefId, // This is just the ID string
-                    firstName: firstName, // We add the firstName from our form state
-                }
-            };
-
-            onMemberAdded(newPopulatedProfile);
-            // --------------------------------------------------------
-
+            // Pass the new profile back to the list
+            if (newProfile) {
+                onMemberAdded(newProfile);
+            }
             onClose(); // Close the modal on success
 
         } catch (err: any) {
@@ -139,7 +117,7 @@ const AddMemberModal: React.FC<AddMemberModalProps> = ({
                     {/* First Name Input */}
                     <div className="space-y-1">
                         <label htmlFor="firstName" className="block text-sm font-medium text-text-secondary">
-                            Child's First Name
+                            Child's First Name (this will be their login)
                         </label>
                         <div className="relative rounded-md shadow-sm">
                             <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
