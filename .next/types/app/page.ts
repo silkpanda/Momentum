@@ -1,4 +1,4 @@
-// File: C:\Users\antho\OneDrive\Desktop\Momentum\momentum-web\app\page.tsx
+// File: D:\partpanda\2025+\Momentum\momentum\app\page.tsx
 import * as entry from '../../../app/page.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 

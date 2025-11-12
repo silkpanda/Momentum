@@ -1,4 +1,4 @@
-// File: C:\Users\antho\OneDrive\Desktop\Momentum\momentum-web\app\layout.tsx
+// File: D:\partpanda\2025+\Momentum\momentum\app\layout.tsx
 import * as entry from '../../../app/layout.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 
