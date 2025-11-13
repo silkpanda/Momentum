@@ -1,6 +1,7 @@
 // =========================================================
 // silkpanda/momentum/app/components/family/FamilyDashboard.tsx
 // Main component for the "Family View" page.
+// REFACTORED to use a single "one-click" action modal.
 // =========================================================
 'use client';
 
@@ -10,8 +11,7 @@ import { IHouseholdMemberProfile } from '../members/MemberList';
 import { ITask } from '../tasks/TaskList';
 import { IStoreItem } from '../store/StoreItemList';
 import { Loader, AlertTriangle, User, Award, ShoppingCart } from 'lucide-react';
-import FamilyTasksModal from './FamilyTasksModal';
-import FamilyStoreModal from './FamilyStoreModal';
+import FamilyMemberActionModal from './FamilyMemberActionModal'; // <-- NEW IMPORT
 
 // --- Member Card Component ---
 interface MemberCardProps {
@@ -32,7 +32,7 @@ const MemberCard: React.FC<MemberCardProps> = ({ member, tasks, onSelect }) => {
         <button
             onClick={onSelect}
             className="flex flex-col items-center justify-center p-6 bg-bg-surface rounded-lg shadow-md border border-border-subtle 
-                       hover:border-action-primary hover:shadow-lg transition-all transform hover:-translate-y-1"
+                       hover:border-action-primary hover:shadow-lg transition-all transform hover:-translate-y-1 w-full"
         >
             <div
                 className="w-24 h-24 rounded-full flex-shrink-0 flex items-center justify-center text-white font-bold text-4xl mb-4"
@@ -70,8 +70,7 @@ const FamilyDashboard: React.FC = () => {
 
     // State for managing modals
     const [selectedMember, setSelectedMember] = useState<IHouseholdMemberProfile | null>(null);
-    const [isTasksModalOpen, setIsTasksModalOpen] = useState(false);
-    const [isStoreModalOpen, setIsStoreModalOpen] = useState(false);
+    const [isActionModalOpen, setIsActionModalOpen] = useState(false); // <-- NEW STATE
 
     // Fetch all data
     const fetchData = useCallback(async () => {
@@ -114,26 +113,13 @@ const FamilyDashboard: React.FC = () => {
     }, [fetchData]);
 
     // Handlers to open modals
-    const handleSelectMember = (member: IHouseholdMemberProfile) => {
+    const openActionModal = (member: IHouseholdMemberProfile) => {
         setSelectedMember(member);
-        // This is a placeholder; you could open a specific modal here,
-        // but the prompt implies clicking the member card is the main selection.
-        // For now, we'll make the buttons below open the modals.
-    };
-
-    const openTasks = (member: IHouseholdMemberProfile) => {
-        setSelectedMember(member);
-        setIsTasksModalOpen(true);
-    };
-
-    const openStore = (member: IHouseholdMemberProfile) => {
-        setSelectedMember(member);
-        setIsStoreModalOpen(true);
+        setIsActionModalOpen(true);
     };
 
     const handleModalClose = () => {
-        setIsTasksModalOpen(false);
-        setIsStoreModalOpen(false);
+        setIsActionModalOpen(false);
         setSelectedMember(null);
         fetchData(); // Re-fetch data on close to show updated points/tasks
     };
@@ -164,48 +150,20 @@ const FamilyDashboard: React.FC = () => {
                 {members
                     .sort((a, b) => a.displayName.localeCompare(b.displayName))
                     .map((member) => (
-                        <div key={member._id} className="flex flex-col space-y-2">
-                            <MemberCard
-                                member={member}
-                                tasks={tasks}
-                                onSelect={() => handleSelectMember(member)}
-                            />
-                            {/* Action buttons for this member */}
-                            <button
-                                onClick={() => openTasks(member)}
-                                className="w-full inline-flex items-center justify-center rounded-lg py-2 px-4 text-sm font-medium shadow-sm 
-                                             bg-bg-surface border border-border-subtle text-text-primary 
-                                             hover:bg-border-subtle"
-                            >
-                                <Award className="w-4 h-4 mr-1.5" />
-                                View Tasks
-                            </button>
-                            <button
-                                onClick={() => openStore(member)}
-                                className="w-full inline-flex items-center justify-center rounded-lg py-2 px-4 text-sm font-medium shadow-sm 
-                                             bg-bg-surface border border-border-subtle text-text-primary 
-                                             hover:bg-border-subtle"
-                            >
-                                <ShoppingCart className="w-4 h-4 mr-1.5" />
-                                View Store
-                            </button>
-                        </div>
+                        <MemberCard
+                            key={member._id}
+                            member={member}
+                            tasks={tasks}
+                            onSelect={() => openActionModal(member)} // <-- MODIFIED
+                        />
                     ))}
             </div>
 
             {/* --- Modals --- */}
-            {isTasksModalOpen && selectedMember && (
-                <FamilyTasksModal
+            {isActionModalOpen && selectedMember && (
+                <FamilyMemberActionModal
                     member={selectedMember}
                     allTasks={tasks}
-                    token={token!}
-                    onClose={handleModalClose}
-                />
-            )}
-
-            {isStoreModalOpen && selectedMember && (
-                <FamilyStoreModal
-                    member={selectedMember}
                     allItems={storeItems}
                     token={token!}
                     onClose={handleModalClose}
