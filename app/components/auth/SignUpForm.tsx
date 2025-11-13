@@ -1,5 +1,5 @@
 // =========================================================
-// silkpanda/momentum/momentum-fac69d659346d6b7b01871d803baa24f6dfaccee/app/components/auth/SignUpForm.tsx
+// silkpanda/momentum/momentum-e07d696d5dc5be6d5d5681cef733d2cb80fb1772/app/components/auth/SignUpForm.tsx
 // REFACTORED to meet new API (v3) signup requirements
 // =========================================================
 'use client';
@@ -21,6 +21,7 @@ interface FormState {
 }
 
 // Profile colors from Governance Doc
+//
 const PROFILE_COLORS = [
     { name: 'Blueberry', hex: '#4285F4' }, { name: 'Celtic Blue', hex: '#1967D2' },
     { name: 'Selective Yellow', hex: '#FBBC04' }, { name: 'Pigment Red', hex: '#F72A25' },
@@ -61,6 +62,14 @@ const SignUpForm: React.FC = () => {
             !formData.password || !formData.householdName || !formData.userDisplayName
         ) {
             setError('Please fill in all fields.');
+            setIsLoading(false);
+            return;
+        }
+
+        // CRITICAL FIX: Add client-side password length validation
+        // This catches the error before it hits the API
+        if (formData.password.length < 8) {
+            setError('Password must be at least 8 characters long.');
             setIsLoading(false);
             return;
         }
@@ -231,7 +240,7 @@ const SignUpForm: React.FC = () => {
                         text-white transition-all duration-200 
                         ${isLoading || success ? 'bg-action-primary/60 cursor-not-allowed' : 'bg-action-primary hover:bg-action-hover transform hover:scale-[1.005] focus:ring-4 focus:ring-action-primary/50'}`}
                     >
-                        {isLoading && <Loader className="w-5 h-5 mr-2 animate-spin" />}
+                        {isLoading && <Loader className="w-5 h-5 mr-2" />}
                         {success ? 'Signing Up...' : 'Sign Up'}
                     </button>
                 </div>
