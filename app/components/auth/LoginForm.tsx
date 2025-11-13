@@ -98,8 +98,9 @@ const LoginForm: React.FC = () => {
         }
 
         try {
-            // FIX: Explicitly target the API server on port 3000 to resolve potential 404/SyntaxError issues.
-            const response = await fetch('http://localhost:3000/api/v1/auth/login', {
+            // SOLUTION: Use relative path to leverage the Next.js proxy defined in next.config.mjs.
+            // This avoids CORS issues and allows API error responses (like 401) to be handled correctly.
+            const response = await fetch('/api/v1/auth/login', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

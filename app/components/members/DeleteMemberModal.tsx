@@ -31,7 +31,7 @@ const DeleteMemberModal: React.FC<DeleteMemberModalProps> = ({
             // DELETE to the 'deleteMemberProfile' endpoint
             // The API endpoint uses the sub-document _id
             //
-            const response = await fetch(`/api/v1/households/members/${member._id}`, {
+            const response = await fetch(`/api/v1/households/${householdId}/members/${member._id}`, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': `Bearer ${token}`,
