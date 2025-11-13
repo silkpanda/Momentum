@@ -21,7 +21,9 @@ interface TaskFormState {
     taskName: string;
     description: string;
     pointsValue: number;
-    assignedToProfileIds: string[]; // Use new field name
+    // FIX: Renamed to match backend schema property 'assignedToRefs'.
+    // This array MUST hold the FamilyMember IDs (the ObjectId references).
+    assignedToRefs: string[]; 
 }
 
 const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ onClose, onTaskCreated, householdMembers }) => {
@@ -29,7 +31,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ onClose, onTaskCreate
         taskName: '',
         description: '',
         pointsValue: 10, // Default points
-        assignedToProfileIds: [], // Use new field name
+        assignedToRefs: [], // FIX: Use new field name
     });
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -64,7 +66,9 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ onClose, onTaskCreate
                     taskName: formData.taskName,
                     description: formData.description,
                     pointsValue: formData.pointsValue,
-                    assignedToProfileIds: formData.assignedToProfileIds, // Send new field
+                    // FIX: Use the correct backend property name: assignedToRefs. 
+                    // The values are now the correct FamilyMember IDs.
+                    assignedToRefs: formData.assignedToRefs, 
                 }),
             });
 
@@ -85,18 +89,28 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ onClose, onTaskCreate
     };
 
     // Helper function to toggle member assignment
-    const toggleAssignment = (profileId: string) => { // Use profileId
+    // CRITICAL FIX: The toggle function must accept and use the actual FamilyMember ID (familyMemberId._id)
+    const toggleAssignment = (memberProfile: IHouseholdMemberProfile) => {
+        // The ID the backend needs for the reference array (FamilyMember ID)
+        const memberRefId = memberProfile.familyMemberId._id; 
+        
         setFormData(prevData => {
-            const currentAssigned = prevData.assignedToProfileIds;
-            if (currentAssigned.includes(profileId)) {
+            const currentAssigned = prevData.assignedToRefs;
+            if (currentAssigned.includes(memberRefId)) {
                 // Remove ID
-                return { ...prevData, assignedToProfileIds: currentAssigned.filter(id => id !== profileId) };
+                return { ...prevData, assignedToRefs: currentAssigned.filter(id => id !== memberRefId) };
             } else {
                 // Add ID
-                return { ...prevData, assignedToProfileIds: [...currentAssigned, profileId] };
+                return { ...prevData, assignedToRefs: [...currentAssigned, memberRefId] };
             }
         });
     };
+
+    // Helper to check if a member is currently assigned, checking against the FamilyMember ID
+    const isMemberAssigned = (memberProfile: IHouseholdMemberProfile) => {
+        return formData.assignedToRefs.includes(memberProfile.familyMemberId._id);
+    };
+
 
     return (
         // Modal Backdrop
@@ -193,11 +207,11 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ onClose, onTaskCreate
                             {householdMembers.length > 0 ? householdMembers.map((member) => (
                                 <button
                                     type="button"
-                                    key={member._id} // Use sub-document _id
+                                    key={member._id} // Use sub-document _id for the React key
                                     title={`Assign to ${member.displayName}`}
-                                    onClick={() => toggleAssignment(member._id)} // Use sub-document _id
+                                    onClick={() => toggleAssignment(member)} // Pass the full member profile
                                     className={`flex items-center space-x-2 p-2 pr-3 rounded-full border transition-all
-                            ${formData.assignedToProfileIds.includes(member._id) // Check new field
+                            ${isMemberAssigned(member) // Check if assigned using the helper
                                             ? 'bg-action-primary/10 border-action-primary text-action-primary'
                                             : 'bg-bg-surface border-border-subtle text-text-secondary hover:bg-border-subtle'}`}
                                 >
@@ -208,7 +222,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ onClose, onTaskCreate
                                         {member.displayName.charAt(0).toUpperCase()}
                                     </div>
                                     <span className="text-sm font-medium">{member.displayName}</span>
-                                    {formData.assignedToProfileIds.includes(member._id) && ( // Check new field
+                                    {isMemberAssigned(member) && ( // Check if assigned
                                         <UserCheck className="w-4 h-4" />
                                     )}
                                 </button>

@@ -52,9 +52,9 @@ const AddMemberModal: React.FC<AddMemberModalProps> = ({
         const colorToSubmit = selectedColor || defaultColor;
 
         try {
-            // POST to the NEW 'createChildProfile' endpoint
-            //
-            const response = await fetch(`/api/v1/households/members/child`, {
+            // FIX: Correct the API URL to use the existing nested resource route.
+            // When `familyMemberId` is missing, the backend will implicitly create a Child profile.
+            const response = await fetch(`/api/v1/households/${householdId}/members`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -64,21 +64,24 @@ const AddMemberModal: React.FC<AddMemberModalProps> = ({
                     firstName: firstName,
                     displayName: firstName, // Use firstName as default displayName
                     profileColor: colorToSubmit,
+                    role: 'Child', // Mandate the role as 'Child'
                 }),
             });
 
             const data = await response.json();
-            if (!response.ok) {
+            if (!response.ok || data.status === 'fail' || data.status === 'error') {
                 throw new Error(data.message || 'Failed to create child profile.');
             }
 
-            // The new API controller returns the new profile object directly
-            //
-            const newProfile = data.data.profile;
+            // The new API controller returns the updated household document.
+            // We need to find the newly added member profile.
+            const newProfileData = data.data.household.memberProfiles.find(
+                (p: IHouseholdMemberProfile) => p.displayName === firstName && p.role === 'Child'
+            );
 
             // Pass the new profile back to the list
-            if (newProfile) {
-                onMemberAdded(newProfile);
+            if (newProfileData) {
+                onMemberAdded(newProfileData);
             }
             onClose(); // Close the modal on success
 
