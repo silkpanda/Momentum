@@ -1,20 +1,20 @@
 // =========================================================
-// silkpanda/momentum/momentum-fac69d659346d6b7b01871d803baa24f6dfaccee/app/components/members/EditMemberModal.tsx
-// REFACTORED for Unified Membership Model (API v3)
+// silkpanda/momentum/momentum-e07d696d5dc5be6d5d5681cef733d2cb80fb1772/app/components/members/EditMemberModal.tsx
+// REFACTORED: Allows all users (Parents and Children) to edit profile color
 // =========================================================
 'use client';
 
 import React, { useState, useEffect } from 'react';
 import { User, Loader, X, AlertTriangle, Check, Palette, Mail } from 'lucide-react';
 import { useSession } from '../layout/SessionContext';
-import { IHouseholdMemberProfile } from './MemberList';
+import { IHouseholdMemberProfile } from './MemberList'; // Import new interface
 
 interface EditMemberModalProps {
-    member: IHouseholdMemberProfile;
+    member: IHouseholdMemberProfile; // Use new interface
     householdId: string;
     onClose: () => void;
-    onMemberUpdated: () => void;
-    usedColors: string[];
+    onMemberUpdated: () => void; // Function to trigger a re-fetch
+    usedColors: string[]; // This is still needed for children
 }
 
 // Profile colors from Governance Doc
@@ -30,7 +30,8 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
     member, householdId, onClose, onMemberUpdated, usedColors
 }) => {
     const [displayName, setDisplayName] = useState(member.displayName);
-    const [selectedColor, setSelectedColor] = useState(member.profileColor || null);
+    // Handle optional profileColor
+    const [selectedColor, setSelectedColor] = useState(member.profileColor || PROFILE_COLORS[0].hex); // Default to first color if null
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const { token } = useSession();
@@ -52,7 +53,6 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
 
         try {
             // PATCH to the 'updateMemberProfile' endpoint
-            // The API endpoint uses the sub-document _id
             //
             const response = await fetch(`/api/v1/households/members/${member._id}`, {
                 method: 'PATCH',
@@ -60,11 +60,10 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`,
                 },
-                // Build conditional request body
+                // FIX: Always send both fields. The API now accepts profileColor for Parents.
+                //
                 body: JSON.stringify(
-                    member.role === 'Parent'
-                        ? { displayName: displayName } // Parents can only update displayName
-                        : { displayName: displayName, profileColor: selectedColor } // Children can update both
+                    { displayName: displayName, profileColor: selectedColor }
                 ),
             });
 
@@ -147,29 +146,27 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
                         </div>
                     )}
 
-                    {/* Conditionally show Color Picker for Children */}
-                    {member.role === 'Child' && (
-                        <div className="space-y-1">
-                            <label className="block text-sm font-medium text-text-secondary">
-                                Profile Color
-                            </label>
-                            <div className="flex flex-wrap gap-2 p-2 bg-bg-canvas rounded-lg border border-border-subtle">
-                                {availableColors.map((color) => (
-                                    <button
-                                        type="button"
-                                        key={color.hex}
-                                        title={color.name}
-                                        onClick={() => setSelectedColor(color.hex)}
-                                        className={`w-8 h-8 rounded-full border-2 transition-all
-                              ${selectedColor === color.hex ? 'border-action-primary ring-2 ring-action-primary/50 scale-110' : 'border-transparent opacity-70 hover:opacity-100'}`}
-                                        style={{ backgroundColor: color.hex }}
-                                    >
-                                        {selectedColor === color.hex && <Check className="w-5 h-5 text-white m-auto" />}
-                                    </button>
-                                ))}
-                            </div>
+                    {/* FIX: Show Color Picker for ALL roles */}
+                    <div className="space-y-1">
+                        <label className="block text-sm font-medium text-text-secondary">
+                            Profile Color
+                        </label>
+                        <div className="flex flex-wrap gap-2 p-2 bg-bg-canvas rounded-lg border border-border-subtle">
+                            {availableColors.map((color) => (
+                                <button
+                                    type="button"
+                                    key={color.hex}
+                                    title={color.name}
+                                    onClick={() => setSelectedColor(color.hex)}
+                                    className={`w-8 h-8 rounded-full border-2 transition-all
+                            ${selectedColor === color.hex ? 'border-action-primary ring-2 ring-action-primary/50 scale-110' : 'border-transparent opacity-70 hover:opacity-100'}`}
+                                    style={{ backgroundColor: color.hex }}
+                                >
+                                    {selectedColor === color.hex && <Check className="w-5 h-5 text-white m-auto" />}
+                                </button>
+                            ))}
                         </div>
-                    )}
+                    </div>
 
                     {/* Error Display */}
                     {error && (

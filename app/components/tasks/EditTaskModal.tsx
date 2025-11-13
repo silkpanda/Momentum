@@ -1,6 +1,6 @@
 // =========================================================
-// silkpanda/momentum/momentum-fac69d659346d6b7b01871d803baa24f6dfaccee/app/components/tasks/EditTaskModal.tsx
-// REFACTORED for Unified Task Assignment Model (API v3)
+// silkpanda/momentum/momentum-e07d696d5dc5be6d5d5681cef733d2cb80fb1772/app/components/tasks/EditTaskModal.tsx
+// REFACTORED: Add defensive null check for task assignments
 // =========================================================
 'use client';
 
@@ -26,7 +26,8 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
     const [pointsValue, setPointsValue] = useState(task.pointsValue);
     // Use new field name and populated data
     const [assignedProfileIds, setAssignedProfileIds] = useState<string[]>(
-        () => task.assignedToProfileIds.map(member => member._id)
+        // FIX: Provide a default empty array if the property is null or undefined
+        () => (task.assignedToProfileIds ?? []).map(member => member._id)
     );
 
     const [isLoading, setIsLoading] = useState(false);
