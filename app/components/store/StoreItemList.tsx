@@ -17,7 +17,7 @@ export interface IStoreItem {
     _id: string;
     itemName: string;
     description: string;
-    costInPoints: number;
+    cost: number; // FIX: Renamed from costInPoints to match backend API/schema
     householdRefId: string;
 }
 
@@ -39,7 +39,7 @@ const StoreItem: React.FC<{
         </div>
         <div className="flex items-center space-x-4">
             <div className="text-center">
-                <p className="text-lg font-semibold text-signal-success">{item.costInPoints}</p>
+                <p className="text-lg font-semibold text-signal-success">{item.cost}</p>
                 <p className="text-xs text-text-secondary">Points</p>
             </div>
 

@@ -18,7 +18,7 @@ interface EditStoreItemModalProps {
 const EditStoreItemModal: React.FC<EditStoreItemModalProps> = ({ item, onClose, onItemUpdated }) => {
     const [itemName, setItemName] = useState(item.itemName);
     const [description, setDescription] = useState(item.description);
-    const [costInPoints, setCostInPoints] = useState(item.costInPoints);
+    const [cost, setCost] = useState(item.cost); // FIX: Use 'cost' from item and rename state
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const { token } = useSession();
@@ -29,7 +29,7 @@ const EditStoreItemModal: React.FC<EditStoreItemModalProps> = ({ item, onClose, 
             setError('Item Name is required.');
             return;
         }
-        if (costInPoints < 1) {
+        if (cost < 1) { // FIX: Use 'cost' in validation
             setError('Cost must be at least 1 point.');
             return;
         }
@@ -48,7 +48,7 @@ const EditStoreItemModal: React.FC<EditStoreItemModalProps> = ({ item, onClose, 
                 body: JSON.stringify({
                     itemName,
                     description,
-                    costInPoints,
+                    cost, // FIX: Send correct field name 'cost'
                 }),
             });
 
@@ -108,7 +108,7 @@ const EditStoreItemModal: React.FC<EditStoreItemModalProps> = ({ item, onClose, 
 
                     {/* Cost Input */}
                     <div className="space-y-1">
-                        <label htmlFor="costInPoints" className="block text-sm font-medium text-text-secondary">
+                        <label htmlFor="cost" className="block text-sm font-medium text-text-secondary">
                             Cost (in Points)
                         </label>
                         <div className="relative rounded-md shadow-sm">
@@ -116,12 +116,12 @@ const EditStoreItemModal: React.FC<EditStoreItemModalProps> = ({ item, onClose, 
                                 <DollarSign className="h-5 w-5 text-text-secondary" />
                             </div>
                             <input
-                                id="costInPoints"
-                                name="costInPoints"
+                                id="cost"
+                                name="cost"
                                 type="number"
                                 min="1"
-                                value={costInPoints}
-                                onChange={(e) => setCostInPoints(parseInt(e.target.value, 10) || 1)}
+                                value={cost}
+                                onChange={(e) => setCost(parseInt(e.target.value, 10) || 1)} // FIX: Use setCost
                                 className="block w-full rounded-md border border-border-subtle p-3 pl-10 text-text-primary bg-bg-surface"
                             />
                         </div>
