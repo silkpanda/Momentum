@@ -10,6 +10,8 @@ import { useSession } from '../layout/SessionContext';
 import CreateStoreItemModal from './CreateStoreItemModal';
 import EditStoreItemModal from './EditStoreItemModal';
 import DeleteStoreItemModal from './DeleteStoreItemModal';
+import PurchaseItemModal from './PurchaseItemModal'; // <-- NEW IMPORT
+import { IHouseholdMemberProfile } from '../members/MemberList'; // <-- NEW IMPORT
 
 // --- Interface ---
 //
@@ -26,48 +28,67 @@ const StoreItem: React.FC<{
     item: IStoreItem;
     onEdit: () => void;
     onDelete: () => void;
-}> = ({ item, onEdit, onDelete }) => (
-    <li className="flex items-center justify-between p-4 bg-bg-surface rounded-lg shadow border border-border-subtle">
-        <div className="flex items-center space-x-4">
-            <div className="flex-shrink-0 bg-action-primary/10 p-2 rounded-lg">
-                <Gift className="w-5 h-5 text-action-primary" />
-            </div>
-            <div>
-                <p className="text-base font-medium text-text-primary">{item.itemName}</p>
-                <p className="text-sm text-text-secondary">{item.description || 'No description'}</p>
-            </div>
-        </div>
-        <div className="flex items-center space-x-4">
-            <div className="text-center">
-                <p className="text-lg font-semibold text-signal-success">{item.cost}</p>
-                <p className="text-xs text-text-secondary">Points</p>
-            </div>
+    onPurchase: () => void; // <-- NEW PROP
+    currentUserPoints: number; // <-- NEW PROP
+}> = ({ item, onEdit, onDelete, onPurchase, currentUserPoints }) => {
+    const canAfford = currentUserPoints >= item.cost;
 
-            {/* Actions */}
-            <button onClick={onEdit} className="p-2 text-text-secondary hover:text-action-primary transition-colors" title="Edit Item">
-                <Edit className="w-4 h-4" />
-            </button>
-            <button onClick={onDelete} className="p-2 text-text-secondary hover:text-signal-alert transition-colors" title="Delete Item">
-                <Trash className="w-4 h-4" />
-            </button>
-        </div>
-    </li>
-);
+    return (
+        <li className="flex items-center justify-between p-4 bg-bg-surface rounded-lg shadow border border-border-subtle">
+            <div className="flex items-center space-x-4">
+                <div className="flex-shrink-0 bg-action-primary/10 p-2 rounded-lg">
+                    <Gift className="w-5 h-5 text-action-primary" />
+                </div>
+                <div>
+                    <p className="text-base font-medium text-text-primary">{item.itemName}</p>
+                    <p className="text-sm text-text-secondary">{item.description || 'No description'}</p>
+                </div>
+            </div>
+            <div className="flex items-center space-x-4">
+                <div className="text-center">
+                    <p className="text-lg font-semibold text-signal-success">{item.cost}</p>
+                    <p className="text-xs text-text-secondary">Points</p>
+                </div>
+
+                {/* NEW: Purchase Button */}
+                <button
+                    onClick={onPurchase}
+                    disabled={!canAfford}
+                    title={canAfford ? "Purchase Item" : "You do not have enough points"}
+                    className="p-2 text-text-secondary hover:text-signal-success transition-colors 
+                           disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                    <ShoppingCart className="w-4 h-4" />
+                </button>
+
+                {/* Actions */}
+                <button onClick={onEdit} className="p-2 text-text-secondary hover:text-action-primary transition-colors" title="Edit Item">
+                    <Edit className="w-4 h-4" />
+                </button>
+                <button onClick={onDelete} className="p-2 text-text-secondary hover:text-signal-alert transition-colors" title="Delete Item">
+                    <Trash className="w-4 h-4" />
+                </button>
+            </div>
+        </li>
+    );
+};
 
 // --- Main Store Item List Component ---
 const StoreItemList: React.FC = () => {
     const [items, setItems] = useState<IStoreItem[]>([]);
+    const [members, setMembers] = useState<IHouseholdMemberProfile[]>([]); // <-- NEW STATE
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [isPurchaseModalOpen, setIsPurchaseModalOpen] = useState(false); // <-- NEW STATE
     const [selectedItem, setSelectedItem] = useState<IStoreItem | null>(null);
 
-    const { token } = useSession();
+    const { token, user } = useSession(); // <-- Get current user
 
-    const fetchItems = useCallback(async () => {
+    const fetchData = useCallback(async () => {
         if (!token) {
             setError('Session invalid. Please log in again.');
             setLoading(false);
@@ -75,21 +96,35 @@ const StoreItemList: React.FC = () => {
         }
 
         setLoading(true);
+        setError(null);
         try {
             //
-            const response = await fetch(`/api/v1/store-items`, {
-                headers: { 'Authorization': `Bearer ${token}` },
-            });
+            const [itemResponse, householdResponse] = await Promise.all([
+                fetch(`/api/v1/store-items`, {
+                    headers: { 'Authorization': `Bearer ${token}` },
+                }),
+                fetch(`/api/v1/households`, {
+                    headers: { 'Authorization': `Bearer ${token}` },
+                })
+            ]);
 
-            if (!response.ok) {
-                throw new Error('Failed to fetch store items.');
+            if (!itemResponse.ok) throw new Error('Failed to fetch store items.');
+            if (!householdResponse.ok) throw new Error('Failed to fetch household data.');
+
+            const itemData = await itemResponse.json();
+            const householdData = await householdResponse.json();
+
+            if (itemData.status === 'success') {
+                setItems(itemData.data.storeItems || []);
+            } else {
+                throw new Error(itemData.message || 'Could not retrieve items.');
             }
-            const data = await response.json();
-            if (data.status === 'success') {
-                setItems(data.data.storeItems || []);
+
+            if (householdData.status === 'success') {
+                setMembers(householdData.data.household.memberProfiles || []);
                 setError(null);
             } else {
-                throw new Error(data.message || 'Could not retrieve items.');
+                throw new Error(householdData.message || 'Could not retrieve household members.');
             }
         } catch (e: any) {
             setError(e.message);
@@ -99,19 +134,23 @@ const StoreItemList: React.FC = () => {
     }, [token]);
 
     useEffect(() => {
-        fetchItems();
-    }, [fetchItems]);
+        fetchData();
+    }, [fetchData]);
 
     const handleItemCreated = () => {
-        fetchItems(); // Re-fetch all items
+        fetchData(); // Re-fetch all items
     };
 
     const handleItemUpdated = () => {
-        fetchItems(); // Re-fetch all items
+        fetchData(); // Re-fetch all items
     };
 
     const handleItemDeleted = () => {
-        fetchItems(); // Re-fetch all items
+        fetchData(); // Re-fetch all items
+    };
+
+    const handleItemPurchased = () => {
+        fetchData(); // Re-fetch all data to update points
     };
 
     // Click Handlers for opening modals
@@ -123,6 +162,11 @@ const StoreItemList: React.FC = () => {
     const openDeleteModal = (item: IStoreItem) => {
         setSelectedItem(item);
         setIsDeleteModalOpen(true);
+    };
+
+    const openPurchaseModal = (item: IStoreItem) => {
+        setSelectedItem(item);
+        setIsPurchaseModalOpen(true);
     };
 
     if (loading && items.length === 0) {
@@ -142,6 +186,10 @@ const StoreItemList: React.FC = () => {
             </div>
         );
     }
+
+    // Find the current user's points total
+    const currentUserProfile = members.find(m => m.familyMemberId._id === user?._id);
+    const currentUserPoints = currentUserProfile?.pointsTotal ?? 0;
 
     return (
         <div className="w-full">
@@ -171,6 +219,8 @@ const StoreItemList: React.FC = () => {
                             item={item}
                             onEdit={() => openEditModal(item)}
                             onDelete={() => openDeleteModal(item)}
+                            onPurchase={() => openPurchaseModal(item)}
+                            currentUserPoints={currentUserPoints}
                         />
                     ))}
                 </ul>
@@ -203,6 +253,17 @@ const StoreItemList: React.FC = () => {
                     item={selectedItem}
                     onClose={() => setIsDeleteModalOpen(false)}
                     onItemDeleted={handleItemDeleted}
+                />
+            )}
+
+            {/* Conditionally render the Purchase modal */}
+            {isPurchaseModalOpen && selectedItem && user && (
+                <PurchaseItemModal
+                    item={selectedItem}
+                    user={user}
+                    currentUserPoints={currentUserPoints}
+                    onClose={() => setIsPurchaseModalOpen(false)}
+                    onItemPurchased={handleItemPurchased}
                 />
             )}
         </div>
