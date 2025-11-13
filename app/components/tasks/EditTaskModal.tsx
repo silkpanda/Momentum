@@ -24,9 +24,12 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
     const [taskName, setTaskName] = useState(task.taskName);
     const [description, setDescription] = useState(task.description);
     const [pointsValue, setPointsValue] = useState(task.pointsValue);
-    // Use new field name and populated data
-    const [assignedProfileIds, setAssignedProfileIds] = useState<string[]>(
-        // FIX: Provide a default empty array if the property is null or undefined
+    
+    // FIX 1 & 2: Rename state variable to match backend property 'assignedToRefs'
+    // This state holds the array of FamilyMember IDs (the IDs the backend needs)
+    const [assignedToRefs, setAssignedToRefs] = useState<string[]>(
+        // The assignedToProfileIds contains populated FamilyMember objects. 
+        // We map their _id, which is the FamilyMember ID, into the state array.
         () => (task.assignedToProfileIds ?? []).map(member => member._id)
     );
 
@@ -61,7 +64,8 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
                     taskName,
                     description,
                     pointsValue,
-                    assignedToProfileIds: assignedProfileIds, // Send new field
+                    // FIX 2: Send the correct field name 'assignedToRefs'
+                    assignedToRefs: assignedToRefs, 
                 }),
             });
 
@@ -81,15 +85,22 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
         }
     };
 
-    // Helper function to toggle member assignment
-    const toggleAssignment = (profileId: string) => { // Use profileId
-        setAssignedProfileIds(prevIds => {
-            if (prevIds.includes(profileId)) {
-                return prevIds.filter(id => id !== profileId); // Remove ID
+    // FIX 3: Update toggleAssignment to take the full profile and use the correct FamilyMember ID
+    const toggleAssignment = (memberProfile: IHouseholdMemberProfile) => { 
+        const memberRefId = memberProfile.familyMemberId._id; // Get the correct FamilyMember ID
+
+        setAssignedToRefs(prevIds => {
+            if (prevIds.includes(memberRefId)) {
+                return prevIds.filter(id => id !== memberRefId); // Remove ID
             } else {
-                return [...prevIds, profileId]; // Add ID
+                return [...prevIds, memberRefId]; // Add ID
             }
         });
+    };
+    
+    // Helper to check if a member is currently assigned, checking against the FamilyMember ID
+    const isMemberAssigned = (memberProfile: IHouseholdMemberProfile) => {
+        return assignedToRefs.includes(memberProfile.familyMemberId._id);
     };
 
     return (
@@ -179,9 +190,9 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
                                     type="button"
                                     key={member._id} // Use sub-document _id
                                     title={`Assign to ${member.displayName}`}
-                                    onClick={() => toggleAssignment(member._id)} // Use sub-document _id
+                                    onClick={() => toggleAssignment(member)} // FIX: Pass the full member object
                                     className={`flex items-center space-x-2 p-2 pr-3 rounded-full border transition-all
-                            ${assignedProfileIds.includes(member._id) // Check new field
+                            ${isMemberAssigned(member) // FIX: Check using helper function
                                             ? 'bg-action-primary/10 border-action-primary text-action-primary'
                                             : 'bg-bg-surface border-border-subtle text-text-secondary hover:bg-border-subtle'}`}
                                 >
@@ -192,7 +203,7 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
                                         {member.displayName.charAt(0).toUpperCase()}
                                     </div>
                                     <span className="text-sm font-medium">{member.displayName}</span>
-                                    {assignedProfileIds.includes(member._id) && ( // Check new field
+                                    {isMemberAssigned(member) && ( // FIX: Check using helper function
                                         <UserCheck className="w-4 h-4" />
                                     )}
                                 </button>
