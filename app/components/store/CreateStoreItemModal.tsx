@@ -1,0 +1,170 @@
+// =========================================================
+// silkpanda/momentum/app/components/store/CreateStoreItemModal.tsx
+// Modal for creating a new store item (Phase 3.4)
+// =========================================================
+'use client';
+
+import React, { useState } from 'react';
+import { Gift, Check, Loader, Type, X, AlertTriangle, DollarSign } from 'lucide-react';
+import { IStoreItem } from './StoreItemList';
+import { useSession } from '../layout/SessionContext';
+
+interface CreateStoreItemModalProps {
+    onClose: () => void;
+    onItemCreated: () => void;
+}
+
+const CreateStoreItemModal: React.FC<CreateStoreItemModalProps> = ({ onClose, onItemCreated }) => {
+    const [itemName, setItemName] = useState('');
+    const [description, setDescription] = useState('');
+    const [costInPoints, setCostInPoints] = useState(100);
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const { token } = useSession();
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (itemName.trim() === '') {
+            setError('Item Name is required.');
+            return;
+        }
+        if (costInPoints < 1) {
+            setError('Cost must be at least 1 point.');
+            return;
+        }
+
+        setIsLoading(true);
+        setError(null);
+
+        try {
+            //
+            const response = await fetch('/api/v1/store-items', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                    itemName,
+                    description,
+                    costInPoints,
+                }),
+            });
+
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.message || 'Failed to create item.');
+            }
+
+            onItemCreated();
+            onClose();
+
+        } catch (err: any) {
+            setError(err.message);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    return (
+        <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+            onClick={onClose}
+        >
+            <div
+                className="relative w-full max-w-lg p-6 bg-bg-surface rounded-xl shadow-xl border border-border-subtle"
+                onClick={(e) => e.stopPropagation()}
+            >
+                <button
+                    onClick={onClose}
+                    className="absolute top-4 right-4 p-1 rounded-full text-text-secondary hover:bg-border-subtle"
+                >
+                    <X className="w-5 h-5" />
+                </button>
+
+                <form onSubmit={handleSubmit} className="flex flex-col space-y-4">
+                    <h3 className="text-xl font-medium text-text-primary">Create New Store Item</h3>
+
+                    {/* Item Name Input */}
+                    <div className="space-y-1">
+                        <label htmlFor="itemName" className="block text-sm font-medium text-text-secondary">
+                            Item Name (Mandatory)
+                        </label>
+                        <div className="relative rounded-md shadow-sm">
+                            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                                <Gift className="h-5 w-5 text-text-secondary" />
+                            </div>
+                            <input
+                                id="itemName"
+                                name="itemName"
+                                type="text"
+                                value={itemName}
+                                onChange={(e) => setItemName(e.target.value)}
+                                placeholder="e.g., '1 Hour of Video Games'"
+                                className="block w-full rounded-md border border-border-subtle p-3 pl-10 text-text-primary bg-bg-surface"
+                            />
+                        </div>
+                    </div>
+
+                    {/* Cost Input */}
+                    <div className="space-y-1">
+                        <label htmlFor="costInPoints" className="block text-sm font-medium text-text-secondary">
+                            Cost (in Points)
+                        </label>
+                        <div className="relative rounded-md shadow-sm">
+                            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                                <DollarSign className="h-5 w-5 text-text-secondary" />
+                            </div>
+                            <input
+                                id="costInPoints"
+                                name="costInPoints"
+                                type="number"
+                                min="1"
+                                value={costInPoints}
+                                onChange={(e) => setCostInPoints(parseInt(e.target.value, 10) || 1)}
+                                className="block w-full rounded-md border border-border-subtle p-3 pl-10 text-text-primary bg-bg-surface"
+                            />
+                        </div>
+                    </div>
+
+                    {/* Description Input */}
+                    <div className="space-y-1">
+                        <label htmlFor="description" className="block text-sm font-medium text-text-secondary">
+                            Description (Optional)
+                        </label>
+                        <textarea
+                            id="description"
+                            name="description"
+                            rows={3}
+                            value={description}
+                            onChange={(e) => setDescription(e.target.value)}
+                            placeholder="e.g., 'Redeemable on weekdays after homework is done.'"
+                            className="block w-full rounded-md border border-border-subtle p-3 text-text-primary bg-bg-surface"
+                        />
+                    </div>
+
+                    {/* Error Display */}
+                    {error && (
+                        <div className="flex items-center text-sm text-signal-alert">
+                            <AlertTriangle className="w-4 h-4 mr-1.5" /> {error}
+                        </div>
+                    )}
+
+                    {/* Submit Button */}
+                    <button
+                        type="submit"
+                        disabled={isLoading}
+                        className={`w-full flex justify-center items-center rounded-lg py-3 px-4 text-base font-medium shadow-sm 
+                        text-white transition-colors
+                        ${isLoading ? 'bg-action-primary/60' : 'bg-action-primary hover:bg-action-hover'}`}
+                    >
+                        {isLoading ? <Loader className="w-5 h-5 animate-spin" /> : <Check className="w-5 h-5 mr-2" />}
+                        Create Item
+                    </button>
+                </form>
+            </div>
+        </div>
+    );
+};
+
+export default CreateStoreItemModal;
