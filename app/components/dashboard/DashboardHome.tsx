@@ -10,7 +10,7 @@ import { IHouseholdMemberProfile } from '../members/MemberList';
 import { ITask } from '../tasks/TaskList';
 import { IStoreItem } from '../store/StoreItemList';
 import { Loader, AlertTriangle, Users, Award, ShoppingCart, User, UserCheck, UserX, Gift } from 'lucide-react';
-import { CheckSquare, CalendarDays } from 'lucide-react'; // Import new icons
+import { CheckSquare, CalendarDays, Package } from 'lucide-react'; // Import new icons
 
 // --- Reusable Stat Card Component ---
 interface StatCardProps {
@@ -146,13 +146,32 @@ const DashboardHome: React.FC = () => {
     }
 
     // --- Calculate Stats ---
-    const storeItemCount = storeItems.length;
 
     // New Task Stat Calculations
     const completeCount = tasks.filter(t => t.isCompleted).length;
     const incompleteTasks = tasks.filter(t => !t.isCompleted);
     const assignedIncompleteCount = incompleteTasks.filter(t => t.assignedToProfileIds && t.assignedToProfileIds.length > 0).length;
     const unassignedIncompleteCount = incompleteTasks.filter(t => !t.assignedToProfileIds || t.assignedToProfileIds.length === 0).length;
+
+    // Find current user's profile to get their points
+    const currentUserProfile = members.find(m => m.familyMemberId._id === user?._id);
+    const currentUserPoints = currentUserProfile?.pointsTotal ?? 0;
+
+    // New Store Stat Calculations
+    const availableRewardsCount = storeItems.filter(item => item.cost <= currentUserPoints).length;
+    const futureRewardsCount = storeItems.filter(item => item.cost > currentUserPoints).length;
+
+
+    /**
+     * Helper to count assigned, incomplete tasks for a member.
+     * We use the familyMemberId for matching.
+     */
+    const getAssignedTaskCount = (memberFamilyId: string) => {
+        return tasks.filter(task =>
+            !task.isCompleted &&
+            task.assignedToProfileIds.some(profile => profile._id === memberFamilyId)
+        ).length;
+    };
 
     // Filter for the current user's *incomplete* tasks
     const myTasks = tasks.filter(
@@ -191,10 +210,21 @@ const DashboardHome: React.FC = () => {
                                     </div>
                                 </div>
 
-                                {/* Show points for all members */}
-                                <div className="text-right">
-                                    <p className="text-base font-semibold text-action-primary">{member.pointsTotal}</p>
-                                    <p className="text-xs text-text-secondary">Points</p>
+                                {/* Right Side: Stats (Tasks + Points) */}
+                                <div className="flex items-center space-x-4">
+                                    {/* Assigned Task Count */}
+                                    <div className="text-center w-12">
+                                        <p className="text-lg font-semibold text-text-primary">
+                                            {getAssignedTaskCount(member.familyMemberId._id)}
+                                        </p>
+                                        <p className="text-xs text-text-secondary">Tasks</p>
+                                    </div>
+
+                                    {/* Points Total */}
+                                    <div className="text-center w-12">
+                                        <p className="text-lg font-semibold text-action-primary">{member.pointsTotal}</p>
+                                        <p className="text-xs text-text-secondary">Points</p>
+                                    </div>
                                 </div>
                             </li>
                         ))}
@@ -230,11 +260,20 @@ const DashboardHome: React.FC = () => {
 
             {/* Store Items Card */}
             <StatCard Icon={ShoppingCart} title="Reward Store">
-                <div className="flex items-center space-x-3">
-                    <Gift className="w-8 h-8 text-action-primary" />
-                    <div>
-                        <p className="text-3xl font-semibold text-text-primary">{storeItemCount}</p>
-                        <p className="text-sm text-text-secondary">Item(s) in store</p>
+                <div className="space-y-3">
+                    <div className="flex items-center space-x-3">
+                        <Gift className="w-6 h-6 text-signal-success" />
+                        <div>
+                            <p className="text-3xl font-semibold text-text-primary">{availableRewardsCount}</p>
+                            <p className="text-sm text-text-secondary">Available Rewards</p>
+                        </div>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                        <Package className="w-6 h-6 text-text-secondary" />
+                        <div>
+                            <p className="text-3xl font-semibold text-text-primary">{futureRewardsCount}</p>
+                            <p className="text-sm text-text-secondary">Future Rewards</p>
+                        </div>
                     </div>
                 </div>
             </StatCard>
