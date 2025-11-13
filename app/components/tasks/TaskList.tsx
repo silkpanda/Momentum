@@ -35,7 +35,9 @@ const TaskItem: React.FC<{
     task: ITask;
     onEdit: () => void;
     onDelete: () => void;
-}> = ({ task, onEdit, onDelete }) => {
+    onMarkComplete: () => void; // New prop for completion
+    isCompleting: boolean; // New prop for loading state
+}> = ({ task, onEdit, onDelete, onMarkComplete, isCompleting }) => {
 
     // Helper to get initials
     const getInitials = (name: string) => name ? name.charAt(0).toUpperCase() : '?';
@@ -76,19 +78,43 @@ const TaskItem: React.FC<{
                     <p className="text-xs text-text-secondary">Points</p>
                 </div>
 
-                {/* Task Status (Read-only for now) */}
-                {task.isCompleted && (
+                {/* --- Task Actions & Status --- */}
+
+                {/* State 1: Loading */}
+                {isCompleting && (
+                    <div className="flex items-center justify-center w-24">
+                        <Loader className="w-5 h-5 text-action-primary animate-spin" />
+                    </div>
+                )}
+
+                {/* State 2: Already Completed */}
+                {task.isCompleted && !isCompleting && (
                     <div className="flex items-center text-signal-success">
                         <CheckSquare className="w-4 h-4 mr-1" />
                         <span className="text-sm font-medium">Done</span>
                     </div>
                 )}
 
-                {/* Placeholder buttons for future Edit/Delete */}
-                <button onClick={onEdit} className="p-2 text-text-secondary hover:text-action-primary transition-colors" title="Edit Task">
+                {/* State 3: Ready to be Completed */}
+                {!task.isCompleted && !isCompleting && (
+                    <button
+                        onClick={onMarkComplete}
+                        disabled={task.assignedToProfileIds.length === 0}
+                        title={
+                            task.assignedToProfileIds.length > 0
+                                ? `Mark '${task.taskName}' complete`
+                                : 'Task must be assigned to award points'
+                        }
+                        className="p-2 text-text-secondary hover:text-signal-success transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                        <CheckSquare className="w-5 h-5" />
+                    </button>
+                )}
+
+                <button onClick={onEdit} className="p-2 text-text-secondary hover:text-action-primary transition-colors" title="Edit Task" disabled={task.isCompleted || isCompleting}>
                     <Edit className="w-4 h-4" />
                 </button>
-                <button onClick={onDelete} className="p-2 text-text-secondary hover:text-signal-alert transition-colors" title="Delete Task">
+                <button onClick={onDelete} className="p-2 text-text-secondary hover:text-signal-alert transition-colors" title="Delete Task" disabled={isCompleting}>
                     <Trash className="w-4 h-4" />
                 </button>
             </div>
@@ -107,6 +133,7 @@ const TaskList: React.FC = () => {
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [selectedTask, setSelectedTask] = useState<ITask | null>(null);
+    const [completingTaskId, setCompletingTaskId] = useState<string | null>(null); // For loading state
 
     // Get session context for API calls
     const { token, householdId } = useSession(); // Get householdId
@@ -134,7 +161,7 @@ const TaskList: React.FC = () => {
             ]);
 
             if (!taskResponse.ok) throw new Error('Failed to fetch tasks.');
-            if (!householdResponse.ok) throw new Error('Failed to fetch household members.'); 
+            if (!householdResponse.ok) throw new Error('Failed to fetch household members.');
 
             const taskData = await taskResponse.json();
             const householdData = await householdResponse.json();
@@ -147,7 +174,7 @@ const TaskList: React.FC = () => {
 
             if (householdData.status === 'success') {
                 // CRITICAL FIX: Extract memberProfiles from the expected API response structure
-                setHouseholdMembers(householdData.data.household.memberProfiles || []); 
+                setHouseholdMembers(householdData.data.household.memberProfiles || []);
             } else {
                 throw new Error(householdData.message || 'Could not retrieve members for assignment.');
             }
@@ -156,7 +183,7 @@ const TaskList: React.FC = () => {
 
         } catch (e: any) {
             // FIX: Use a combined, more descriptive error message
-            setError(`Failed to load tasks or members for assignment: ${e.message}`); 
+            setError(`Failed to load tasks or members for assignment: ${e.message}`);
         } finally {
             setLoading(false);
         }
@@ -176,6 +203,50 @@ const TaskList: React.FC = () => {
 
     const handleTaskDeleted = () => {
         fetchData(); // Re-fetch to get updated list
+    };
+
+    // New Handler for Marking Task Complete
+    const handleMarkComplete = async (task: ITask) => {
+        // Prevent multiple clicks
+        if (completingTaskId) return;
+
+        // Safety checks
+        if (task.isCompleted) {
+            setError("Task is already complete.");
+            return;
+        }
+        if (task.assignedToProfileIds.length === 0) {
+            setError("Task must be assigned to a member to award points.");
+            return;
+        }
+
+        // Get the first assigned member's ID
+        const memberIdToAward = task.assignedToProfileIds[0]._id;
+
+        setCompletingTaskId(task._id);
+        setError(null);
+
+        try {
+            const response = await fetch(`/api/v1/tasks/${task._id}/complete`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`,
+                },
+                body: JSON.stringify({ memberId: memberIdToAward }),
+            });
+
+            if (!response.ok) {
+                const data = await response.json();
+                throw new Error(data.message || 'Failed to complete task.');
+            }
+
+            fetchData(); // Refresh the list on success
+        } catch (e: any) {
+            setError(e.message);
+        } finally {
+            setCompletingTaskId(null); // Clear loading state
+        }
     };
 
     // Click Handlers for opening modals
@@ -239,6 +310,8 @@ const TaskList: React.FC = () => {
                             task={task}
                             onEdit={() => openEditModal(task)}
                             onDelete={() => openDeleteModal(task)}
+                            onMarkComplete={() => handleMarkComplete(task)}
+                            isCompleting={completingTaskId === task._id}
                         />
                     ))
                 ) : (

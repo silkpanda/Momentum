@@ -66,13 +66,11 @@ const MemberItem: React.FC<{
             </div>
         </div>
         <div className="flex items-center space-x-4">
-            {/* Conditional Points: Only show for children */}
-            {member.role === 'Child' && (
-                <div className="text-center">
-                    <p className="text-lg font-semibold text-action-primary">{member.pointsTotal}</p>
-                    <p className="text-xs text-text-secondary">Points</p>
-                </div>
-            )}
+            {/* Points: Show for all members */}
+            <div className="text-center">
+                <p className="text-lg font-semibold text-action-primary">{member.pointsTotal}</p>
+                <p className="text-xs text-text-secondary">Points</p>
+            </div>
 
             {/* Actions */}
             <button onClick={onEdit} className="p-2 text-text-secondary hover:text-action-primary transition-colors" title="Edit Member">
@@ -128,14 +126,14 @@ const MemberList: React.FC = () => {
             const data = await response.json();
             if (data.status === 'success') {
                 // CRITICAL FIX: The API response structure is { data: { household: { memberProfiles: [...] } } }
-                setMemberProfiles(data.data.household.memberProfiles || []); 
+                setMemberProfiles(data.data.household.memberProfiles || []);
                 setError(null);
             } else {
-                throw new Error(data.message || 'Could not retrieve member list data.'); 
+                throw new Error(data.message || 'Could not retrieve member list data.');
             }
         } catch (e: any) {
             // FIX: Use a better error message for the user if the underlying cause is API failure
-            setError(`Failed to load family members: ${e.message}`); 
+            setError(`Failed to load family members: ${e.message}`);
         } finally {
             setLoading(false);
         }

@@ -10,7 +10,7 @@ import { IHouseholdMemberProfile } from '../members/MemberList';
 import { ITask } from '../tasks/TaskList';
 import { IStoreItem } from '../store/StoreItemList';
 import { Loader, AlertTriangle, Users, Award, ShoppingCart, User, UserCheck, UserX, Gift } from 'lucide-react';
-import Loading from '../../dashboard/loading';
+import { CheckSquare, CalendarDays } from 'lucide-react'; // Import new icons
 
 // --- Reusable Stat Card Component ---
 interface StatCardProps {
@@ -31,9 +31,29 @@ const StatCard: React.FC<StatCardProps> = ({ Icon, title, children }) => (
     </div>
 );
 
+// --- Reusable Task Item for "My Tasks" ---
+const MyTaskItem: React.FC<{ task: ITask }> = ({ task }) => (
+    <li className="flex items-center justify-between p-3 bg-bg-canvas rounded-lg border border-border-subtle">
+        <div className="flex items-center space-x-3">
+            <div className="flex-shrink-0 bg-action-primary/10 p-2 rounded-lg">
+                <Award className="w-4 h-4 text-action-primary" />
+            </div>
+            <div>
+                <p className="text-sm font-medium text-text-primary">{task.taskName}</p>
+                <p className="text-xs text-text-secondary">{task.description || 'No description'}</p>
+            </div>
+        </div>
+        <div className="text-right">
+            <p className="text-sm font-semibold text-signal-success">+{task.pointsValue}</p>
+            <p className="text-xs text-text-secondary">Points</p>
+        </div>
+    </li>
+);
+
+
 // --- Main Dashboard Component ---
 const DashboardHome: React.FC = () => {
-    const { token, householdId } = useSession();
+    const { token, householdId, user } = useSession(); // Get current user
     const [members, setMembers] = useState<IHouseholdMemberProfile[]>([]);
     const [tasks, setTasks] = useState<ITask[]>([]);
     const [storeItems, setStoreItems] = useState<IStoreItem[]>([]);
@@ -126,14 +146,25 @@ const DashboardHome: React.FC = () => {
     }
 
     // --- Calculate Stats ---
-    const assignedTasksCount = tasks.filter(
-        (t) => t.assignedToProfileIds && t.assignedToProfileIds.length > 0
-    ).length;
-    const unassignedTasksCount = tasks.length - assignedTasksCount;
     const storeItemCount = storeItems.length;
+
+    // New Task Stat Calculations
+    const completeCount = tasks.filter(t => t.isCompleted).length;
+    const incompleteTasks = tasks.filter(t => !t.isCompleted);
+    const assignedIncompleteCount = incompleteTasks.filter(t => t.assignedToProfileIds && t.assignedToProfileIds.length > 0).length;
+    const unassignedIncompleteCount = incompleteTasks.filter(t => !t.assignedToProfileIds || t.assignedToProfileIds.length === 0).length;
+
+    // Filter for the current user's *incomplete* tasks
+    const myTasks = tasks.filter(
+        (task) =>
+            !task.isCompleted &&
+            task.assignedToProfileIds.some((profile) => profile._id === user?._id)
+    );
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+            {/* --- Row 1: Summary Cards --- */}
 
             {/* Family Members Card */}
             <StatCard Icon={Users} title="Family Members">
@@ -145,17 +176,25 @@ const DashboardHome: React.FC = () => {
                             return a.displayName.localeCompare(b.displayName);
                         })
                         .map((member) => (
-                            <li key={member._id} className="flex items-center space-x-3">
-                                <div
-                                    className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-white font-medium text-sm"
-                                    style={{ backgroundColor: member.profileColor || '#6B7280' }} // gray fallback
-                                >
-                                    {/* Show User icon for Parents, Initials for Children */}
-                                    {member.role === 'Parent' ? <User className="w-4 h-4" /> : member.displayName.charAt(0).toUpperCase()}
+                            <li key={member._id} className="flex items-center justify-between space-x-3">
+                                <div className="flex items-center space-x-3">
+                                    <div
+                                        className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-white font-medium text-sm"
+                                        style={{ backgroundColor: member.profileColor || '#6B7280' }} // gray fallback
+                                    >
+                                        {/* Show User icon for Parents, Initials for Children */}
+                                        {member.role === 'Parent' ? <User className="w-4 h-4" /> : member.displayName.charAt(0).toUpperCase()}
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-medium text-text-primary">{member.displayName}</p>
+                                        <p className="text-xs text-text-secondary">{member.role}</p>
+                                    </div>
                                 </div>
-                                <div>
-                                    <p className="text-sm font-medium text-text-primary">{member.displayName}</p>
-                                    <p className="text-xs text-text-secondary">{member.role}</p>
+
+                                {/* Show points for all members */}
+                                <div className="text-right">
+                                    <p className="text-base font-semibold text-action-primary">{member.pointsTotal}</p>
+                                    <p className="text-xs text-text-secondary">Points</p>
                                 </div>
                             </li>
                         ))}
@@ -164,19 +203,26 @@ const DashboardHome: React.FC = () => {
 
             {/* Task Status Card */}
             <StatCard Icon={Award} title="Task Status">
-                <div className="space-y-4">
+                <div className="space-y-3">
                     <div className="flex items-center space-x-3">
-                        <UserCheck className="w-6 h-6 text-signal-success" />
+                        <UserCheck className="w-6 h-6 text-action-primary" />
                         <div>
-                            <p className="text-3xl font-semibold text-text-primary">{assignedTasksCount}</p>
-                            <p className="text-sm text-text-secondary">Assigned Task(s)</p>
+                            <p className="text-3xl font-semibold text-text-primary">{assignedIncompleteCount}</p>
+                            <p className="text-sm text-text-secondary">Assigned (Incomplete)</p>
                         </div>
                     </div>
                     <div className="flex items-center space-x-3">
                         <UserX className="w-6 h-6 text-text-secondary" />
                         <div>
-                            <p className="text-3xl font-semibold text-text-primary">{unassignedTasksCount}</p>
-                            <p className="text-sm text-text-secondary">Unassigned Task(s)</p>
+                            <p className="text-3xl font-semibold text-text-primary">{unassignedIncompleteCount}</p>
+                            <p className="text-sm text-text-secondary">Unassigned</p>
+                        </div>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                        <CheckSquare className="w-6 h-6 text-signal-success" />
+                        <div>
+                            <p className="text-3xl font-semibold text-text-primary">{completeCount}</p>
+                            <p className="text-sm text-text-secondary">Complete</p>
                         </div>
                     </div>
                 </div>
@@ -193,6 +239,33 @@ const DashboardHome: React.FC = () => {
                 </div>
             </StatCard>
 
+            {/* --- Row 2: User-Specific Content --- */}
+
+            {/* My Tasks Card */}
+            <div className="lg:col-span-2">
+                <StatCard Icon={CheckSquare} title="My Tasks">
+                    {myTasks.length > 0 ? (
+                        <ul className="space-y-2">
+                            {myTasks.map((task) => (
+                                <MyTaskItem key={task._id} task={task} />
+                            ))}
+                        </ul>
+                    ) : (
+                        <p className="text-sm text-text-secondary text-center p-4">
+                            You have no assigned tasks.
+                        </p>
+                    )}
+                </StatCard>
+            </div>
+
+            {/* Calendar Placeholder Card */}
+            <div className="lg:col-span-1">
+                <StatCard Icon={CalendarDays} title="Calendar">
+                    <div className="flex items-center justify-center min-h-[150px] bg-bg-canvas rounded-lg">
+                        <p className="text-sm text-text-secondary">Calendar view coming soon.</p>
+                    </div>
+                </StatCard>
+            </div>
         </div>
     );
 };
