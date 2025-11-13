@@ -6,7 +6,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { LayoutDashboard, Users, Zap, LogOut, Settings, Award } from 'lucide-react';
+import { LayoutDashboard, Users, Zap, LogOut, Settings, Award, HeartHandshake } from 'lucide-react';
 import Link from 'next/link';
 // Import the new SessionContext and UserData interface
 import { SessionContext, UserData } from './SessionContext';
@@ -126,6 +126,7 @@ const DashboardLayout: React.FC<React.PropsWithChildren> = ({ children }) => {
                         {/* Navigation Menu */}
                         <nav className="flex flex-col space-y-1">
                             <NavLink href="/dashboard" Icon={LayoutDashboard} label="Dashboard" />
+                            <NavLink href="/family" Icon={HeartHandshake} label="Family View" />
                             {/* MVP Navigation Links (Phase 2.2 - 3.4) */}
                             <NavLink href="/tasks" Icon={Award} label="Tasks" />
                             <NavLink href="/members" Icon={Users} label="Family Members" />
