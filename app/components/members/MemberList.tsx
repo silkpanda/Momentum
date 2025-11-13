@@ -5,11 +5,13 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Loader, AlertTriangle, UserPlus, Trash, Edit, User } from 'lucide-react';
+import { Loader, AlertTriangle, UserPlus, Trash, Edit, User, Award } from 'lucide-react';
 import { useSession } from '../layout/SessionContext';
 import AddMemberModal from './AddMemberModal';
 import EditMemberModal from './EditMemberModal';
 import DeleteMemberModal from './DeleteMemberModal';
+import { ITask } from '../tasks/TaskList'; // <-- NEW IMPORT
+import MemberProfileModal from './MemberProfileModal'; // <-- NEW IMPORT
 
 // --- Interfaces ---
 //
@@ -38,9 +40,11 @@ const MemberItem: React.FC<{
     isSelf: boolean;
     onEdit: () => void;
     onDelete: () => void;
-}> = ({ member, isSelf, onEdit, onDelete }) => (
+    onOpenProfile: () => void; // <-- NEW PROP
+    assignedTaskCount: number;
+}> = ({ member, isSelf, onEdit, onDelete, onOpenProfile, assignedTaskCount }) => (
     <li className="flex items-center justify-between p-4 bg-bg-surface rounded-lg shadow border border-border-subtle">
-        <div className="flex items-center space-x-4">
+        <button onClick={onOpenProfile} className="flex items-center space-x-4 text-left hover:opacity-80 transition-opacity">
             {/* Conditional Avatar: Color for child, icon for parent */}
             {member.profileColor ? (
                 <div
@@ -64,12 +68,18 @@ const MemberItem: React.FC<{
                     {member.role === 'Parent' ? member.familyMemberId.email : 'Child Profile'}
                 </p>
             </div>
-        </div>
+        </button>
         <div className="flex items-center space-x-4">
             {/* Points: Show for all members */}
-            <div className="text-center">
+            <div className="text-center w-16">
                 <p className="text-lg font-semibold text-action-primary">{member.pointsTotal}</p>
                 <p className="text-xs text-text-secondary">Points</p>
+            </div>
+
+            {/* Assigned Task Count */}
+            <div className="text-center w-16 flex items-center justify-center space-x-1.5">
+                <Award className="w-4 h-4 text-text-secondary" />
+                <p className="text-lg font-semibold text-text-primary">{assignedTaskCount}</p>
             </div>
 
             {/* Actions */}
@@ -93,9 +103,11 @@ const MemberItem: React.FC<{
 const MemberList: React.FC = () => {
     // State now holds the single, unified array from the API
     const [memberProfiles, setMemberProfiles] = useState<IHouseholdMemberProfile[]>([]);
+    const [tasks, setTasks] = useState<ITask[]>([]); // <-- NEW STATE
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+    const [isProfileModalOpen, setIsProfileModalOpen] = useState(false); // <-- NEW STATE
 
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -104,8 +116,8 @@ const MemberList: React.FC = () => {
     // Use the session context to get the householdId and token
     const { user, householdId, token } = useSession(); // Get logged-in user
 
-    // Wrap fetch in useCallback so it can be reused
-    const fetchHouseholdData = useCallback(async () => {
+    // Updated to fetch all required data
+    const fetchData = useCallback(async () => {
         if (!householdId || !token) {
             setError('Session invalid. Please log in again.');
             setLoading(false);
@@ -114,34 +126,48 @@ const MemberList: React.FC = () => {
 
         setLoading(true);
         try {
-            // The API endpoint is now correctly implemented to return the primary household
-            const response = await fetch(`/api/v1/households`, {
-                headers: { 'Authorization': `Bearer ${token}` },
-            });
+            // Fetch members and tasks in parallel
+            const [householdResponse, taskResponse] = await Promise.all([
+                fetch(`/api/v1/households`, {
+                    headers: { 'Authorization': `Bearer ${token}` },
+                }),
+                fetch('/api/v1/tasks', {
+                    headers: { 'Authorization': `Bearer ${token}` },
+                })
+            ]);
 
-            if (!response.ok) {
-                // If it's a 404 from the API, the error handler below will catch it.
-                throw new Error('Failed to fetch household data.');
-            }
-            const data = await response.json();
-            if (data.status === 'success') {
+            if (!householdResponse.ok) throw new Error('Failed to fetch household data.');
+            if (!taskResponse.ok) throw new Error('Failed to fetch tasks.');
+
+            const householdData = await householdResponse.json();
+            const taskData = await taskResponse.json();
+
+            if (householdData.status === 'success') {
                 // CRITICAL FIX: The API response structure is { data: { household: { memberProfiles: [...] } } }
-                setMemberProfiles(data.data.household.memberProfiles || []);
-                setError(null);
+                setMemberProfiles(householdData.data.household.memberProfiles || []);
             } else {
-                throw new Error(data.message || 'Could not retrieve member list data.');
+                throw new Error(householdData.message || 'Could not retrieve member list data.');
             }
+
+            if (taskData.status === 'success') {
+                setTasks(taskData.data.tasks || []);
+            } else {
+                throw new Error(taskData.message || 'Could not retrieve tasks.');
+            }
+
+            setError(null);
+
         } catch (e: any) {
             // FIX: Use a better error message for the user if the underlying cause is API failure
-            setError(`Failed to load family members: ${e.message}`);
+            setError(`Failed to load family members or tasks: ${e.message}`);
         } finally {
             setLoading(false);
         }
     }, [householdId, token]);
 
     useEffect(() => {
-        fetchHouseholdData(); // Call fetch on initial load
-    }, [fetchHouseholdData]);
+        fetchData(); // Call fetch on initial load
+    }, [fetchData]);
 
     const handleMemberAdded = (newProfile: IHouseholdMemberProfile) => {
         // Add to state directly to avoid re-fetch
@@ -149,11 +175,11 @@ const MemberList: React.FC = () => {
     };
 
     const handleMemberUpdated = () => {
-        fetchHouseholdData(); // Re-fetch to get updated, populated data
+        fetchData(); // Re-fetch to get updated, populated data
     };
 
     const handleMemberDeleted = () => {
-        fetchHouseholdData(); // Re-fetch to get updated list
+        fetchData(); // Re-fetch to get updated list
     };
 
     // Click Handlers for opening modals
@@ -165,6 +191,23 @@ const MemberList: React.FC = () => {
     const openDeleteModal = (member: IHouseholdMemberProfile) => {
         setSelectedMember(member);
         setIsDeleteModalOpen(true);
+    };
+
+    // Click Handler for new Profile Modal
+    const openProfileModal = (member: IHouseholdMemberProfile) => {
+        setSelectedMember(member);
+        setIsProfileModalOpen(true);
+    };
+
+    /**
+     * Helper to count assigned, incomplete tasks for a member.
+     * We use the familyMemberId for matching, as this is the ID used in task assignments.
+     */
+    const getAssignedTaskCount = (memberFamilyId: string) => {
+        return tasks.filter(task =>
+            !task.isCompleted &&
+            task.assignedToProfileIds.some(profile => profile._id === memberFamilyId)
+        ).length;
     };
 
     if (loading && memberProfiles.length === 0) {
@@ -222,6 +265,8 @@ const MemberList: React.FC = () => {
                                 isSelf={member.familyMemberId._id === user?._id} // Check if self
                                 onEdit={() => openEditModal(member)}
                                 onDelete={() => openDeleteModal(member)}
+                                onOpenProfile={() => openProfileModal(member)} // Pass handler
+                                assignedTaskCount={getAssignedTaskCount(member.familyMemberId._id)} // Pass count
                             />
                         ))}
                 </ul>
@@ -241,6 +286,15 @@ const MemberList: React.FC = () => {
                     onMemberAdded={handleMemberAdded}
                     // Pass the list of already used colors
                     usedColors={memberProfiles.map(p => p.profileColor).filter(Boolean) as string[]}
+                />
+            )}
+
+            {/* Conditionally render Profile Modal */}
+            {isProfileModalOpen && selectedMember && (
+                <MemberProfileModal
+                    member={selectedMember}
+                    allTasks={tasks}
+                    onClose={() => setIsProfileModalOpen(false)}
                 />
             )}
 
