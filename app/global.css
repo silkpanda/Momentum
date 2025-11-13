@@ -11,17 +11,18 @@ body {
   font-family: 'Inter', sans-serif;
 }
 
-/* --- 4. Define Custom Theme (from Step 3 Guide & page.tsx) --- */
+/* --- 4. Define Custom Theme (based on Style Guide, Section 3.2: "Calm Light") --- */
 @theme {
-  /* These are sensible placeholders based on the names.
-    We can replace them with the real Style Guide hex codes.
-  */
-  --color-text-primary: oklch(0.1 0 0);       /* Dark Gray/Black */
-  --color-text-secondary: oklch(0.4 0 0);    /* Medium Gray */
-  --color-action-primary: oklch(0.6 0.2 260); /* A nice Blue */
-  --color-action-hover: oklch(0.5 0.2 260);   /* A darker Blue */
-  --color-signal-success: oklch(0.7 0.2 145); /* Green */
+  /* Text and Action Colors (Red-600 is the fix) */
+  --color-text-primary: #111827;       /* text-gray-900 [cite: 365] */
+  --color-text-secondary: #4B5563;    /* text-gray-600 [cite: 366] */
+  --color-action-primary: #4F46E5;    /* bg-indigo-600 [cite: 368] */
+  --color-action-hover: #4338CA;      /* bg-indigo-700 [cite: 369] (Approximation for hover state) */
+  --color-signal-success: #16A34A;    /* text-green-600 [cite: 370] */
+  --color-signal-alert: #DC2626;      /* text-red-600 [cite: 371] (The missing color: Red-600) */
   
-  --color-bg-surface: oklch(1 0 0);           /* White */
-  --color-border-subtle: oklch(0.9 0 0);      /* Light Gray */
+  /* Background and Border Colors */
+  --color-bg-canvas: #F9FAFB;         /* bg-gray-50 [cite: 363] */
+  --color-bg-surface: #FFFFFF;        /* bg-white [cite: 364] */
+  --color-border-subtle: #E5E7EB;     /* border-gray-200 [cite: 367] */
 }
