@@ -116,27 +116,26 @@ const MemberList: React.FC = () => {
 
         setLoading(true);
         try {
-            // CRITICAL FIX: The API endpoint no longer takes an :id.
-            // It uses the token to find the user's household.
-            //
+            // The API endpoint is now correctly implemented to return the primary household
             const response = await fetch(`/api/v1/households`, {
                 headers: { 'Authorization': `Bearer ${token}` },
             });
 
             if (!response.ok) {
-                throw new Error('Failed to fetch household data.'); // This will be caught
+                // If it's a 404 from the API, the error handler below will catch it.
+                throw new Error('Failed to fetch household data.');
             }
             const data = await response.json();
             if (data.status === 'success') {
-                // The controller now populates 'memberProfiles.familyMemberId'
-                //
-                setMemberProfiles(data.data.household.memberProfiles || []);
+                // CRITICAL FIX: The API response structure is { data: { household: { memberProfiles: [...] } } }
+                setMemberProfiles(data.data.household.memberProfiles || []); 
                 setError(null);
             } else {
-                throw new Error(data.message || 'Could not retrieve data.'); // This is the error you are seeing
+                throw new Error(data.message || 'Could not retrieve member list data.'); 
             }
         } catch (e: any) {
-            setError(e.message); // The 404 error was caught here
+            // FIX: Use a better error message for the user if the underlying cause is API failure
+            setError(`Failed to load family members: ${e.message}`); 
         } finally {
             setLoading(false);
         }

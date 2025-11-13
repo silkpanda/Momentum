@@ -127,15 +127,14 @@ const TaskList: React.FC = () => {
                 fetch('/api/v1/tasks', {
                     headers: { 'Authorization': `Bearer ${token}` },
                 }),
-                // 2. FIX: Fetch Household using the new route
-                //
+                // 2. Fetch Household using the new route (which returns the single household context)
                 fetch(`/api/v1/households`, {
                     headers: { 'Authorization': `Bearer ${token}` },
                 })
             ]);
 
             if (!taskResponse.ok) throw new Error('Failed to fetch tasks.');
-            if (!householdResponse.ok) throw new Error('Failed to fetch household members.'); // This was failing (404)
+            if (!householdResponse.ok) throw new Error('Failed to fetch household members.'); 
 
             const taskData = await taskResponse.json();
             const householdData = await householdResponse.json();
@@ -147,16 +146,17 @@ const TaskList: React.FC = () => {
             }
 
             if (householdData.status === 'success') {
-                // Use the new unified memberProfiles array
-                setHouseholdMembers(householdData.data.household.memberProfiles);
+                // CRITICAL FIX: Extract memberProfiles from the expected API response structure
+                setHouseholdMembers(householdData.data.household.memberProfiles || []); 
             } else {
-                throw new Error(householdData.message || 'Could not retrieve members.');
+                throw new Error(householdData.message || 'Could not retrieve members for assignment.');
             }
 
             setError(null); // Clear error on success
 
         } catch (e: any) {
-            setError(e.message); // This is where "Could not retrieve data" is being set
+            // FIX: Use a combined, more descriptive error message
+            setError(`Failed to load tasks or members for assignment: ${e.message}`); 
         } finally {
             setLoading(false);
         }
