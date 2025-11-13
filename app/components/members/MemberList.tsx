@@ -5,7 +5,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Loader, AlertTriangle, UserPlus, Trash, Edit, User, Award } from 'lucide-react';
+import { Loader, AlertTriangle, UserPlus, Trash, Edit, User, Award, ChevronDown } from 'lucide-react';
 import { useSession } from '../layout/SessionContext';
 import AddMemberModal from './AddMemberModal';
 import EditMemberModal from './EditMemberModal';
@@ -98,6 +98,48 @@ const MemberItem: React.FC<{
         </div>
     </li>
 );
+
+// --- NEW: Collapsible Section Component ---
+interface CollapsibleMemberSectionProps {
+    Icon: React.ElementType;
+    title: string;
+    members: IHouseholdMemberProfile[];
+    children: React.ReactNode;
+    defaultOpen?: boolean;
+}
+
+const CollapsibleMemberSection: React.FC<CollapsibleMemberSectionProps> = ({
+    Icon, title, members, children, defaultOpen = false
+}) => {
+    const [isOpen, setIsOpen] = useState(defaultOpen);
+
+    return (
+        <div className="bg-bg-surface rounded-lg shadow-md border border-border-subtle">
+            <button
+                onClick={() => setIsOpen(!isOpen)}
+                className="w-full flex items-center justify-between p-4"
+            >
+                <div className="flex items-center space-x-3">
+                    <Icon className="w-5 h-5 text-action-primary" />
+                    <h3 className="text-lg font-medium text-text-primary">{title}</h3>
+                    <span className="text-sm text-text-secondary">({members.length})</span>
+                </div>
+                <ChevronDown
+                    className={`w-5 h-5 text-text-secondary transition-transform ${isOpen ? 'rotate-180' : ''}`}
+                />
+            </button>
+            {isOpen && (
+                <div className="p-4 border-t border-border-subtle">
+                    {members.length > 0 ? (
+                        <ul className="space-y-4">{children}</ul>
+                    ) : (
+                        <p className="text-sm text-text-secondary text-center">No members in this section.</p>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+};
 
 // --- Main Member List Component ---
 const MemberList: React.FC = () => {
@@ -248,35 +290,52 @@ const MemberList: React.FC = () => {
                 </button>
             </div>
 
-            {/* Render Unified Member List */}
-            {memberProfiles.length > 0 ? (
-                <ul className="space-y-4">
-                    {/* Sort to show Parents first, then Children */}
-                    {[...memberProfiles]
-                        .sort((a, b) => {
-                            if (a.role === 'Parent' && b.role !== 'Parent') return -1;
-                            if (a.role !== 'Parent' && b.role === 'Parent') return 1;
-                            return 0;
-                        })
-                        .map((member) => (
-                            <MemberItem
-                                key={member._id} // Use sub-document ID
-                                member={member}
-                                isSelf={member.familyMemberId._id === user?._id} // Check if self
-                                onEdit={() => openEditModal(member)}
-                                onDelete={() => openDeleteModal(member)}
-                                onOpenProfile={() => openProfileModal(member)} // Pass handler
-                                assignedTaskCount={getAssignedTaskCount(member.familyMemberId._id)} // Pass count
-                            />
-                        ))}
-                </ul>
-            ) : (
-                <div className="text-center p-8 bg-bg-surface rounded-lg shadow-md border border-border-subtle">
-                    <User className="w-12 h-12 mx-auto text-text-secondary/50" />
-                    <p className="mt-4 text-text-secondary">No child profiles found.</p>
-                    <p className="text-sm text-text-secondary/80">Click "Add New Member" to get started.</p>
-                </div>
-            )}
+            {/* --- NEW: Filter members into sections --- */}
+            {(() => {
+                const parentProfiles = memberProfiles.filter(m => m.role === 'Parent');
+                const childProfiles = memberProfiles.filter(m => m.role === 'Child');
+
+                return (
+                    memberProfiles.length > 0 ? (
+                        <div className="space-y-4">
+                            <CollapsibleMemberSection
+                                Icon={User}
+                                title="Parents"
+                                members={parentProfiles}
+                                defaultOpen={true}
+                            >
+                                {parentProfiles.map((member) => (
+                                    <MemberItem key={member._id} member={member} isSelf={member.familyMemberId._id === user?._id} onEdit={() => openEditModal(member)} onDelete={() => openDeleteModal(member)} onOpenProfile={() => openProfileModal(member)} assignedTaskCount={getAssignedTaskCount(member.familyMemberId._id)} />
+                                ))}
+                            </CollapsibleMemberSection>
+
+                            <CollapsibleMemberSection
+                                Icon={User}
+                                title="Children"
+                                members={childProfiles}
+                            >
+                                {childProfiles.map((member) => (
+                                    <MemberItem
+                                        key={member._id} // Use sub-document ID
+                                        member={member}
+                                        isSelf={member.familyMemberId._id === user?._id} // Check if self
+                                        onEdit={() => openEditModal(member)}
+                                        onDelete={() => openDeleteModal(member)}
+                                        onOpenProfile={() => openProfileModal(member)} // Pass handler
+                                        assignedTaskCount={getAssignedTaskCount(member.familyMemberId._id)} // Pass count
+                                    />
+                                ))}
+                            </CollapsibleMemberSection>
+                        </div>
+                    ) : (
+                        <div className="text-center p-8 bg-bg-surface rounded-lg shadow-md border border-border-subtle">
+                            <User className="w-12 h-12 mx-auto text-text-secondary/50" />
+                            <p className="mt-4 text-text-secondary">No child profiles found.</p>
+                            <p className="text-sm text-text-secondary/80">Click "Add New Member" to get started.</p>
+                        </div>
+                    )
+                );
+            })()}
 
             {/* Conditionally render the modal */}
             {isAddModalOpen && (

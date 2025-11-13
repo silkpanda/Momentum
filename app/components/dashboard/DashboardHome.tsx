@@ -32,8 +32,12 @@ const StatCard: React.FC<StatCardProps> = ({ Icon, title, children }) => (
 );
 
 // --- Reusable Task Item for "My Tasks" ---
-const MyTaskItem: React.FC<{ task: ITask }> = ({ task }) => (
-    <li className="flex items-center justify-between p-3 bg-bg-canvas rounded-lg border border-border-subtle">
+const MyTaskItem: React.FC<{
+    task: ITask;
+    onMarkComplete: () => void;
+    isCompleting: boolean;
+}> = ({ task, onMarkComplete, isCompleting }) => (
+    <li className="flex items-center justify-between p-3 bg-bg-canvas rounded-lg border border-border-subtle min-h-[68px]">
         <div className="flex items-center space-x-3">
             <div className="flex-shrink-0 bg-action-primary/10 p-2 rounded-lg">
                 <Award className="w-4 h-4 text-action-primary" />
@@ -43,9 +47,26 @@ const MyTaskItem: React.FC<{ task: ITask }> = ({ task }) => (
                 <p className="text-xs text-text-secondary">{task.description || 'No description'}</p>
             </div>
         </div>
-        <div className="text-right">
-            <p className="text-sm font-semibold text-signal-success">+{task.pointsValue}</p>
-            <p className="text-xs text-text-secondary">Points</p>
+        <div className="flex items-center space-x-3">
+            <div className="text-right">
+                <p className="text-sm font-semibold text-signal-success">+{task.pointsValue}</p>
+                <p className="text-xs text-text-secondary">Points</p>
+            </div>
+
+            {/* Completion Button/Status */}
+            <div className="w-10 text-right">
+                {isCompleting ? (
+                    <Loader className="w-5 h-5 text-action-primary animate-spin" />
+                ) : (
+                    <button
+                        onClick={onMarkComplete}
+                        title={`Mark '${task.taskName}' complete`}
+                        className="p-2 text-text-secondary hover:text-signal-success transition-colors"
+                    >
+                        <CheckSquare className="w-5 h-5" />
+                    </button>
+                )}
+            </div>
         </div>
     </li>
 );
@@ -58,6 +79,7 @@ const DashboardHome: React.FC = () => {
     const [tasks, setTasks] = useState<ITask[]>([]);
     const [storeItems, setStoreItems] = useState<IStoreItem[]>([]);
     const [loading, setLoading] = useState(true);
+    const [completingTaskId, setCompletingTaskId] = useState<string | null>(null); // New state
     const [error, setError] = useState<string | null>(null);
 
     const fetchData = useCallback(async () => {
@@ -173,6 +195,38 @@ const DashboardHome: React.FC = () => {
         ).length;
     };
 
+    // Handler for completing a task
+    const handleMarkComplete = async (task: ITask) => {
+        if (completingTaskId || !user) return; // Prevent multiple clicks or action if user is null
+
+        setCompletingTaskId(task._id);
+        setError(null);
+
+        try {
+            const response = await fetch(`/api/v1/tasks/${task._id}/complete`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`,
+                },
+                // Pass the current logged-in user's ID as the member to award points
+                body: JSON.stringify({ memberId: user._id }),
+            });
+
+            if (!response.ok) {
+                const data = await response.json();
+                throw new Error(data.message || 'Failed to complete task.');
+            }
+
+            fetchData(); // Refresh all dashboard data
+        } catch (e: any) {
+            setError(e.message);
+            // Don't clear loading state on error, so user doesn't retry
+        } finally {
+            setCompletingTaskId(null); // Clear loading state on success or error
+        }
+    };
+
     // Filter for the current user's *incomplete* tasks
     const myTasks = tasks.filter(
         (task) =>
@@ -286,7 +340,11 @@ const DashboardHome: React.FC = () => {
                     {myTasks.length > 0 ? (
                         <ul className="space-y-2">
                             {myTasks.map((task) => (
-                                <MyTaskItem key={task._id} task={task} />
+                                <MyTaskItem
+                                    key={task._id}
+                                    task={task}
+                                    onMarkComplete={() => handleMarkComplete(task)}
+                                    isCompleting={completingTaskId === task._id} />
                             ))}
                         </ul>
                     ) : (

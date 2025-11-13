@@ -5,7 +5,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Award, Plus, Loader, AlertTriangle, Trash, Edit, CheckSquare } from 'lucide-react';
+import { Award, Plus, Loader, AlertTriangle, Trash, Edit, CheckSquare, ChevronDown, UserCheck, UserX } from 'lucide-react';
 import CreateTaskModal from './CreateTaskModal';
 import { useSession } from '../layout/SessionContext';
 import EditTaskModal from './EditTaskModal';
@@ -119,6 +119,48 @@ const TaskItem: React.FC<{
                 </button>
             </div>
         </li>
+    );
+};
+
+// --- NEW: Collapsible Section Component ---
+interface CollapsibleTaskSectionProps {
+    Icon: React.ElementType;
+    title: string;
+    tasks: ITask[];
+    children: React.ReactNode;
+    defaultOpen?: boolean;
+}
+
+const CollapsibleTaskSection: React.FC<CollapsibleTaskSectionProps> = ({
+    Icon, title, tasks, children, defaultOpen = false
+}) => {
+    const [isOpen, setIsOpen] = useState(defaultOpen);
+
+    return (
+        <div className="bg-bg-surface rounded-lg shadow-md border border-border-subtle">
+            <button
+                onClick={() => setIsOpen(!isOpen)}
+                className="w-full flex items-center justify-between p-4"
+            >
+                <div className="flex items-center space-x-3">
+                    <Icon className="w-5 h-5 text-action-primary" />
+                    <h3 className="text-lg font-medium text-text-primary">{title}</h3>
+                    <span className="text-sm text-text-secondary">({tasks.length})</span>
+                </div>
+                <ChevronDown
+                    className={`w-5 h-5 text-text-secondary transition-transform ${isOpen ? 'rotate-180' : ''}`}
+                />
+            </button>
+            {isOpen && (
+                <div className="p-4 border-t border-border-subtle">
+                    {tasks.length > 0 ? (
+                        <ul className="space-y-4">{children}</ul>
+                    ) : (
+                        <p className="text-sm text-text-secondary text-center">No tasks in this section.</p>
+                    )}
+                </div>
+            )}
+        </div>
     );
 };
 
@@ -301,25 +343,58 @@ const TaskList: React.FC = () => {
                 </button>
             </div>
 
-            {/* Content: Task List */}
-            <ul className="space-y-4">
-                {tasks.length > 0 ? (
-                    tasks.map((task) => (
-                        <TaskItem
-                            key={task._id}
-                            task={task}
-                            onEdit={() => openEditModal(task)}
-                            onDelete={() => openDeleteModal(task)}
-                            onMarkComplete={() => handleMarkComplete(task)}
-                            isCompleting={completingTaskId === task._id}
-                        />
-                    ))
-                ) : (
-                    <div className="text-center p-8 bg-bg-surface rounded-lg shadow-md border border-border-subtle">
-                        <p className="text-text-secondary">No tasks found. Click "Add New Task" to get started.</p>
-                    </div>
-                )}
-            </ul>
+            {/* --- NEW: Filter tasks into sections --- */}
+            {(() => {
+                const completedTasks = tasks.filter(t => t.isCompleted);
+                const incompleteTasks = tasks.filter(t => !t.isCompleted);
+                const assignedIncompleteTasks = incompleteTasks.filter(
+                    t => !t.isCompleted && t.assignedToProfileIds && t.assignedToProfileIds.length > 0
+                );
+                const unassignedIncompleteTasks = incompleteTasks.filter(
+                    t => !t.isCompleted && (!t.assignedToProfileIds || t.assignedToProfileIds.length === 0)
+                );
+
+                return (
+                    tasks.length > 0 ? (
+                        <div className="space-y-4">
+                            <CollapsibleTaskSection
+                                Icon={UserCheck}
+                                title="Assigned (Incomplete)"
+                                tasks={assignedIncompleteTasks}
+                                defaultOpen={true}
+                            >
+                                {assignedIncompleteTasks.map((task) => (
+                                    <TaskItem key={task._id} task={task} onEdit={() => openEditModal(task)} onDelete={() => openDeleteModal(task)} onMarkComplete={() => handleMarkComplete(task)} isCompleting={completingTaskId === task._id} />
+                                ))}
+                            </CollapsibleTaskSection>
+
+                            <CollapsibleTaskSection
+                                Icon={UserX}
+                                title="Unassigned"
+                                tasks={unassignedIncompleteTasks}
+                            >
+                                {unassignedIncompleteTasks.map((task) => (
+                                    <TaskItem key={task._id} task={task} onEdit={() => openEditModal(task)} onDelete={() => openDeleteModal(task)} onMarkComplete={() => handleMarkComplete(task)} isCompleting={completingTaskId === task._id} />
+                                ))}
+                            </CollapsibleTaskSection>
+
+                            <CollapsibleTaskSection
+                                Icon={CheckSquare}
+                                title="Complete"
+                                tasks={completedTasks}
+                            >
+                                {completedTasks.map((task) => (
+                                    <TaskItem key={task._id} task={task} onEdit={() => openEditModal(task)} onDelete={() => openDeleteModal(task)} onMarkComplete={() => handleMarkComplete(task)} isCompleting={completingTaskId === task._id} />
+                                ))}
+                            </CollapsibleTaskSection>
+                        </div>
+                    ) : (
+                        <div className="text-center p-8 bg-bg-surface rounded-lg shadow-md border border-border-subtle">
+                            <p className="text-text-secondary">No tasks found. Click "Add New Task" to get started.</p>
+                        </div>
+                    )
+                );
+            })()}
 
             {/* Conditionally render the modal */}
             {isCreateModalOpen && (
