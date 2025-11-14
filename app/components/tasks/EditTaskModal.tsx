@@ -31,7 +31,7 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
     const [assignedToRefs, setAssignedToRefs] = useState<string[]>(
         // The assignedToProfileIds contains populated FamilyMember objects. 
         // We map their _id, which is the FamilyMember ID, into the state array.
-        () => (task.assignedToProfileIds ?? []).map(member => member._id)
+        () => (task.assignedToRefs ?? []).map(member => member._id)
     );
 
     const [isLoading, setIsLoading] = useState(false);
