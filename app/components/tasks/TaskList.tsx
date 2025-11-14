@@ -2,6 +2,10 @@
 // silkpanda/momentum/momentum-fac69d659346d6b7b01871d803baa24f6dfaccee/app/components/tasks/TaskList.tsx
 // REFACTORED for Unified Task Assignment Model (API v3)
 // REFACTORED (v4) to call Embedded Web BFF
+//
+// TELA CODICIS FIX: Synchronized ITask interface with API model.
+// The API provides 'assignedToRefs' populated with 'firstName'.
+// The interface and TaskItem component now reflect this correct contract.
 // =========================================================
 'use client';
 
@@ -21,11 +25,12 @@ export interface ITask {
     description: string;
     pointsValue: number;
     isCompleted: boolean;
-    // This is the NEW field, populated by the API
     //
-    assignedToProfileIds: {
-        _id: string; // This is the memberProfile sub-document ID
-        displayName: string;
+    // TELA CODICIS FIX: Renamed 'assignedToProfileIds' to 'assignedToRefs' to match API model.
+    //
+    assignedToRefs: { // FIX: Renamed from assignedToProfileIds
+        _id: string; // This is the FamilyMember ID
+        firstName: string; // FIX: API populates firstName, not displayName
         profileColor?: string;
     }[];
     householdRefId: string;
@@ -55,17 +60,17 @@ const TaskItem: React.FC<{
                     <p className="text-sm text-text-secondary">{task.description || 'No description'}</p>
 
                     {/* Display assigned member avatars */}
-                    {task.assignedToProfileIds && task.assignedToProfileIds.length > 0 && (
+                    {task.assignedToRefs && task.assignedToRefs.length > 0 && ( // FIX: Use assignedToRefs
                         <div className="flex items-center space-x-1 mt-2">
                             <span className="text-xs text-text-secondary mr-1">Assigned:</span>
-                            {task.assignedToProfileIds.map(member => (
+                            {task.assignedToRefs.map(member => ( // FIX: Use assignedToRefs
                                 <div
-                                    key={member._id} // Use the sub-document _id
-                                    title={member.displayName}
+                                    key={member._id} // Use the FamilyMember ID
+                                    title={member.firstName} // FIX: Use firstName
                                     className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white"
                                     style={{ backgroundColor: member.profileColor || '#808080' }} // Add fallback
                                 >
-                                    {getInitials(member.displayName)}
+                                    {getInitials(member.firstName)}
                                 </div>
                             ))}
                         </div>
@@ -100,9 +105,9 @@ const TaskItem: React.FC<{
                 {!task.isCompleted && !isCompleting && (
                     <button
                         onClick={onMarkComplete}
-                        disabled={task.assignedToProfileIds.length === 0}
+                        disabled={task.assignedToRefs.length === 0} // FIX: Use assignedToRefs
                         title={
-                            task.assignedToProfileIds.length > 0
+                            task.assignedToRefs.length > 0 // FIX: Use assignedToRefs
                                 ? `Mark '${task.taskName}' complete`
                                 : 'Task must be assigned to award points'
                         }
@@ -184,7 +189,7 @@ const TaskList: React.FC = () => {
     // This function now fetches BOTH tasks and household members
     const fetchData = useCallback(async () => {
         if (!token || !householdId) {
-            setError('Authentication error. Please log in again.');
+            setError('Session invalid. Please log in again.');
             setLoading(false);
             return;
         }
@@ -245,13 +250,13 @@ const TaskList: React.FC = () => {
             setError("Task is already complete.");
             return;
         }
-        if (task.assignedToProfileIds.length === 0) {
+        if (task.assignedToRefs.length === 0) { // FIX: Use assignedToRefs
             setError("Task must be assigned to a member to award points.");
             return;
         }
 
         // Get the first assigned member's ID
-        const memberIdToAward = task.assignedToProfileIds[0]._id;
+        const memberIdToAward = task.assignedToRefs[0]._id; // FIX: Use assignedToRefs
 
         setCompletingTaskId(task._id);
         setError(null);
@@ -337,10 +342,10 @@ const TaskList: React.FC = () => {
                 const completedTasks = tasks.filter(t => t.isCompleted);
                 const incompleteTasks = tasks.filter(t => !t.isCompleted);
                 const assignedIncompleteTasks = incompleteTasks.filter(
-                    t => !t.isCompleted && t.assignedToProfileIds && t.assignedToProfileIds.length > 0
+                    t => !t.isCompleted && t.assignedToRefs && t.assignedToRefs.length > 0 // FIX: Use assignedToRefs
                 );
                 const unassignedIncompleteTasks = incompleteTasks.filter(
-                    t => !t.isCompleted && (!t.assignedToProfileIds || t.assignedToProfileIds.length === 0)
+                    t => !t.isCompleted && (!t.assignedToRefs || t.assignedToRefs.length === 0) // FIX: Use assignedToRefs
                 );
 
                 return (

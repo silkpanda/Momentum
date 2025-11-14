@@ -2,6 +2,9 @@
 // silkpanda/momentum/app/components/dashboard/DashboardHome.tsx
 // Main component for the main dashboard content (Phase 3.5)
 // REFACTORED (v4) to call Embedded Web BFF
+//
+// TELA CODICIS FIX: Updated component to use 'assignedToRefs'
+// to match the synchronized ITask interface.
 // =========================================================
 'use client';
 
@@ -154,8 +157,8 @@ const DashboardHome: React.FC = () => {
     // New Task Stat Calculations
     const completeCount = tasks.filter(t => t.isCompleted).length;
     const incompleteTasks = tasks.filter(t => !t.isCompleted);
-    const assignedIncompleteCount = incompleteTasks.filter(t => t.assignedToProfileIds && t.assignedToProfileIds.length > 0).length;
-    const unassignedIncompleteCount = incompleteTasks.filter(t => !t.assignedToProfileIds || t.assignedToProfileIds.length === 0).length;
+    const assignedIncompleteCount = incompleteTasks.filter(t => t.assignedToRefs && t.assignedToRefs.length > 0).length; // FIX: Use assignedToRefs
+    const unassignedIncompleteCount = incompleteTasks.filter(t => !t.assignedToRefs || t.assignedToRefs.length === 0).length; // FIX: Use assignedToRefs
 
     // Find current user's profile to get their points
     const currentUserProfile = members.find(m => m.familyMemberId._id === user?._id);
@@ -173,7 +176,7 @@ const DashboardHome: React.FC = () => {
     const getAssignedTaskCount = (memberFamilyId: string) => {
         return tasks.filter(task =>
             !task.isCompleted &&
-            task.assignedToProfileIds.some(profile => profile._id === memberFamilyId)
+            task.assignedToRefs.some(profile => profile._id === memberFamilyId) // FIX: Use assignedToRefs
         ).length;
     };
 
@@ -214,7 +217,7 @@ const DashboardHome: React.FC = () => {
     const myTasks = tasks.filter(
         (task) =>
             !task.isCompleted &&
-            task.assignedToProfileIds.some((profile) => profile._id === user?._id)
+            task.assignedToRefs.some((profile) => profile._id === user?._id) // FIX: Use assignedToRefs
     );
 
     return (

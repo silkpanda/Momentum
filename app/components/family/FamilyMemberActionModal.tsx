@@ -2,6 +2,9 @@
 // silkpanda/momentum/app/components/family/FamilyMemberActionModal.tsx
 // New unified modal for the "Family View" page.
 // REFACTORED (v4) to call Embedded Web BFF
+//
+// TELA CODICIS FIX: Updated component to use 'assignedToRefs'
+// to match the synchronized ITask interface.
 // =========================================================
 'use client';
 
@@ -151,7 +154,7 @@ const FamilyMemberActionModal: React.FC<FamilyMemberActionModalProps> = ({
 
     const incompleteTasks = tasks.filter(task =>
         !task.isCompleted &&
-        task.assignedToProfileIds.some(profile => profile._id === member.familyMemberId._id)
+        task.assignedToRefs.some(profile => profile._id === member.familyMemberId._id) // FIX: Use assignedToRefs
     );
 
     // --- Store Logic ---

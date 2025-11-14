@@ -3,6 +3,9 @@
 // Main component for the "Family View" page.
 // REFACTORED to use a single "one-click" action modal.
 // REFACTORED (v4) to call Embedded Web BFF
+//
+// TELA CODICIS FIX: Updated component to use 'assignedToRefs'
+// to match the synchronized ITask interface.
 // =========================================================
 'use client';
 
@@ -26,7 +29,7 @@ const MemberCard: React.FC<MemberCardProps> = ({ member, tasks, onSelect }) => {
     // Get count of incomplete tasks assigned to this member
     const assignedTaskCount = tasks.filter(task =>
         !task.isCompleted &&
-        task.assignedToProfileIds.some(profile => profile._id === member.familyMemberId._id)
+        task.assignedToRefs.some(profile => profile._id === member.familyMemberId._id) // FIX: Use assignedToRefs
     ).length;
 
     return (
