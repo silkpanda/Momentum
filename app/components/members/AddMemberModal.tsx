@@ -1,6 +1,7 @@
 // =========================================================
 // silkpanda/momentum/momentum-fac69d659346d6b7b01871d803baa24f6dfaccee/app/components/members/AddMemberModal.tsx
 // REFACTORED for Unified Membership Model (API v3)
+// REFACTORED (v4) to call Embedded Web BFF
 // =========================================================
 'use client';
 
@@ -52,15 +53,16 @@ const AddMemberModal: React.FC<AddMemberModalProps> = ({
         const colorToSubmit = selectedColor || defaultColor;
 
         try {
-            // FIX: Correct the API URL to use the existing nested resource route.
-            // When `familyMemberId` is missing, the backend will implicitly create a Child profile.
-            const response = await fetch(`/api/v1/households/${householdId}/members`, {
+            // REFACTORED (v4): Call the Embedded BFF endpoint
+            // We now pass the householdId in the body for the BFF to use.
+            const response = await fetch(`/web-bff/family/members`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`,
                 },
                 body: JSON.stringify({
+                    householdId: householdId, // Pass householdId for the BFF
                     firstName: firstName,
                     displayName: firstName, // Use firstName as default displayName
                     profileColor: colorToSubmit,

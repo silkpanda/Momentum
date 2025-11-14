@@ -1,6 +1,7 @@
 // =========================================================
 // silkpanda/momentum/app/components/store/PurchaseItemModal.tsx
 // Modal for purchasing a store item (Phase 3.4)
+// REFACTORED (v4) to call Embedded Web BFF
 // =========================================================
 'use client';
 
@@ -29,8 +30,8 @@ const PurchaseItemModal: React.FC<PurchaseItemModalProps> = ({
         setError(null);
 
         try {
-            // Call the purchase endpoint
-            const response = await fetch(`/api/v1/store-items/${item._id}/purchase`, {
+            // REFACTORED (v4): Call the Embedded BFF endpoint
+            const response = await fetch(`/web-bff/store/${item._id}/purchase`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

@@ -1,6 +1,7 @@
 // =========================================================
 // silkpanda/momentum/app/components/store/DeleteStoreItemModal.tsx
 // Modal for deleting a store item (Phase 3.4)
+// REFACTORED (v4) to call Embedded Web BFF
 // =========================================================
 'use client';
 
@@ -27,8 +28,8 @@ const DeleteStoreItemModal: React.FC<DeleteStoreItemModalProps> = ({
         setError(null);
 
         try {
-            //
-            const response = await fetch(`/api/v1/store-items/${item._id}`, {
+            // REFACTORED (v4): Call the Embedded BFF endpoint
+            const response = await fetch(`/web-bff/store/${item._id}`, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': `Bearer ${token}`,

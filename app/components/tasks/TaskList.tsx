@@ -1,6 +1,7 @@
 // =========================================================
 // silkpanda/momentum/momentum-fac69d659346d6b7b01871d803baa24f6dfaccee/app/components/tasks/TaskList.tsx
 // REFACTORED for Unified Task Assignment Model (API v3)
+// REFACTORED (v4) to call Embedded Web BFF
 // =========================================================
 'use client';
 
@@ -190,35 +191,22 @@ const TaskList: React.FC = () => {
         setLoading(true);
 
         try {
-            // Run API calls in parallel for efficiency
-            const [taskResponse, householdResponse] = await Promise.all([
-                // 1. Fetch Tasks
-                fetch('/api/v1/tasks', {
-                    headers: { 'Authorization': `Bearer ${token}` },
-                }),
-                // 2. Fetch Household using the new route (which returns the single household context)
-                fetch(`/api/v1/households`, {
-                    headers: { 'Authorization': `Bearer ${token}` },
-                })
-            ]);
+            // REFACTORED (v4): Call the single Embedded BFF aggregation endpoint
+            const response = await fetch('/web-bff/tasks/page-data', {
+                headers: { 'Authorization': `Bearer ${token}` },
+            });
 
-            if (!taskResponse.ok) throw new Error('Failed to fetch tasks.');
-            if (!householdResponse.ok) throw new Error('Failed to fetch household members.');
-
-            const taskData = await taskResponse.json();
-            const householdData = await householdResponse.json();
-
-            if (taskData.status === 'success') {
-                setTasks(taskData.data.tasks);
-            } else {
-                throw new Error(taskData.message || 'Could not retrieve tasks.');
+            if (!response.ok) {
+                throw new Error('Failed to fetch task page data from BFF.');
             }
 
-            if (householdData.status === 'success') {
-                // CRITICAL FIX: Extract memberProfiles from the expected API response structure
-                setHouseholdMembers(householdData.data.household.memberProfiles || []);
+            const data = await response.json();
+
+            if (data.tasks && data.householdMembers) {
+                setTasks(data.tasks);
+                setHouseholdMembers(data.householdMembers);
             } else {
-                throw new Error(householdData.message || 'Could not retrieve members for assignment.');
+                throw new Error('BFF returned malformed data.');
             }
 
             setError(null); // Clear error on success
@@ -269,7 +257,8 @@ const TaskList: React.FC = () => {
         setError(null);
 
         try {
-            const response = await fetch(`/api/v1/tasks/${task._id}/complete`, {
+            // REFACTORED (v4): Call the Embedded BFF endpoint
+            const response = await fetch(`/web-bff/tasks/${task._id}/complete`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

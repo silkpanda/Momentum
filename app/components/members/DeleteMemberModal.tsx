@@ -1,6 +1,7 @@
 // =========================================================
 // silkpanda/momentum/momentum-fac69d659346d6b7b01871d803baa24f6dfaccee/app/components/members/DeleteMemberModal.tsx
 // REFACTORED for Unified Membership Model (API v3)
+// REFACTORED (v4) to call Embedded Web BFF
 // =========================================================
 'use client';
 
@@ -30,16 +31,17 @@ const DeleteMemberModal: React.FC<DeleteMemberModalProps> = ({
         try {
             // DELETE to the 'deleteMemberProfile' endpoint
             // The API endpoint uses the sub-document _id
-            //
-            const response = await fetch(`/api/v1/households/${householdId}/members/${member._id}`, {
+            // REFACTORED (v4): Call the Embedded BFF endpoint
+            // We must pass householdId as a query param for the BFF
+            const response = await fetch(`/web-bff/family/members/${member._id}?householdId=${householdId}`, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': `Bearer ${token}`,
                 },
             });
 
-            const data = await response.json();
             if (!response.ok) {
+                const data = await response.json();
                 throw new Error(data.message || 'Failed to delete member.');
             }
 

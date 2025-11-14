@@ -1,6 +1,7 @@
 // =========================================================
 // silkpanda/momentum/momentum-e07d696d5dc5be6d5d5681cef733d2cb80fb1772/app/components/auth/SignUpForm.tsx
 // REFACTORED to meet new API (v3) signup requirements
+// REFACTORED (v4) to call Embedded Web BFF
 // =========================================================
 'use client';
 
@@ -75,8 +76,8 @@ const SignUpForm: React.FC = () => {
         }
 
         try {
-            //
-            const response = await fetch('/api/v1/auth/signup', {
+            // REFACTORED (v4): Call the Embedded Web BFF endpoint
+            const response = await fetch('/web-bff/auth/signup', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

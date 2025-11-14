@@ -1,6 +1,7 @@
 // =========================================================
 // silkpanda/momentum/app/components/dashboard/DashboardHome.tsx
-// New component for the main dashboard content (Phase 3.5)
+// Main component for the main dashboard content (Phase 3.5)
+// REFACTORED (v4) to call Embedded Web BFF
 // =========================================================
 'use client';
 
@@ -92,42 +93,23 @@ const DashboardHome: React.FC = () => {
         setError(null);
 
         try {
-            const [householdResponse, taskResponse, storeResponse] = await Promise.all([
-                fetch('/api/v1/households', {
-                    headers: { 'Authorization': `Bearer ${token}` },
-                }),
-                fetch('/api/v1/tasks', {
-                    headers: { 'Authorization': `Bearer ${token}` },
-                }),
-                fetch('/api/v1/store-items', {
-                    headers: { 'Authorization': `Bearer ${token}` },
-                }),
-            ]);
+            // REFACTORED (v4): Call the single Embedded BFF aggregation endpoint
+            const response = await fetch('/web-bff/dashboard/data', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
 
-            if (!householdResponse.ok) throw new Error('Failed to fetch household members.');
-            if (!taskResponse.ok) throw new Error('Failed to fetch tasks.');
-            if (!storeResponse.ok) throw new Error('Failed to fetch store items.');
-
-            const householdData = await householdResponse.json();
-            const taskData = await taskResponse.json();
-            const storeData = await storeResponse.json();
-
-            if (householdData.status === 'success') {
-                setMembers(householdData.data.household.memberProfiles || []);
-            } else {
-                throw new Error(householdData.message || 'Could not retrieve members.');
+            if (!response.ok) {
+                throw new Error('Failed to fetch dashboard data from BFF');
             }
 
-            if (taskData.status === 'success') {
-                setTasks(taskData.data.tasks || []);
-            } else {
-                throw new Error(taskData.message || 'Could not retrieve tasks.');
-            }
+            const data = await response.json();
 
-            if (storeData.status === 'success') {
-                setStoreItems(storeData.data.storeItems || []);
+            if (data.members && data.tasks && data.storeItems) {
+                setMembers(data.members);
+                setTasks(data.tasks);
+                setStoreItems(data.storeItems);
             } else {
-                throw new Error(storeData.message || 'Could not retrieve store items.');
+                throw new Error('BFF returned malformed data');
             }
 
         } catch (e: any) {
@@ -203,7 +185,8 @@ const DashboardHome: React.FC = () => {
         setError(null);
 
         try {
-            const response = await fetch(`/api/v1/tasks/${task._id}/complete`, {
+            // REFACTORED (v4): Call the Embedded Web BFF endpoint
+            const response = await fetch(`/web-bff/tasks/${task._id}/complete`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

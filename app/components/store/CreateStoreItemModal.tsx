@@ -1,6 +1,7 @@
 // =========================================================
 // silkpanda/momentum/app/components/store/CreateStoreItemModal.tsx
 // Modal for creating a new store item (Phase 3.4)
+// REFACTORED (v4) to call Embedded Web BFF
 // =========================================================
 'use client';
 
@@ -37,8 +38,8 @@ const CreateStoreItemModal: React.FC<CreateStoreItemModalProps> = ({ onClose, on
         setError(null);
 
         try {
-            //
-            const response = await fetch('/api/v1/store-items', {
+            // REFACTORED (v4): Call the Embedded BFF endpoint
+            const response = await fetch('/web-bff/store', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

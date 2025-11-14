@@ -4,6 +4,7 @@
 //
 // [FIX] Moved FormInput component definition outside
 // LoginForm to prevent re-rendering and focus loss.
+// REFACTORED (v4) to call Embedded Web BFF
 // =========================================================
 'use client';
 
@@ -98,9 +99,8 @@ const LoginForm: React.FC = () => {
         }
 
         try {
-            // SOLUTION: Use relative path to leverage the Next.js proxy defined in next.config.mjs.
-            // This avoids CORS issues and allows API error responses (like 401) to be handled correctly.
-            const response = await fetch('/api/v1/auth/login', {
+            // REFACTORED (v4): Call the Embedded Web BFF endpoint
+            const response = await fetch('/web-bff/auth/login', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

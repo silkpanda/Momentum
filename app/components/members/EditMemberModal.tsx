@@ -1,6 +1,7 @@
 // =========================================================
 // silkpanda/momentum/momentum-e07d696d5dc5be6d5d5681cef733d2cb80fb1772/app/components/members/EditMemberModal.tsx
 // REFACTORED: Allows all users (Parents and Children) to edit profile color
+// REFACTORED (v4) to call Embedded Web BFF
 // =========================================================
 'use client';
 
@@ -53,8 +54,8 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
 
         try {
             // PATCH to the 'updateMemberProfile' endpoint
-            //
-            const response = await fetch(`/api/v1/households/members/${member._id}`, {
+            // REFACTORED (v4): Call the Embedded BFF endpoint
+            const response = await fetch(`/web-bff/family/members/${member._id}`, {
                 method: 'PATCH',
                 headers: {
                     'Content-Type': 'application/json',
@@ -63,7 +64,11 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
                 // FIX: Always send both fields. The API now accepts profileColor for Parents.
                 //
                 body: JSON.stringify(
-                    { displayName: displayName, profileColor: selectedColor }
+                    {
+                        householdId: householdId, // <-- ADD THIS
+                        displayName: displayName,
+                        profileColor: selectedColor
+                    }
                 ),
             });
 

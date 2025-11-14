@@ -1,6 +1,7 @@
 // =========================================================
 // silkpanda/momentum/app/components/family/FamilyMemberActionModal.tsx
 // New unified modal for the "Family View" page.
+// REFACTORED (v4) to call Embedded Web BFF
 // =========================================================
 'use client';
 
@@ -122,7 +123,8 @@ const FamilyMemberActionModal: React.FC<FamilyMemberActionModalProps> = ({
         setError(null);
 
         try {
-            const response = await fetch(`/api/v1/tasks/${task._id}/complete`, {
+            // REFACTORED (v4): Call the Embedded BFF endpoint
+            const response = await fetch(`/web-bff/tasks/${task._id}/complete`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({ memberId: member.familyMemberId._id }),
@@ -163,7 +165,8 @@ const FamilyMemberActionModal: React.FC<FamilyMemberActionModalProps> = ({
         setError(null);
 
         try {
-            const response = await fetch(`/api/v1/store-items/${item._id}/purchase`, {
+            // REFACTORED (v4): Call the Embedded BFF endpoint
+            const response = await fetch(`/web-bff/store/${item._id}/purchase`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({ memberId: member.familyMemberId._id }),

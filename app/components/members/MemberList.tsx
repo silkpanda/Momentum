@@ -1,6 +1,7 @@
 // =========================================================
 // silkpanda/momentum/momentum-aed7f8804ec93e3a89b85f13a44796c67e349b99/app/components/members/MemberList.tsx
 // REFACTORED for Unified Membership Model (API v3)
+// REFACTORED (v4) to call Embedded Web BFF
 // =========================================================
 'use client';
 
@@ -168,33 +169,20 @@ const MemberList: React.FC = () => {
 
         setLoading(true);
         try {
-            // Fetch members and tasks in parallel
-            const [householdResponse, taskResponse] = await Promise.all([
-                fetch(`/api/v1/households`, {
-                    headers: { 'Authorization': `Bearer ${token}` },
-                }),
-                fetch('/api/v1/tasks', {
-                    headers: { 'Authorization': `Bearer ${token}` },
-                })
-            ]);
+            // REFACTORED (v4): Call the single Embedded BFF aggregation endpoint
+            const response = await fetch('/web-bff/family/members/page-data', {
+                headers: { 'Authorization': `Bearer ${token}` },
+            });
 
-            if (!householdResponse.ok) throw new Error('Failed to fetch household data.');
-            if (!taskResponse.ok) throw new Error('Failed to fetch tasks.');
+            if (!response.ok) throw new Error('Failed to fetch member page data from BFF.');
 
-            const householdData = await householdResponse.json();
-            const taskData = await taskResponse.json();
+            const data = await response.json();
 
-            if (householdData.status === 'success') {
-                // CRITICAL FIX: The API response structure is { data: { household: { memberProfiles: [...] } } }
-                setMemberProfiles(householdData.data.household.memberProfiles || []);
+            if (data.memberProfiles && data.tasks) {
+                setMemberProfiles(data.memberProfiles);
+                setTasks(data.tasks);
             } else {
-                throw new Error(householdData.message || 'Could not retrieve member list data.');
-            }
-
-            if (taskData.status === 'success') {
-                setTasks(taskData.data.tasks || []);
-            } else {
-                throw new Error(taskData.message || 'Could not retrieve tasks.');
+                throw new Error('BFF returned malformed data.');
             }
 
             setError(null);

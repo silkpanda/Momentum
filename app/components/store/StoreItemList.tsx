@@ -1,6 +1,7 @@
 // =========================================================
 // silkpanda/momentum/app/components/store/StoreItemList.tsx
 // Renders the list of store items and handles CRUD.
+// REFACTORED (v4) to call Embedded Web BFF
 // =========================================================
 'use client';
 
@@ -98,33 +99,23 @@ const StoreItemList: React.FC = () => {
         setLoading(true);
         setError(null);
         try {
-            //
-            const [itemResponse, householdResponse] = await Promise.all([
-                fetch(`/api/v1/store-items`, {
-                    headers: { 'Authorization': `Bearer ${token}` },
-                }),
-                fetch(`/api/v1/households`, {
-                    headers: { 'Authorization': `Bearer ${token}` },
-                })
-            ]);
+            // REFACTORED (v4): Call the single Embedded BFF aggregation endpoint
+            const response = await fetch(`/web-bff/store/page-data`, {
+                headers: { 'Authorization': `Bearer ${token}` },
+            });
 
-            if (!itemResponse.ok) throw new Error('Failed to fetch store items.');
-            if (!householdResponse.ok) throw new Error('Failed to fetch household data.');
-
-            const itemData = await itemResponse.json();
-            const householdData = await householdResponse.json();
-
-            if (itemData.status === 'success') {
-                setItems(itemData.data.storeItems || []);
-            } else {
-                throw new Error(itemData.message || 'Could not retrieve items.');
+            if (!response.ok) {
+                throw new Error('Failed to fetch store page data from BFF.');
             }
 
-            if (householdData.status === 'success') {
-                setMembers(householdData.data.household.memberProfiles || []);
+            const data = await response.json();
+
+            if (data.storeItems && data.memberProfiles) {
+                setItems(data.storeItems);
+                setMembers(data.memberProfiles);
                 setError(null);
             } else {
-                throw new Error(householdData.message || 'Could not retrieve household members.');
+                throw new Error('BFF returned malformed data.');
             }
         } catch (e: any) {
             setError(e.message);

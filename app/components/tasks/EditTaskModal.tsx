@@ -1,6 +1,7 @@
 // =========================================================
 // silkpanda/momentum/momentum-e07d696d5dc5be6d5d5681cef733d2cb80fb1772/app/components/tasks/EditTaskModal.tsx
 // REFACTORED: Add defensive null check for task assignments
+// REFACTORED (v4) to call Embedded Web BFF
 // =========================================================
 'use client';
 
@@ -24,7 +25,7 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
     const [taskName, setTaskName] = useState(task.taskName);
     const [description, setDescription] = useState(task.description);
     const [pointsValue, setPointsValue] = useState(task.pointsValue);
-    
+
     // FIX 1 & 2: Rename state variable to match backend property 'assignedToRefs'
     // This state holds the array of FamilyMember IDs (the IDs the backend needs)
     const [assignedToRefs, setAssignedToRefs] = useState<string[]>(
@@ -53,8 +54,8 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
 
         try {
             // PATCH to the 'updateTask' endpoint
-            //
-            const response = await fetch(`/api/v1/tasks/${task._id}`, {
+            // REFACTORED (v4): Call the Embedded BFF endpoint
+            const response = await fetch(`/web-bff/tasks/${task._id}`, {
                 method: 'PATCH',
                 headers: {
                     'Content-Type': 'application/json',
@@ -65,7 +66,7 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
                     description,
                     pointsValue,
                     // FIX 2: Send the correct field name 'assignedToRefs'
-                    assignedToRefs: assignedToRefs, 
+                    assignedToRefs: assignedToRefs,
                 }),
             });
 
@@ -86,7 +87,7 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
     };
 
     // FIX 3: Update toggleAssignment to take the full profile and use the correct FamilyMember ID
-    const toggleAssignment = (memberProfile: IHouseholdMemberProfile) => { 
+    const toggleAssignment = (memberProfile: IHouseholdMemberProfile) => {
         const memberRefId = memberProfile.familyMemberId._id; // Get the correct FamilyMember ID
 
         setAssignedToRefs(prevIds => {
@@ -97,7 +98,7 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
             }
         });
     };
-    
+
     // Helper to check if a member is currently assigned, checking against the FamilyMember ID
     const isMemberAssigned = (memberProfile: IHouseholdMemberProfile) => {
         return assignedToRefs.includes(memberProfile.familyMemberId._id);

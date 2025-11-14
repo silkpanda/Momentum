@@ -1,6 +1,7 @@
 // =========================================================
 // silkpanda/momentum-web/app/components/tasks/DeleteTaskModal.tsx
 // Modal for deleting a task (Phase 2.4)
+// REFACTORED (v4) to call Embedded Web BFF
 // =========================================================
 'use client';
 
@@ -28,8 +29,8 @@ const DeleteTaskModal: React.FC<DeleteTaskModalProps> = ({
 
         try {
             // DELETE to the 'deleteTask' endpoint
-            //
-            const response = await fetch(`/api/v1/tasks/${task._id}`, {
+            // REFACTORED (v4): Call the Embedded BFF endpoint
+            const response = await fetch(`/web-bff/tasks/${task._id}`, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': `Bearer ${token}`,

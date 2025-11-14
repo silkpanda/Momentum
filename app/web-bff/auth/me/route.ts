@@ -1,0 +1,47 @@
+// =========================================================
+// silkpanda/momentum/app/web-bff/auth/me/route.ts
+// EMBEDDED WEB BFF (v4 Blueprint)
+// Securely validates the user's session token
+// =========================================================
+import { NextResponse } from 'next/server';
+import { headers } from 'next/headers';
+
+// This is our internal API's URL.
+const API_URL = 'http://localhost:3000/api/v1/auth/me';
+
+/**
+ * @desc    Get the authenticated user's data
+ * @route   GET /web-bff/auth/me
+ * @access  Private (requires token)
+ */
+export async function GET() {
+    const headersList = headers();
+    const authorization = headersList.get('authorization');
+
+    // 1. Validate the Authorization header exists
+    if (!authorization) {
+        return NextResponse.json({ message: 'Authorization header is missing' }, { status: 401 });
+    }
+
+    try {
+        // 2. Forward the request (with token) to the internal 'momentum-api'
+        const apiResponse = await fetch(API_URL, {
+            method: 'GET',
+            headers: {
+                'Authorization': authorization,
+            },
+        });
+
+        const data = await apiResponse.json();
+
+        // 3. Return the API's response (or error) back to our frontend client
+        if (!apiResponse.ok) {
+            return NextResponse.json({ message: data.message || 'API Error' }, { status: apiResponse.status });
+        }
+
+        return NextResponse.json(data);
+
+    } catch (err: any) {
+        return NextResponse.json({ message: 'BFF Error: Failed to validate session', error: err.message }, { status: 500 });
+    }
+}

@@ -2,6 +2,7 @@
 // silkpanda/momentum/app/components/family/FamilyDashboard.tsx
 // Main component for the "Family View" page.
 // REFACTORED to use a single "one-click" action modal.
+// REFACTORED (v4) to call Embedded Web BFF
 // =========================================================
 'use client';
 
@@ -62,7 +63,7 @@ const MemberCard: React.FC<MemberCardProps> = ({ member, tasks, onSelect }) => {
 // --- Main Family Dashboard Component ---
 const FamilyDashboard: React.FC = () => {
     const { token, householdId } = useSession();
-    const [members, setMembers] = useState<IHouseholdMemberProfile[]>([]);
+    const [memberProfiles, setMemberProfiles] = useState<IHouseholdMemberProfile[]>([]);
     const [tasks, setTasks] = useState<ITask[]>([]);
     const [storeItems, setStoreItems] = useState<IStoreItem[]>([]);
     const [loading, setLoading] = useState(true);
@@ -70,7 +71,7 @@ const FamilyDashboard: React.FC = () => {
 
     // State for managing modals
     const [selectedMember, setSelectedMember] = useState<IHouseholdMemberProfile | null>(null);
-    const [isActionModalOpen, setIsActionModalOpen] = useState(false); // <-- NEW STATE
+    const [isActionModalOpen, setIsActionModalOpen] = useState(false);
 
     // Fetch all data
     const fetchData = useCallback(async () => {
@@ -83,23 +84,24 @@ const FamilyDashboard: React.FC = () => {
         setError(null);
 
         try {
-            const [householdResponse, taskResponse, storeResponse] = await Promise.all([
-                fetch('/api/v1/households', { headers: { 'Authorization': `Bearer ${token}` } }),
-                fetch('/api/v1/tasks', { headers: { 'Authorization': `Bearer ${token}` } }),
-                fetch('/api/v1/store-items', { headers: { 'Authorization': `Bearer ${token}` } }),
-            ]);
+            // REFACTORED (v4): Call the single Embedded BFF aggregation endpoint
+            const response = await fetch('/web-bff/family/page-data', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
 
-            if (!householdResponse.ok) throw new Error('Failed to fetch household members.');
-            if (!taskResponse.ok) throw new Error('Failed to fetch tasks.');
-            if (!storeResponse.ok) throw new Error('Failed to fetch store items.');
+            if (!response.ok) {
+                throw new Error('Failed to fetch family page data from BFF');
+            }
 
-            const householdData = await householdResponse.json();
-            const taskData = await taskResponse.json();
-            const storeData = await storeResponse.json();
+            const data = await response.json();
 
-            setMembers(householdData.data.household.memberProfiles || []);
-            setTasks(taskData.data.tasks || []);
-            setStoreItems(storeData.data.storeItems || []);
+            if (data.memberProfiles && data.tasks && data.storeItems) {
+                setMemberProfiles(data.memberProfiles);
+                setTasks(data.tasks);
+                setStoreItems(data.storeItems);
+            } else {
+                throw new Error('BFF returned malformed data');
+            }
 
         } catch (e: any) {
             setError(e.message);
@@ -147,7 +149,7 @@ const FamilyDashboard: React.FC = () => {
         <div>
             {/* Member Selection Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {members
+                {memberProfiles
                     .sort((a, b) => a.displayName.localeCompare(b.displayName))
                     .map((member) => (
                         <MemberCard

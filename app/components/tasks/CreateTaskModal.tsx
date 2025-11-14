@@ -1,6 +1,7 @@
 // =========================================================
 // silkpanda/momentum/momentum-e07d696d5dc5be6d5d5681cef733d2cb80fb1772/app/components/tasks/CreateTaskModal.tsx
 // REFACTORED for Unified Task Assignment Model (API v3)
+// REFACTORED (v4) to call Embedded Web BFF
 // =========================================================
 'use client';
 
@@ -23,7 +24,7 @@ interface TaskFormState {
     pointsValue: number;
     // FIX: Renamed to match backend schema property 'assignedToRefs'.
     // This array MUST hold the FamilyMember IDs (the ObjectId references).
-    assignedToRefs: string[]; 
+    assignedToRefs: string[];
 }
 
 const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ onClose, onTaskCreated, householdMembers }) => {
@@ -55,8 +56,8 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ onClose, onTaskCreate
 
         try {
             // POST to the 'createTask' endpoint
-            //
-            const response = await fetch('/api/v1/tasks', {
+            // REFACTORED (v4): Call the Embedded BFF endpoint
+            const response = await fetch('/web-bff/tasks', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -68,7 +69,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ onClose, onTaskCreate
                     pointsValue: formData.pointsValue,
                     // FIX: Use the correct backend property name: assignedToRefs. 
                     // The values are now the correct FamilyMember IDs.
-                    assignedToRefs: formData.assignedToRefs, 
+                    assignedToRefs: formData.assignedToRefs,
                 }),
             });
 
@@ -92,8 +93,8 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ onClose, onTaskCreate
     // CRITICAL FIX: The toggle function must accept and use the actual FamilyMember ID (familyMemberId._id)
     const toggleAssignment = (memberProfile: IHouseholdMemberProfile) => {
         // The ID the backend needs for the reference array (FamilyMember ID)
-        const memberRefId = memberProfile.familyMemberId._id; 
-        
+        const memberRefId = memberProfile.familyMemberId._id;
+
         setFormData(prevData => {
             const currentAssigned = prevData.assignedToRefs;
             if (currentAssigned.includes(memberRefId)) {

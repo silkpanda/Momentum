@@ -54,7 +54,8 @@ const DashboardLayout: React.FC<React.PropsWithChildren> = ({ children }) => {
         // 2. Fetch authenticated user data
         const fetchUser = async () => {
             try {
-                const response = await fetch('/api/v1/auth/me', {
+                // REFACTORED (v4): Call the Embedded Web BFF endpoint
+                const response = await fetch('/web-bff/auth/me', {
                     headers: {
                         'Authorization': `Bearer ${sessionToken}`, // Use the real token
                     },
