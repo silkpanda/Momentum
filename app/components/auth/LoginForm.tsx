@@ -5,6 +5,9 @@
 // [FIX] Moved FormInput component definition outside
 // LoginForm to prevent re-rendering and focus loss.
 // REFACTORED (v4) to call Embedded Web BFF
+//
+// TELA CODICIS CLEANUP: Removed local FormInput definition
+// and now import the centralized ../layout/FormInput.tsx.
 // =========================================================
 'use client';
 
@@ -12,6 +15,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { Mail, Lock, AlertTriangle, Loader, CheckCircle, LogIn } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import FormInput from '../layout/FormInput'; // TELA CODICIS: Import centralized component
 
 // Interface for the form state
 // [FIX] Moved outside component to be accessible by FormInput
@@ -20,56 +24,8 @@ interface FormState {
     password: string;
 }
 
-// --- Reusable Input Component Props ---
-// [FIX] Added dedicated props interface for the FormInput component
-interface FormInputProps {
-    id: string;
-    name: keyof FormState;
-    type?: string;
-    label: string;
-    Icon: React.ElementType;
-    placeholder: string;
-    value: string; // [FIX] Explicitly pass value
-    onChange: (e: React.ChangeEvent<HTMLInputElement>) => void; // [FIX] Explicitly pass onChange
-}
-
-// --- Reusable Input Component (Consistent with SignUpForm) ---
-// [FIX] Moved component definition outside of LoginForm
-const FormInput: React.FC<FormInputProps> = ({
-    id,
-    name,
-    type = 'text',
-    label,
-    Icon,
-    placeholder,
-    value,
-    onChange,
-}) => (
-    <div className="space-y-1">
-        {/* Label Styling (Source: Style Guide, 5. Component Design, Forms) */}
-        <label htmlFor={id} className="block text-sm font-medium text-text-secondary">
-            {label}
-        </label>
-        <div className="relative rounded-md shadow-sm">
-            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                {/* Icon using Lucide */}
-                <Icon className="h-5 w-5 text-text-secondary" aria-hidden="true" />
-            </div>
-            <input
-                id={id}
-                name={name}
-                type={type}
-                value={value} // [FIX] Use prop
-                onChange={onChange} // [FIX] Use prop
-                required
-                placeholder={placeholder}
-                // Input Field Styling (Source: Style Guide, 5. Component Design, Forms)
-                className="block w-full rounded-md border border-border-subtle p-3 pl-10 text-text-primary bg-bg-surface
-                 placeholder:text-text-secondary/70 focus:border-action-primary focus:ring-action-primary transition duration-150 sm:text-sm"
-            />
-        </div>
-    </div>
-);
+// TELA CODICIS: Removed local FormInput definition.
+// The component is now imported from ../layout/FormInput.tsx
 
 const LoginForm: React.FC = () => {
     const [formData, setFormData] = useState<FormState>({
