@@ -94,7 +94,7 @@ const DashboardHome: React.FC = () => {
 
         try {
             // REFACTORED (v4): Call the single Embedded BFF aggregation endpoint
-            const response = await fetch('/web-bff/dashboard/data', {
+            const response = await fetch('/web-bff/dashboard/page-data', {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
 
