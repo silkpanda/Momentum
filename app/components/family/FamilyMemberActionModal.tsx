@@ -3,8 +3,8 @@
 // New unified modal for the "Family View" page.
 // REFACTORED (v4) to call Embedded Web BFF
 //
-// TELA CODICIS FIX: Updated component to use 'assignedToRefs'
-// to match the synchronized ITask interface.
+// TELA CODICIS CLEANUP: Refactored to use useSession()
+// hook instead of prop-drilling for the token.
 // =========================================================
 'use client';
 
@@ -13,13 +13,13 @@ import { X, Award, CheckCircle, CheckSquare, Loader, ShoppingCart, Gift, Package
 import { IHouseholdMemberProfile } from '../members/MemberList';
 import { ITask } from '../tasks/TaskList';
 import { IStoreItem } from '../store/StoreItemList';
+import { useSession } from '../layout/SessionContext'; // TELA CODICIS: Import hook
 
 // --- Props Interface ---
 interface FamilyMemberActionModalProps {
     member: IHouseholdMemberProfile;
     allTasks: ITask[];
     allItems: IStoreItem[];
-    token: string;
     onClose: () => void;
 }
 
@@ -104,13 +104,14 @@ const MemberStoreItem: React.FC<{
 
 // --- Main Modal Component ---
 const FamilyMemberActionModal: React.FC<FamilyMemberActionModalProps> = ({
-    member, allTasks, allItems, token, onClose
+    member, allTasks, allItems, onClose
 }) => {
 
     // --- Shared State ---
     const [currentView, setCurrentView] = useState<'tasks' | 'store'>('tasks');
     const [currentPoints, setCurrentPoints] = useState(member.pointsTotal);
     const [error, setError] = useState<string | null>(null);
+    const { token } = useSession(); // TELA CODICIS: Get token from context
 
     // --- Task State ---
     const [tasks, setTasks] = useState(allTasks);

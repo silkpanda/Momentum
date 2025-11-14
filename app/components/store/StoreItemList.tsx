@@ -2,6 +2,9 @@
 // silkpanda/momentum/app/components/store/StoreItemList.tsx
 // Renders the list of store items and handles CRUD.
 // REFACTORED (v4) to call Embedded Web BFF
+//
+// TELA CODICIS CLEANUP: Implemented optimistic state updates
+// for Create, Update, and Delete to improve UI performance.
 // =========================================================
 'use client';
 
@@ -128,16 +131,16 @@ const StoreItemList: React.FC = () => {
         fetchData();
     }, [fetchData]);
 
-    const handleItemCreated = () => {
-        fetchData(); // Re-fetch all items
+    const handleItemCreated = (newItem: IStoreItem) => {
+        setItems(current => [...current, newItem]); // TELA CODICIS: Optimistic update
     };
 
-    const handleItemUpdated = () => {
-        fetchData(); // Re-fetch all items
+    const handleItemUpdated = (updatedItem: IStoreItem) => {
+        setItems(current => current.map(item => item._id === updatedItem._id ? updatedItem : item)); // TELA CODICIS: Optimistic update
     };
 
     const handleItemDeleted = () => {
-        fetchData(); // Re-fetch all items
+        setItems(current => current.filter(item => item._id !== selectedItem?._id)); // TELA CODICIS: Optimistic update
     };
 
     const handleItemPurchased = () => {

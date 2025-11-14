@@ -2,6 +2,9 @@
 // silkpanda/momentum/app/components/store/EditStoreItemModal.tsx
 // Modal for editing a store item (Phase 3.4)
 // REFACTORED (v4) to call Embedded Web BFF
+//
+// TELA CODICIS CLEANUP: Modified onItemUpdated to return
+// the updated item object for optimistic state updates.
 // =========================================================
 'use client';
 
@@ -13,7 +16,7 @@ import { useSession } from '../layout/SessionContext';
 interface EditStoreItemModalProps {
     item: IStoreItem;
     onClose: () => void;
-    onItemUpdated: () => void;
+    onItemUpdated: (updatedItem: IStoreItem) => void; // TELA CODICIS: Pass back updated item
 }
 
 const EditStoreItemModal: React.FC<EditStoreItemModalProps> = ({ item, onClose, onItemUpdated }) => {
@@ -58,7 +61,7 @@ const EditStoreItemModal: React.FC<EditStoreItemModalProps> = ({ item, onClose, 
                 throw new Error(data.message || 'Failed to update item.');
             }
 
-            onItemUpdated();
+            onItemUpdated(data.data.storeItem); // TELA CODICIS: Pass the updated item object back
             onClose();
 
         } catch (err: any) {

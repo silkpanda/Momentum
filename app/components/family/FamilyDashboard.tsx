@@ -4,8 +4,8 @@
 // REFACTORED to use a single "one-click" action modal.
 // REFACTORED (v4) to call Embedded Web BFF
 //
-// TELA CODICIS FIX: Updated component to use 'assignedToRefs'
-// to match the synchronized ITask interface.
+// TELA CODICIS CLEANUP: Removed token prop-drilling
+// to FamilyMemberActionModal.
 // =========================================================
 'use client';
 
@@ -170,7 +170,6 @@ const FamilyDashboard: React.FC = () => {
                     member={selectedMember}
                     allTasks={tasks}
                     allItems={storeItems}
-                    token={token!}
                     onClose={handleModalClose}
                 />
             )}

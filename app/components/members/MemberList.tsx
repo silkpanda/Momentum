@@ -3,8 +3,8 @@
 // REFACTORED for Unified Membership Model (API v3)
 // REFACTORED (v4) to call Embedded Web BFF
 //
-// TELA CODICIS CLEANUP: Removed local CollapsibleMemberSection
-// and imported from ../layout/CollapsibleSection
+// TELA CODICIS CLEANUP: Implemented optimistic state updates
+// for Update and Delete to improve UI performance.
 // =========================================================
 'use client';
 
@@ -169,12 +169,12 @@ const MemberList: React.FC = () => {
         setMemberProfiles(current => [...current, newProfile]);
     };
 
-    const handleMemberUpdated = () => {
-        fetchData(); // Re-fetch to get updated, populated data
+    const handleMemberUpdated = (updatedProfile: IHouseholdMemberProfile) => {
+        setMemberProfiles(current => current.map(m => m._id === updatedProfile._id ? updatedProfile : m)); // TELA CODICIS: Optimistic update
     };
 
     const handleMemberDeleted = () => {
-        fetchData(); // Re-fetch to get updated list
+        setMemberProfiles(current => current.filter(m => m._id !== selectedMember?._id)); // TELA CODICIS: Optimistic update
     };
 
     // Click Handlers for opening modals

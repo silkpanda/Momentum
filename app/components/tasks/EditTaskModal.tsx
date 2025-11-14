@@ -2,6 +2,9 @@
 // silkpanda/momentum/momentum-e07d696d5dc5be6d5d5681cef733d2cb80fb1772/app/components/tasks/EditTaskModal.tsx
 // REFACTORED: Add defensive null check for task assignments
 // REFACTORED (v4) to call Embedded Web BFF
+//
+// TELA CODICIS CLEANUP: Modified onTaskUpdated to return
+// the updated task object for optimistic state updates.
 // =========================================================
 'use client';
 
@@ -14,7 +17,7 @@ import { IHouseholdMemberProfile } from '../members/MemberList';
 interface EditTaskModalProps {
     task: ITask; // The task being edited
     onClose: () => void;
-    onTaskUpdated: () => void; // Function to trigger a re-fetch
+    onTaskUpdated: (updatedTask: ITask) => void; // TELA CODICIS: Pass back updated task
     householdMembers: IHouseholdMemberProfile[];
 }
 
@@ -76,7 +79,7 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
             }
 
             // Call the refresh function passed from the parent
-            onTaskUpdated();
+            onTaskUpdated(data.data.task); // TELA CODICIS: Pass the updated task object back
             onClose(); // Close the modal on success
 
         } catch (err: any) {

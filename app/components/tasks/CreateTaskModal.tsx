@@ -2,6 +2,9 @@
 // silkpanda/momentum/momentum-e07d696d5dc5be6d5d5681cef733d2cb80fb1772/app/components/tasks/CreateTaskModal.tsx
 // REFACTORED for Unified Task Assignment Model (API v3)
 // REFACTORED (v4) to call Embedded Web BFF
+//
+// TELA CODICIS CLEANUP: Refactored to use useSession()
+// hook instead of direct localStorage access.
 // =========================================================
 'use client';
 
@@ -9,11 +12,12 @@ import React, { useState } from 'react';
 import { Award, Check, Loader, Type, X, AlertTriangle, UserCheck } from 'lucide-react';
 import { ITask } from './TaskList';
 import { IHouseholdMemberProfile } from '../members/MemberList';
+import { useSession } from '../layout/SessionContext'; // TELA CODICIS: Import hook
 
 // Define the props the modal will accept
 interface CreateTaskModalProps {
     onClose: () => void;
-    onTaskCreated: (newTask: ITask) => void;
+    onTaskCreated: (newTask: ITask) => void; // TELA CODICIS: Ensure this passes the new task
     householdMembers: IHouseholdMemberProfile[]; // Accept the list of members
 }
 
@@ -36,6 +40,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ onClose, onTaskCreate
     });
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const { token } = useSession(); // TELA CODICIS: Get token from context
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -52,7 +57,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ onClose, onTaskCreate
 
         setIsLoading(true);
         setError(null);
-        const token = localStorage.getItem('momentum_token');
+        // TELA CODICIS: Token is now supplied by the useSession hook
 
         try {
             // POST to the 'createTask' endpoint
@@ -79,7 +84,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ onClose, onTaskCreate
             }
 
             // Pass the new task (data.data.task) back to the parent list
-            onTaskCreated(data.data.task);
+            onTaskCreated(data.data.task); // TELA CODICIS: Pass the new task object back
             onClose(); // Close the modal on success
 
         } catch (err: any) {

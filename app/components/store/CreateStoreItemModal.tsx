@@ -2,6 +2,9 @@
 // silkpanda/momentum/app/components/store/CreateStoreItemModal.tsx
 // Modal for creating a new store item (Phase 3.4)
 // REFACTORED (v4) to call Embedded Web BFF
+//
+// TELA CODICIS CLEANUP: Modified onItemCreated to return
+// the new item object for optimistic state updates.
 // =========================================================
 'use client';
 
@@ -12,7 +15,7 @@ import { useSession } from '../layout/SessionContext';
 
 interface CreateStoreItemModalProps {
     onClose: () => void;
-    onItemCreated: () => void;
+    onItemCreated: (newItem: IStoreItem) => void; // TELA CODICIS: Pass back new item
 }
 
 const CreateStoreItemModal: React.FC<CreateStoreItemModalProps> = ({ onClose, onItemCreated }) => {
@@ -57,7 +60,7 @@ const CreateStoreItemModal: React.FC<CreateStoreItemModalProps> = ({ onClose, on
                 throw new Error(data.message || 'Failed to create item.');
             }
 
-            onItemCreated();
+            onItemCreated(data.data.storeItem); // TELA CODICIS: Pass the new item object back
             onClose();
 
         } catch (err: any) {

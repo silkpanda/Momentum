@@ -3,8 +3,8 @@
 // REFACTORED: Allows all users (Parents and Children) to edit profile color
 // REFACTORED (v4) to call Embedded Web BFF
 //
-// TELA CODICIS CLEANUP: Removed local PROFILE_COLORS
-// and imported from /app/lib/constants.ts
+// TELA CODICIS CLEANUP: Modified onMemberUpdated to return
+// the updated profile object for optimistic state updates.
 // =========================================================
 'use client';
 
@@ -18,7 +18,7 @@ interface EditMemberModalProps {
     member: IHouseholdMemberProfile; // Use new interface
     householdId: string;
     onClose: () => void;
-    onMemberUpdated: () => void; // Function to trigger a re-fetch
+    onMemberUpdated: (updatedProfile: IHouseholdMemberProfile) => void; // TELA CODICIS: Pass back updated profile
     usedColors: string[]; // This is still needed for children
 }
 
@@ -72,8 +72,18 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
                 throw new Error(data.message || 'Failed to update member.');
             }
 
+            // TELA CODICIS: Find the updated profile from the returned household doc
+            // The API route for this returns the raw household doc, not a wrapped object
+            const updatedProfile = data.memberProfiles.find(
+                (p: IHouseholdMemberProfile) => p._id === member._id
+            );
+
             // Call the refresh function passed from the parent
-            onMemberUpdated();
+            if (updatedProfile) {
+                onMemberUpdated(updatedProfile);
+            } else {
+                onMemberUpdated({ ...member, displayName, profileColor: selectedColor }); // Fallback
+            }
             onClose(); // Close the modal on success
 
         } catch (err: any) {

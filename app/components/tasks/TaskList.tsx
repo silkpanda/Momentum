@@ -3,9 +3,11 @@
 // REFACTORED for Unified Task Assignment Model (API v3)
 // REFACTORED (v4) to call Embedded Web BFF
 //
-// TELA CODICIS FIX: Synchronized ITask interface with API model.
-// TELA CODICIS CLEANUP: Removed local CollapsibleTaskSection
-// and imported from ../layout/CollapsibleSection
+// TELA CODICIS CLEANUP: Implemented optimistic state updates
+// for Create, Update, and Delete to improve UI performance.
+//
+// TELA CODICIS CLEANUP: Removed flawed "Mark Complete"
+// button from this management view.
 // =========================================================
 'use client';
 
@@ -42,9 +44,7 @@ const TaskItem: React.FC<{
     task: ITask;
     onEdit: () => void;
     onDelete: () => void;
-    onMarkComplete: () => void; // New prop for completion
-    isCompleting: boolean; // New prop for loading state
-}> = ({ task, onEdit, onDelete, onMarkComplete, isCompleting }) => {
+}> = ({ task, onEdit, onDelete }) => {
 
     // Helper to get initials
     const getInitials = (name: string) => name ? name.charAt(0).toUpperCase() : '?';
@@ -87,41 +87,19 @@ const TaskItem: React.FC<{
 
                 {/* --- Task Actions & Status --- */}
 
-                {/* State 1: Loading */}
-                {isCompleting && (
-                    <div className="flex items-center justify-center w-24">
-                        <Loader className="w-5 h-5 text-action-primary animate-spin" />
-                    </div>
-                )}
-
-                {/* State 2: Already Completed */}
-                {task.isCompleted && !isCompleting && (
+                {/* TELA CODICIS: Removed "Mark Complete" button. */}
+                {/* This is a management view; completion/approval is handled elsewhere. */}
+                {task.isCompleted && (
                     <div className="flex items-center text-signal-success">
                         <CheckSquare className="w-4 h-4 mr-1" />
                         <span className="text-sm font-medium">Done</span>
                     </div>
                 )}
 
-                {/* State 3: Ready to be Completed */}
-                {!task.isCompleted && !isCompleting && (
-                    <button
-                        onClick={onMarkComplete}
-                        disabled={task.assignedToRefs.length === 0} // FIX: Use assignedToRefs
-                        title={
-                            task.assignedToRefs.length > 0 // FIX: Use assignedToRefs
-                                ? `Mark '${task.taskName}' complete`
-                                : 'Task must be assigned to award points'
-                        }
-                        className="p-2 text-text-secondary hover:text-signal-success transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                        <CheckSquare className="w-5 h-5" />
-                    </button>
-                )}
-
-                <button onClick={onEdit} className="p-2 text-text-secondary hover:text-action-primary transition-colors" title="Edit Task" disabled={task.isCompleted || isCompleting}>
+                <button onClick={onEdit} className="p-2 text-text-secondary hover:text-action-primary transition-colors" title="Edit Task" disabled={task.isCompleted}>
                     <Edit className="w-4 h-4" />
                 </button>
-                <button onClick={onDelete} className="p-2 text-text-secondary hover:text-signal-alert transition-colors" title="Delete Task" disabled={isCompleting}>
+                <button onClick={onDelete} className="p-2 text-text-secondary hover:text-signal-alert transition-colors" title="Delete Task">
                     <Trash className="w-4 h-4" />
                 </button>
             </div>
@@ -143,7 +121,6 @@ const TaskList: React.FC = () => {
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [selectedTask, setSelectedTask] = useState<ITask | null>(null);
-    const [completingTaskId, setCompletingTaskId] = useState<string | null>(null); // For loading state
 
     // Get session context for API calls
     const { token, householdId } = useSession(); // Get householdId
@@ -190,61 +167,16 @@ const TaskList: React.FC = () => {
         fetchData();
     }, [fetchData]); // Call fetch on initial load
 
-    const handleTaskCreated = () => {
-        fetchData(); // Re-fetch for consistency
+    const handleTaskCreated = (newTask: ITask) => {
+        setTasks(current => [...current, newTask]); // TELA CODICIS: Optimistic update
     };
 
-    const handleTaskUpdated = () => {
-        fetchData(); // Re-fetch to get updated data
+    const handleTaskUpdated = (updatedTask: ITask) => {
+        setTasks(current => current.map(t => t._id === updatedTask._id ? updatedTask : t)); // TELA CODICIS: Optimistic update
     };
 
     const handleTaskDeleted = () => {
-        fetchData(); // Re-fetch to get updated list
-    };
-
-    // New Handler for Marking Task Complete
-    const handleMarkComplete = async (task: ITask) => {
-        // Prevent multiple clicks
-        if (completingTaskId) return;
-
-        // Safety checks
-        if (task.isCompleted) {
-            setError("Task is already complete.");
-            return;
-        }
-        if (task.assignedToRefs.length === 0) { // FIX: Use assignedToRefs
-            setError("Task must be assigned to a member to award points.");
-            return;
-        }
-
-        // Get the first assigned member's ID
-        const memberIdToAward = task.assignedToRefs[0]._id; // FIX: Use assignedToRefs
-
-        setCompletingTaskId(task._id);
-        setError(null);
-
-        try {
-            // REFACTORED (v4): Call the Embedded BFF endpoint
-            const response = await fetch(`/web-bff/tasks/${task._id}/complete`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`,
-                },
-                body: JSON.stringify({ memberId: memberIdToAward }),
-            });
-
-            if (!response.ok) {
-                const data = await response.json();
-                throw new Error(data.message || 'Failed to complete task.');
-            }
-
-            fetchData(); // Refresh the list on success
-        } catch (e: any) {
-            setError(e.message);
-        } finally {
-            setCompletingTaskId(null); // Clear loading state
-        }
+        setTasks(current => current.filter(t => t._id !== selectedTask?._id)); // TELA CODICIS: Optimistic update
     };
 
     // Click Handlers for opening modals
@@ -321,7 +253,7 @@ const TaskList: React.FC = () => {
                                 emptyMessage="No assigned (incomplete) tasks."
                             >
                                 {assignedIncompleteTasks.map((task) => (
-                                    <TaskItem key={task._id} task={task} onEdit={() => openEditModal(task)} onDelete={() => openDeleteModal(task)} onMarkComplete={() => handleMarkComplete(task)} isCompleting={completingTaskId === task._id} />
+                                    <TaskItem key={task._id} task={task} onEdit={() => openEditModal(task)} onDelete={() => openDeleteModal(task)} />
                                 ))}
                             </CollapsibleSection>
 
@@ -332,7 +264,7 @@ const TaskList: React.FC = () => {
                                 emptyMessage="No unassigned tasks."
                             >
                                 {unassignedIncompleteTasks.map((task) => (
-                                    <TaskItem key={task._id} task={task} onEdit={() => openEditModal(task)} onDelete={() => openDeleteModal(task)} onMarkComplete={() => handleMarkComplete(task)} isCompleting={completingTaskId === task._id} />
+                                    <TaskItem key={task._id} task={task} onEdit={() => openEditModal(task)} onDelete={() => openDeleteModal(task)} />
                                 ))}
                             </CollapsibleSection>
 
@@ -343,7 +275,7 @@ const TaskList: React.FC = () => {
                                 emptyMessage="No completed tasks."
                             >
                                 {completedTasks.map((task) => (
-                                    <TaskItem key={task._id} task={task} onEdit={() => openEditModal(task)} onDelete={() => openDeleteModal(task)} onMarkComplete={() => handleMarkComplete(task)} isCompleting={completingTaskId === task._id} />
+                                    <TaskItem key={task._id} task={task} onEdit={() => openEditModal(task)} onDelete={() => openDeleteModal(task)} />
                                 ))}
                             </CollapsibleSection>
                         </div>
