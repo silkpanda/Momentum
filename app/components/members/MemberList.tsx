@@ -2,6 +2,9 @@
 // silkpanda/momentum/momentum-aed7f8804ec93e3a89b85f13a44796c67e349b99/app/components/members/MemberList.tsx
 // REFACTORED for Unified Membership Model (API v3)
 // REFACTORED (v4) to call Embedded Web BFF
+//
+// TELA CODICIS CLEANUP: Removed local CollapsibleMemberSection
+// and imported from ../layout/CollapsibleSection
 // =========================================================
 'use client';
 
@@ -13,6 +16,7 @@ import EditMemberModal from './EditMemberModal';
 import DeleteMemberModal from './DeleteMemberModal';
 import { ITask } from '../tasks/TaskList'; // <-- NEW IMPORT
 import MemberProfileModal from './MemberProfileModal'; // <-- NEW IMPORT
+import CollapsibleSection from '../layout/CollapsibleSection'; // TELA CODICIS: Import component
 
 // --- Interfaces ---
 //
@@ -100,47 +104,8 @@ const MemberItem: React.FC<{
     </li>
 );
 
-// --- NEW: Collapsible Section Component ---
-interface CollapsibleMemberSectionProps {
-    Icon: React.ElementType;
-    title: string;
-    members: IHouseholdMemberProfile[];
-    children: React.ReactNode;
-    defaultOpen?: boolean;
-}
-
-const CollapsibleMemberSection: React.FC<CollapsibleMemberSectionProps> = ({
-    Icon, title, members, children, defaultOpen = false
-}) => {
-    const [isOpen, setIsOpen] = useState(defaultOpen);
-
-    return (
-        <div className="bg-bg-surface rounded-lg shadow-md border border-border-subtle">
-            <button
-                onClick={() => setIsOpen(!isOpen)}
-                className="w-full flex items-center justify-between p-4"
-            >
-                <div className="flex items-center space-x-3">
-                    <Icon className="w-5 h-5 text-action-primary" />
-                    <h3 className="text-lg font-medium text-text-primary">{title}</h3>
-                    <span className="text-sm text-text-secondary">({members.length})</span>
-                </div>
-                <ChevronDown
-                    className={`w-5 h-5 text-text-secondary transition-transform ${isOpen ? 'rotate-180' : ''}`}
-                />
-            </button>
-            {isOpen && (
-                <div className="p-4 border-t border-border-subtle">
-                    {members.length > 0 ? (
-                        <ul className="space-y-4">{children}</ul>
-                    ) : (
-                        <p className="text-sm text-text-secondary text-center">No members in this section.</p>
-                    )}
-                </div>
-            )}
-        </div>
-    );
-};
+// TELA CODICIS: Removed local CollapsibleMemberSection
+// component definition. Now importing from /layout.
 
 // --- Main Member List Component ---
 const MemberList: React.FC = () => {
@@ -236,7 +201,7 @@ const MemberList: React.FC = () => {
     const getAssignedTaskCount = (memberFamilyId: string) => {
         return tasks.filter(task =>
             !task.isCompleted &&
-            task.assignedToProfileIds.some(profile => profile._id === memberFamilyId)
+            task.assignedToRefs.some(profile => profile._id === memberFamilyId)
         ).length;
     };
 
@@ -286,21 +251,23 @@ const MemberList: React.FC = () => {
                 return (
                     memberProfiles.length > 0 ? (
                         <div className="space-y-4">
-                            <CollapsibleMemberSection
+                            <CollapsibleSection
                                 Icon={User}
                                 title="Parents"
-                                members={parentProfiles}
+                                count={parentProfiles.length}
                                 defaultOpen={true}
+                                emptyMessage="No parents in this section."
                             >
                                 {parentProfiles.map((member) => (
                                     <MemberItem key={member._id} member={member} isSelf={member.familyMemberId._id === user?._id} onEdit={() => openEditModal(member)} onDelete={() => openDeleteModal(member)} onOpenProfile={() => openProfileModal(member)} assignedTaskCount={getAssignedTaskCount(member.familyMemberId._id)} />
                                 ))}
-                            </CollapsibleMemberSection>
+                            </CollapsibleSection>
 
-                            <CollapsibleMemberSection
+                            <CollapsibleSection
                                 Icon={User}
                                 title="Children"
-                                members={childProfiles}
+                                count={childProfiles.length}
+                                emptyMessage="No children in this section."
                             >
                                 {childProfiles.map((member) => (
                                     <MemberItem
@@ -313,7 +280,7 @@ const MemberList: React.FC = () => {
                                         assignedTaskCount={getAssignedTaskCount(member.familyMemberId._id)} // Pass count
                                     />
                                 ))}
-                            </CollapsibleMemberSection>
+                            </CollapsibleSection>
                         </div>
                     ) : (
                         <div className="text-center p-8 bg-bg-surface rounded-lg shadow-md border border-border-subtle">

@@ -4,8 +4,8 @@
 // REFACTORED (v4) to call Embedded Web BFF
 //
 // TELA CODICIS FIX: Synchronized ITask interface with API model.
-// The API provides 'assignedToRefs' populated with 'firstName'.
-// The interface and TaskItem component now reflect this correct contract.
+// TELA CODICIS CLEANUP: Removed local CollapsibleTaskSection
+// and imported from ../layout/CollapsibleSection
 // =========================================================
 'use client';
 
@@ -16,6 +16,7 @@ import { useSession } from '../layout/SessionContext';
 import EditTaskModal from './EditTaskModal';
 import DeleteTaskModal from './DeleteTaskModal';
 import { IHouseholdMemberProfile } from '../members/MemberList'; // Use new unified interface
+import CollapsibleSection from '../layout/CollapsibleSection'; // TELA CODICIS: Import component
 
 // --- Task Interface ---
 //
@@ -128,47 +129,8 @@ const TaskItem: React.FC<{
     );
 };
 
-// --- NEW: Collapsible Section Component ---
-interface CollapsibleTaskSectionProps {
-    Icon: React.ElementType;
-    title: string;
-    tasks: ITask[];
-    children: React.ReactNode;
-    defaultOpen?: boolean;
-}
-
-const CollapsibleTaskSection: React.FC<CollapsibleTaskSectionProps> = ({
-    Icon, title, tasks, children, defaultOpen = false
-}) => {
-    const [isOpen, setIsOpen] = useState(defaultOpen);
-
-    return (
-        <div className="bg-bg-surface rounded-lg shadow-md border border-border-subtle">
-            <button
-                onClick={() => setIsOpen(!isOpen)}
-                className="w-full flex items-center justify-between p-4"
-            >
-                <div className="flex items-center space-x-3">
-                    <Icon className="w-5 h-5 text-action-primary" />
-                    <h3 className="text-lg font-medium text-text-primary">{title}</h3>
-                    <span className="text-sm text-text-secondary">({tasks.length})</span>
-                </div>
-                <ChevronDown
-                    className={`w-5 h-5 text-text-secondary transition-transform ${isOpen ? 'rotate-180' : ''}`}
-                />
-            </button>
-            {isOpen && (
-                <div className="p-4 border-t border-border-subtle">
-                    {tasks.length > 0 ? (
-                        <ul className="space-y-4">{children}</ul>
-                    ) : (
-                        <p className="text-sm text-text-secondary text-center">No tasks in this section.</p>
-                    )}
-                </div>
-            )}
-        </div>
-    );
-};
+// TELA CODICIS: Removed local CollapsibleTaskSection
+// component definition. Now importing from /layout.
 
 // --- Main Task List Component ---
 const TaskList: React.FC = () => {
@@ -351,36 +313,39 @@ const TaskList: React.FC = () => {
                 return (
                     tasks.length > 0 ? (
                         <div className="space-y-4">
-                            <CollapsibleTaskSection
+                            <CollapsibleSection
                                 Icon={UserCheck}
                                 title="Assigned (Incomplete)"
-                                tasks={assignedIncompleteTasks}
+                                count={assignedIncompleteTasks.length}
                                 defaultOpen={true}
+                                emptyMessage="No assigned (incomplete) tasks."
                             >
                                 {assignedIncompleteTasks.map((task) => (
                                     <TaskItem key={task._id} task={task} onEdit={() => openEditModal(task)} onDelete={() => openDeleteModal(task)} onMarkComplete={() => handleMarkComplete(task)} isCompleting={completingTaskId === task._id} />
                                 ))}
-                            </CollapsibleTaskSection>
+                            </CollapsibleSection>
 
-                            <CollapsibleTaskSection
+                            <CollapsibleSection
                                 Icon={UserX}
                                 title="Unassigned"
-                                tasks={unassignedIncompleteTasks}
+                                count={unassignedIncompleteTasks.length}
+                                emptyMessage="No unassigned tasks."
                             >
                                 {unassignedIncompleteTasks.map((task) => (
                                     <TaskItem key={task._id} task={task} onEdit={() => openEditModal(task)} onDelete={() => openDeleteModal(task)} onMarkComplete={() => handleMarkComplete(task)} isCompleting={completingTaskId === task._id} />
                                 ))}
-                            </CollapsibleTaskSection>
+                            </CollapsibleSection>
 
-                            <CollapsibleTaskSection
+                            <CollapsibleSection
                                 Icon={CheckSquare}
                                 title="Complete"
-                                tasks={completedTasks}
+                                count={completedTasks.length}
+                                emptyMessage="No completed tasks."
                             >
                                 {completedTasks.map((task) => (
                                     <TaskItem key={task._id} task={task} onEdit={() => openEditModal(task)} onDelete={() => openDeleteModal(task)} onMarkComplete={() => handleMarkComplete(task)} isCompleting={completingTaskId === task._id} />
                                 ))}
-                            </CollapsibleTaskSection>
+                            </CollapsibleSection>
                         </div>
                     ) : (
                         <div className="text-center p-8 bg-bg-surface rounded-lg shadow-md border border-border-subtle">

@@ -2,6 +2,9 @@
 // silkpanda/momentum/momentum-e07d696d5dc5be6d5d5681cef733d2cb80fb1772/app/components/members/EditMemberModal.tsx
 // REFACTORED: Allows all users (Parents and Children) to edit profile color
 // REFACTORED (v4) to call Embedded Web BFF
+//
+// TELA CODICIS CLEANUP: Removed local PROFILE_COLORS
+// and imported from /app/lib/constants.ts
 // =========================================================
 'use client';
 
@@ -9,6 +12,7 @@ import React, { useState, useEffect } from 'react';
 import { User, Loader, X, AlertTriangle, Check, Palette, Mail } from 'lucide-react';
 import { useSession } from '../layout/SessionContext';
 import { IHouseholdMemberProfile } from './MemberList'; // Import new interface
+import { PROFILE_COLORS } from '../../lib/constants'; // TELA CODICIS: Import constant
 
 interface EditMemberModalProps {
     member: IHouseholdMemberProfile; // Use new interface
@@ -17,15 +21,6 @@ interface EditMemberModalProps {
     onMemberUpdated: () => void; // Function to trigger a re-fetch
     usedColors: string[]; // This is still needed for children
 }
-
-// Profile colors from Governance Doc
-const PROFILE_COLORS = [
-    { name: 'Blueberry', hex: '#4285F4' }, { name: 'Celtic Blue', hex: '#1967D2' },
-    { name: 'Selective Yellow', hex: '#FBBC04' }, { name: 'Pigment Red', hex: '#F72A25' },
-    { name: 'Sea Green', hex: '#34A853' }, { name: 'Dark Spring Green', hex: '#188038' },
-    { name: 'Tangerine', hex: '#FF8C00' }, { name: 'Grape', hex: '#8E24AA' },
-    { name: 'Flamingo', hex: '#E67C73' }, { name: 'Peacock', hex: '#039BE5' },
-];
 
 const EditMemberModal: React.FC<EditMemberModalProps> = ({
     member, householdId, onClose, onMemberUpdated, usedColors

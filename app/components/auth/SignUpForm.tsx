@@ -2,6 +2,9 @@
 // silkpanda/momentum/momentum-e07d696d5dc5be6d5d5681cef733d2cb80fb1772/app/components/auth/SignUpForm.tsx
 // REFACTORED to meet new API (v3) signup requirements
 // REFACTORED (v4) to call Embedded Web BFF
+//
+// TELA CODICIS CLEANUP: Removed local PROFILE_COLORS
+// and imported from /app/lib/constants.ts
 // =========================================================
 'use client';
 
@@ -10,6 +13,7 @@ import Link from 'next/link';
 import { Mail, Lock, User, AlertTriangle, Loader, CheckCircle, Home, Palette, CheckIcon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import FormInput from '../layout/FormInput'; // Your path
+import { PROFILE_COLORS } from '../../lib/constants'; // TELA CODICIS: Import constant
 
 // Interface for the form state
 interface FormState {
@@ -20,16 +24,6 @@ interface FormState {
     householdName: string; // ADDED
     userDisplayName: string; // ADDED
 }
-
-// Profile colors from Governance Doc
-//
-const PROFILE_COLORS = [
-    { name: 'Blueberry', hex: '#4285F4' }, { name: 'Celtic Blue', hex: '#1967D2' },
-    { name: 'Selective Yellow', hex: '#FBBC04' }, { name: 'Pigment Red', hex: '#F72A25' },
-    { name: 'Sea Green', hex: '#34A853' }, { name: 'Dark Spring Green', hex: '#188038' },
-    { name: 'Tangerine', hex: '#FF8C00' }, { name: 'Grape', hex: '#8E24AA' },
-    { name: 'Flamingo', hex: '#E67C73' }, { name: 'Peacock', hex: '#039BE5' },
-];
 
 const SignUpForm: React.FC = () => {
     const [formData, setFormData] = useState<FormState>({
