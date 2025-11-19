@@ -3,7 +3,7 @@
 // Main component for the main dashboard content (Phase 3.5)
 // REFACTORED (v4) to call Embedded Web BFF
 //
-// TELA CODICIS FIX: Updated component to use 'assignedToRefs'
+// TELA CODICIS FIX: Updated component to use 'assignedTo'
 // to match the synchronized ITask interface.
 // =========================================================
 'use client';
@@ -47,7 +47,7 @@ const MyTaskItem: React.FC<{
                 <Award className="w-4 h-4 text-action-primary" />
             </div>
             <div>
-                <p className="text-sm font-medium text-text-primary">{task.taskName}</p>
+                <p className="text-sm font-medium text-text-primary">{task.title}</p>
                 <p className="text-xs text-text-secondary">{task.description || 'No description'}</p>
             </div>
         </div>
@@ -64,7 +64,7 @@ const MyTaskItem: React.FC<{
                 ) : (
                     <button
                         onClick={onMarkComplete}
-                        title={`Mark '${task.taskName}' complete`}
+                        title={`Mark '${task.title}' complete`}
                         className="p-2 text-text-secondary hover:text-signal-success transition-colors"
                     >
                         <CheckSquare className="w-5 h-5" />
@@ -157,8 +157,8 @@ const DashboardHome: React.FC = () => {
     // New Task Stat Calculations
     const completeCount = tasks.filter(t => t.isCompleted).length;
     const incompleteTasks = tasks.filter(t => !t.isCompleted);
-    const assignedIncompleteCount = incompleteTasks.filter(t => t.assignedToRefs && t.assignedToRefs.length > 0).length; // FIX: Use assignedToRefs
-    const unassignedIncompleteCount = incompleteTasks.filter(t => !t.assignedToRefs || t.assignedToRefs.length === 0).length; // FIX: Use assignedToRefs
+    const assignedIncompleteCount = incompleteTasks.filter(t => t.assignedTo).length;
+    const unassignedIncompleteCount = incompleteTasks.filter(t => !t.assignedTo).length;
 
     // Find current user's profile to get their points
     const currentUserProfile = members.find(m => m.familyMemberId._id === user?._id);
@@ -176,7 +176,7 @@ const DashboardHome: React.FC = () => {
     const getAssignedTaskCount = (memberFamilyId: string) => {
         return tasks.filter(task =>
             !task.isCompleted &&
-            task.assignedToRefs.some(profile => profile._id === memberFamilyId) // FIX: Use assignedToRefs
+            task.assignedTo === memberFamilyId
         ).length;
     };
 
@@ -217,7 +217,7 @@ const DashboardHome: React.FC = () => {
     const myTasks = tasks.filter(
         (task) =>
             !task.isCompleted &&
-            task.assignedToRefs.some((profile) => profile._id === user?._id) // FIX: Use assignedToRefs
+            task.assignedTo === user?._id
     );
 
     return (

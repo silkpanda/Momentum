@@ -14,8 +14,8 @@ import { useSession } from '../layout/SessionContext';
 import { IHouseholdMemberProfile } from '../members/MemberList';
 import { ITask } from '../tasks/TaskList';
 import { IStoreItem } from '../store/StoreItemList';
-import { Loader, AlertTriangle, User, Award, ShoppingCart } from 'lucide-react';
-import FamilyMemberActionModal from './FamilyMemberActionModal'; // <-- NEW IMPORT
+import { Loader, AlertTriangle, User } from 'lucide-react';
+import FamilyMemberActionModal from './FamilyMemberActionModal';
 
 // --- Member Card Component ---
 interface MemberCardProps {
@@ -29,7 +29,7 @@ const MemberCard: React.FC<MemberCardProps> = ({ member, tasks, onSelect }) => {
     // Get count of incomplete tasks assigned to this member
     const assignedTaskCount = tasks.filter(task =>
         !task.isCompleted &&
-        task.assignedToRefs.some(profile => profile._id === member.familyMemberId._id) // FIX: Use assignedToRefs
+        task.assignedTo?.some(profile => profile._id === member.familyMemberId._id)
     ).length;
 
     return (
@@ -159,7 +159,7 @@ const FamilyDashboard: React.FC = () => {
                             key={member._id}
                             member={member}
                             tasks={tasks}
-                            onSelect={() => openActionModal(member)} // <-- MODIFIED
+                            onSelect={() => openActionModal(member)}
                         />
                     ))}
             </div>

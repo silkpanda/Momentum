@@ -13,7 +13,7 @@ import { X, Award, CheckCircle, CheckSquare, Loader, ShoppingCart, Gift, Package
 import { IHouseholdMemberProfile } from '../members/MemberList';
 import { ITask } from '../tasks/TaskList';
 import { IStoreItem } from '../store/StoreItemList';
-import { useSession } from '../layout/SessionContext'; // TELA CODICIS: Import hook
+import { useSession } from '../layout/SessionContext';
 
 // --- Props Interface ---
 interface FamilyMemberActionModalProps {
@@ -23,7 +23,7 @@ interface FamilyMemberActionModalProps {
     onClose: () => void;
 }
 
-// --- Reusable Task Row Component ---
+// ---  Reusable Task Row Component ---
 const MemberTaskItem: React.FC<{
     task: ITask;
     onComplete: () => void;
@@ -35,7 +35,7 @@ const MemberTaskItem: React.FC<{
                 <Award className="w-4 h-4 text-action-primary" />
             </div>
             <div>
-                <p className="text-sm font-medium text-text-primary">{task.taskName}</p>
+                <p className="text-sm font-medium text-text-primary">{task.title}</p>
                 <p className="text-xs text-text-secondary">{task.description || 'No description'}</p>
             </div>
         </div>
@@ -50,7 +50,7 @@ const MemberTaskItem: React.FC<{
                 ) : (
                     <button
                         onClick={onComplete}
-                        title={`Mark '${task.taskName}' complete`}
+                        title={`Mark '${task.title}' complete`}
                         className="p-2 text-text-secondary hover:text-signal-success transition-colors"
                     >
                         <CheckSquare className="w-5 h-5" />
@@ -111,7 +111,7 @@ const FamilyMemberActionModal: React.FC<FamilyMemberActionModalProps> = ({
     const [currentView, setCurrentView] = useState<'tasks' | 'store'>('tasks');
     const [currentPoints, setCurrentPoints] = useState(member.pointsTotal);
     const [error, setError] = useState<string | null>(null);
-    const { token } = useSession(); // TELA CODICIS: Get token from context
+    const { token } = useSession();
 
     // --- Task State ---
     const [tasks, setTasks] = useState(allTasks);
@@ -127,7 +127,6 @@ const FamilyMemberActionModal: React.FC<FamilyMemberActionModalProps> = ({
         setError(null);
 
         try {
-            // REFACTORED (v4): Call the Embedded BFF endpoint
             const response = await fetch(`/web-bff/tasks/${task._id}/complete`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
@@ -137,13 +136,11 @@ const FamilyMemberActionModal: React.FC<FamilyMemberActionModalProps> = ({
                 const data = await response.json();
                 throw new Error(data.message || 'Failed to complete task.');
             }
-            // Optimistically update UI
             setTasks(currentTasks =>
                 currentTasks.map(t =>
                     t._id === task._id ? { ...t, isCompleted: true } : t
                 )
             );
-            // Update points total
             setCurrentPoints(prevPoints => prevPoints + task.pointsValue);
 
         } catch (e: any) {
@@ -155,7 +152,7 @@ const FamilyMemberActionModal: React.FC<FamilyMemberActionModalProps> = ({
 
     const incompleteTasks = tasks.filter(task =>
         !task.isCompleted &&
-        task.assignedToRefs.some(profile => profile._id === member.familyMemberId._id) // FIX: Use assignedToRefs
+        task.assignedTo?.some(profile => profile._id === member.familyMemberId._id)
     );
 
     // --- Store Logic ---
@@ -169,7 +166,6 @@ const FamilyMemberActionModal: React.FC<FamilyMemberActionModalProps> = ({
         setError(null);
 
         try {
-            // REFACTORED (v4): Call the Embedded BFF endpoint
             const response = await fetch(`/web-bff/store/${item._id}/purchase`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
@@ -179,7 +175,6 @@ const FamilyMemberActionModal: React.FC<FamilyMemberActionModalProps> = ({
                 const data = await response.json();
                 throw new Error(data.message || 'Failed to purchase item.');
             }
-            // Update points total
             setCurrentPoints(prevPoints => prevPoints - item.cost);
         } catch (e: any) {
             setError(e.message);

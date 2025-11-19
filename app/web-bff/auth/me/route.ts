@@ -39,6 +39,30 @@ export async function GET() {
             return NextResponse.json({ message: data.message || 'API Error' }, { status: apiResponse.status });
         }
 
+        // 3. Fetch household data to get the user's role
+        const householdId = data.data.householdId;
+        const userId = data.data.user._id;
+
+        if (householdId) {
+            const householdResponse = await fetch(`http://localhost:3000/api/v1/households/${householdId}`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': authorization,
+                },
+            });
+
+            if (householdResponse.ok) {
+                const householdData = await householdResponse.json();
+                const memberProfile = householdData.data.memberProfiles.find(
+                    (m: any) => m.familyMemberId === userId || m.familyMemberId._id === userId
+                );
+
+                if (memberProfile) {
+                    data.data.user.role = memberProfile.role;
+                }
+            }
+        }
+
         return NextResponse.json(data);
 
     } catch (err: any) {

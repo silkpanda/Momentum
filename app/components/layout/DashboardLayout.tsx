@@ -130,6 +130,9 @@ const DashboardLayout: React.FC<React.PropsWithChildren> = ({ children }) => {
                             <NavLink href="/family" Icon={HeartHandshake} label="Family View" />
                             {/* MVP Navigation Links (Phase 2.2 - 3.4) */}
                             <NavLink href="/tasks" Icon={Award} label="Tasks" />
+                            <NavLink href="/quests" Icon={Zap} label="Quests" />
+                            <NavLink href="/routines" Icon={Users} label="Routines" />
+                            <NavLink href="/meals" Icon={HeartHandshake} label="Meals" />
                             <NavLink href="/members" Icon={Users} label="Family Members" />
                             <NavLink href="/store" Icon={Award} label="Reward Store" />
                             <NavLink href="/settings" Icon={Settings} label="Settings" />

@@ -1,0 +1,124 @@
+// =========================================================
+// silkpanda/momentum/app/components/meals/MealPlanList.tsx
+// List of meal plans
+// =========================================================
+'use client';
+
+import React, { useState } from 'react';
+import { Plus, Calendar, Search, Pencil } from 'lucide-react';
+import { useSession } from '../layout/SessionContext';
+import CreateMealPlanModal from './CreateMealPlanModal';
+import EditMealPlanModal from './EditMealPlanModal';
+
+export interface IMealPlan {
+    _id: string;
+    startDate: string;
+    endDate: string;
+    meals: {
+        date: string;
+        mealType: 'breakfast' | 'lunch' | 'dinner' | 'snack';
+        recipeId?: string; // Ref to Recipe
+        restaurantId?: string; // Ref to Restaurant
+        notes?: string;
+    }[];
+}
+
+interface MealPlanListProps {
+    mealPlans: IMealPlan[];
+}
+
+const MealPlanList: React.FC<MealPlanListProps> = ({ mealPlans: initialMealPlans }) => {
+    const { user } = useSession();
+    const [mealPlans, setMealPlans] = useState<IMealPlan[]>(initialMealPlans);
+
+    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+    const [editingPlan, setEditingPlan] = useState<IMealPlan | null>(null);
+
+    const handleMealPlanCreated = (newPlan: IMealPlan) => {
+        setMealPlans([newPlan, ...mealPlans]);
+    };
+
+    const handleMealPlanUpdated = (updatedPlan: IMealPlan) => {
+        setMealPlans(mealPlans.map(p => p._id === updatedPlan._id ? updatedPlan : p));
+    };
+
+    return (
+        <div className="space-y-6">
+            <div className="flex justify-between items-center">
+                <h2 className="text-xl font-bold text-text-primary">Meal Plans</h2>
+                {user?.role === 'Parent' && (
+                    <button
+                        onClick={() => setIsCreateModalOpen(true)}
+                        className="flex items-center px-3 py-2 bg-action-primary text-white rounded-lg hover:bg-action-hover transition-colors text-sm"
+                    >
+                        <Plus className="w-4 h-4 mr-1.5" />
+                        New Plan
+                    </button>
+                )}
+            </div>
+
+            {isCreateModalOpen && (
+                <CreateMealPlanModal
+                    onClose={() => setIsCreateModalOpen(false)}
+                    onMealPlanCreated={handleMealPlanCreated}
+                />
+            )}
+
+            {editingPlan && (
+                <EditMealPlanModal
+                    mealPlan={editingPlan}
+                    onClose={() => setEditingPlan(null)}
+                    onMealPlanUpdated={handleMealPlanUpdated}
+                />
+            )}
+
+            <div className="grid grid-cols-1 gap-4">
+                {mealPlans.length > 0 ? (
+                    mealPlans.map((plan) => (
+                        <div key={plan._id} className="bg-bg-surface rounded-xl shadow-sm border border-border-subtle p-5 hover:shadow-md transition-shadow flex items-center justify-between group">
+                            <div className="flex items-center space-x-4">
+                                <div className="p-3 rounded-lg bg-action-primary/10 text-action-primary">
+                                    <Calendar className="w-6 h-6" />
+                                </div>
+                                <div>
+                                    <h3 className="font-medium text-text-primary">
+                                        {new Date(plan.startDate).toLocaleDateString()} - {new Date(plan.endDate).toLocaleDateString()}
+                                    </h3>
+                                    <p className="text-sm text-text-secondary">{plan.meals.length} meals planned</p>
+                                </div>
+                            </div>
+                            <div className="flex items-center space-x-3">
+                                <button className="text-sm text-action-primary font-medium hover:underline">
+                                    View Details
+                                </button>
+                                {user?.role === 'Parent' && (
+                                    <>
+                                        {/* Edit button disabled: API does not support updating meal plans
+                                        <button
+                                            onClick={() => setEditingPlan(plan)}
+                                            className="p-2 text-text-tertiary hover:text-action-primary hover:bg-action-primary/10 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                                            title="Edit Plan"
+                                        >
+                                            <Pencil className="w-4 h-4" />
+                                        </button>
+                                        */}
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                    ))
+                ) : (
+                    <div className="text-center py-12 bg-bg-surface rounded-xl border border-border-subtle border-dashed">
+                        <div className="mx-auto w-12 h-12 bg-bg-canvas rounded-full flex items-center justify-center mb-4">
+                            <Search className="w-6 h-6 text-text-tertiary" />
+                        </div>
+                        <h3 className="text-lg font-medium text-text-primary">No meal plans</h3>
+                        <p className="text-text-secondary">Plan your week ahead.</p>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
+export default MealPlanList;
