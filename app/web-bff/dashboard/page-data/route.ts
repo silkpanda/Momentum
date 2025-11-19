@@ -44,7 +44,7 @@ export async function GET() {
 
         // 4. Aggregate and return the combined data
         return NextResponse.json({
-            members: householdData.data.household.memberProfiles || [],
+            members: householdData.data.memberProfiles || [],
             tasks: taskData.data.tasks || [],
             storeItems: storeData.data.storeItems || [],
         });

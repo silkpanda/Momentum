@@ -1,6 +1,6 @@
 // =========================================================
-// silkpanda/momentum-web/app/components/tasks/DeleteTaskModal.tsx
-// Modal for deleting a task (Phase 2.4)
+// silkpanda/momentum/app/components/tasks/DeleteTaskModal.tsx
+// Modal for deleting a task
 // REFACTORED (v4) to call Embedded Web BFF
 // =========================================================
 'use client';
@@ -13,7 +13,7 @@ import { ITask } from './TaskList';
 interface DeleteTaskModalProps {
     task: ITask;
     onClose: () => void;
-    onTaskDeleted: () => void; // Function to trigger a re-fetch
+    onTaskDeleted: () => void;
 }
 
 const DeleteTaskModal: React.FC<DeleteTaskModalProps> = ({
@@ -28,8 +28,6 @@ const DeleteTaskModal: React.FC<DeleteTaskModalProps> = ({
         setError(null);
 
         try {
-            // DELETE to the 'deleteTask' endpoint
-            // REFACTORED (v4): Call the Embedded BFF endpoint
             const response = await fetch(`/web-bff/tasks/${task._id}`, {
                 method: 'DELETE',
                 headers: {
@@ -37,15 +35,13 @@ const DeleteTaskModal: React.FC<DeleteTaskModalProps> = ({
                 },
             });
 
-            // DELETE requests often return 204 No Content, which has no JSON body
             if (!response.ok) {
-                const data = await response.json(); // Try to parse error
+                const data = await response.json();
                 throw new Error(data.message || 'Failed to delete task.');
             }
 
-            // Call the refresh function passed from the parent
             onTaskDeleted();
-            onClose(); // Close the modal on success
+            onClose();
 
         } catch (err: any) {
             setError(err.message);
@@ -73,7 +69,7 @@ const DeleteTaskModal: React.FC<DeleteTaskModalProps> = ({
                     Delete Task?
                 </h3>
                 <p className="text-sm text-text-secondary text-center mt-2">
-                    Are you sure you want to delete the task <strong className="text-text-primary">"{task.taskName}"</strong>?
+                    Are you sure you want to delete the task <strong className="text-text-primary">"{task.title}"</strong>?
                     This action cannot be undone.
                 </p>
 

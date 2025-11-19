@@ -1,5 +1,5 @@
 // =========================================================
-// silkpanda/momentum/momentum-fac69d659346d6b7b01871d803baa24f6dfaccee/app/components/tasks/TaskList.tsx
+// silkpanda/momentum/app/components/tasks/TaskList.tsx
 // REFACTORED for Unified Task Assignment Model (API v3)
 // REFACTORED (v4) to call Embedded Web BFF
 //
@@ -17,23 +17,21 @@ import CreateTaskModal from './CreateTaskModal';
 import { useSession } from '../layout/SessionContext';
 import EditTaskModal from './EditTaskModal';
 import DeleteTaskModal from './DeleteTaskModal';
-import { IHouseholdMemberProfile } from '../members/MemberList'; // Use new unified interface
-import CollapsibleSection from '../layout/CollapsibleSection'; // TELA CODICIS: Import component
+import { IHouseholdMemberProfile } from '../members/MemberList';
+import Collapsible from '../layout/CollapsibleSection';
 
 // --- Task Interface ---
-//
 export interface ITask {
     _id: string;
-    taskName: string;
+    title: string; // FIX: API uses 'title', not 'taskName'
     description: string;
     pointsValue: number;
     isCompleted: boolean;
-    //
-    // TELA CODICIS FIX: Renamed 'assignedToProfileIds' to 'assignedToRefs' to match API model.
-    //
-    assignedToRefs: { // FIX: Renamed from assignedToProfileIds
-        _id: string; // This is the FamilyMember ID
-        firstName: string; // FIX: API populates firstName, not displayName
+    // FIX: API uses 'assignedTo', not 'assignedToRefs'
+    // API populates with displayName and profileColor
+    assignedTo: {
+        _id: string;
+        displayName: string; // FIX: API populates displayName, not firstName
         profileColor?: string;
     }[];
     householdRefId: string;
@@ -57,21 +55,21 @@ const TaskItem: React.FC<{
                     <Award className="w-5 h-5 text-action-primary" />
                 </div>
                 <div>
-                    <p className="text-base font-medium text-text-primary">{task.taskName}</p>
+                    <p className="text-base font-medium text-text-primary">{task.title}</p>
                     <p className="text-sm text-text-secondary">{task.description || 'No description'}</p>
 
                     {/* Display assigned member avatars */}
-                    {task.assignedToRefs && task.assignedToRefs.length > 0 && ( // FIX: Use assignedToRefs
+                    {task.assignedTo && task.assignedTo.length > 0 && (
                         <div className="flex items-center space-x-1 mt-2">
                             <span className="text-xs text-text-secondary mr-1">Assigned:</span>
-                            {task.assignedToRefs.map(member => ( // FIX: Use assignedToRefs
+                            {task.assignedTo.map(member => (
                                 <div
-                                    key={member._id} // Use the FamilyMember ID
-                                    title={member.firstName} // FIX: Use firstName
+                                    key={member._id}
+                                    title={member.displayName}
                                     className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white"
-                                    style={{ backgroundColor: member.profileColor || '#808080' }} // Add fallback
+                                    style={{ backgroundColor: member.profileColor || '#808080' }}
                                 >
-                                    {getInitials(member.firstName)}
+                                    {getInitials(member.displayName)}
                                 </div>
                             ))}
                         </div>
@@ -86,9 +84,6 @@ const TaskItem: React.FC<{
                 </div>
 
                 {/* --- Task Actions & Status --- */}
-
-                {/* TELA CODICIS: Removed "Mark Complete" button. */}
-                {/* This is a management view; completion/approval is handled elsewhere. */}
                 {task.isCompleted && (
                     <div className="flex items-center text-signal-success">
                         <CheckSquare className="w-4 h-4 mr-1" />
@@ -107,14 +102,10 @@ const TaskItem: React.FC<{
     );
 };
 
-// TELA CODICIS: Removed local CollapsibleTaskSection
-// component definition. Now importing from /layout.
-
 // --- Main Task List Component ---
 const TaskList: React.FC = () => {
     const [tasks, setTasks] = useState<ITask[]>([]);
-    // State to hold the list of members for assignment
-    const [householdMembers, setHouseholdMembers] = useState<IHouseholdMemberProfile[]>([]); // Use new interface
+    const [householdMembers, setHouseholdMembers] = useState<IHouseholdMemberProfile[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -122,10 +113,8 @@ const TaskList: React.FC = () => {
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [selectedTask, setSelectedTask] = useState<ITask | null>(null);
 
-    // Get session context for API calls
-    const { token, householdId } = useSession(); // Get householdId
+    const { token, householdId } = useSession();
 
-    // This function now fetches BOTH tasks and household members
     const fetchData = useCallback(async () => {
         if (!token || !householdId) {
             setError('Session invalid. Please log in again.');
@@ -135,7 +124,6 @@ const TaskList: React.FC = () => {
         setLoading(true);
 
         try {
-            // REFACTORED (v4): Call the single Embedded BFF aggregation endpoint
             const response = await fetch('/web-bff/tasks/page-data', {
                 headers: { 'Authorization': `Bearer ${token}` },
             });
@@ -153,10 +141,9 @@ const TaskList: React.FC = () => {
                 throw new Error('BFF returned malformed data.');
             }
 
-            setError(null); // Clear error on success
+            setError(null);
 
         } catch (e: any) {
-            // FIX: Use a combined, more descriptive error message
             setError(`Failed to load tasks or members for assignment: ${e.message}`);
         } finally {
             setLoading(false);
@@ -165,21 +152,20 @@ const TaskList: React.FC = () => {
 
     useEffect(() => {
         fetchData();
-    }, [fetchData]); // Call fetch on initial load
+    }, [fetchData]);
 
     const handleTaskCreated = (newTask: ITask) => {
-        setTasks(current => [...current, newTask]); // TELA CODICIS: Optimistic update
+        setTasks(current => [...current, newTask]);
     };
 
     const handleTaskUpdated = (updatedTask: ITask) => {
-        setTasks(current => current.map(t => t._id === updatedTask._id ? updatedTask : t)); // TELA CODICIS: Optimistic update
+        setTasks(current => current.map(t => t._id === updatedTask._id ? updatedTask : t));
     };
 
     const handleTaskDeleted = () => {
-        setTasks(current => current.filter(t => t._id !== selectedTask?._id)); // TELA CODICIS: Optimistic update
+        setTasks(current => current.filter(t => t._id !== selectedTask?._id));
     };
 
-    // Click Handlers for opening modals
     const openEditModal = (task: ITask) => {
         setSelectedTask(task);
         setIsEditModalOpen(true);
@@ -190,8 +176,7 @@ const TaskList: React.FC = () => {
         setIsDeleteModalOpen(true);
     };
 
-    // Render Loading state
-    if (loading && tasks.length === 0) { // Only show full load on init
+    if (loading && tasks.length === 0) {
         return (
             <div className="flex justify-center items-center p-8 bg-bg-surface rounded-lg shadow-md border border-border-subtle">
                 <Loader className="w-6 h-6 text-action-primary animate-spin" />
@@ -200,7 +185,6 @@ const TaskList: React.FC = () => {
         );
     }
 
-    // Render Error state
     if (error) {
         return (
             <div className="flex items-center p-4 bg-signal-alert/10 text-signal-alert rounded-lg border border-border-subtle">
@@ -210,16 +194,13 @@ const TaskList: React.FC = () => {
         );
     }
 
-    // Render Main Content
     return (
         <div className="w-full">
-            {/* Header and Add Task Button */}
             <div className="flex justify-between items-center mb-4">
                 <h2 className="text-lg font-medium text-text-secondary">
                     {tasks.length} {tasks.length === 1 ? 'Task' : 'Tasks'} Configured
                     {loading && <Loader className="w-4 h-4 ml-2 inline animate-spin" />}
                 </h2>
-                {/* Mandated Button: Icon + Text Label */}
                 <button
                     onClick={() => setIsCreateModalOpen(true)}
                     className="inline-flex items-center rounded-lg py-2 px-4 text-sm font-medium shadow-sm 
@@ -231,21 +212,20 @@ const TaskList: React.FC = () => {
                 </button>
             </div>
 
-            {/* --- NEW: Filter tasks into sections --- */}
             {(() => {
                 const completedTasks = tasks.filter(t => t.isCompleted);
                 const incompleteTasks = tasks.filter(t => !t.isCompleted);
                 const assignedIncompleteTasks = incompleteTasks.filter(
-                    t => !t.isCompleted && t.assignedToRefs && t.assignedToRefs.length > 0 // FIX: Use assignedToRefs
+                    t => !t.isCompleted && t.assignedTo && t.assignedTo.length > 0
                 );
                 const unassignedIncompleteTasks = incompleteTasks.filter(
-                    t => !t.isCompleted && (!t.assignedToRefs || t.assignedToRefs.length === 0) // FIX: Use assignedToRefs
+                    t => !t.isCompleted && (!t.assignedTo || t.assignedTo.length === 0)
                 );
 
                 return (
                     tasks.length > 0 ? (
                         <div className="space-y-4">
-                            <CollapsibleSection
+                            <Collapsible
                                 Icon={UserCheck}
                                 title="Assigned (Incomplete)"
                                 count={assignedIncompleteTasks.length}
@@ -255,9 +235,9 @@ const TaskList: React.FC = () => {
                                 {assignedIncompleteTasks.map((task) => (
                                     <TaskItem key={task._id} task={task} onEdit={() => openEditModal(task)} onDelete={() => openDeleteModal(task)} />
                                 ))}
-                            </CollapsibleSection>
+                            </Collapsible>
 
-                            <CollapsibleSection
+                            <Collapsible
                                 Icon={UserX}
                                 title="Unassigned"
                                 count={unassignedIncompleteTasks.length}
@@ -266,9 +246,9 @@ const TaskList: React.FC = () => {
                                 {unassignedIncompleteTasks.map((task) => (
                                     <TaskItem key={task._id} task={task} onEdit={() => openEditModal(task)} onDelete={() => openDeleteModal(task)} />
                                 ))}
-                            </CollapsibleSection>
+                            </Collapsible>
 
-                            <CollapsibleSection
+                            <Collapsible
                                 Icon={CheckSquare}
                                 title="Complete"
                                 count={completedTasks.length}
@@ -277,7 +257,7 @@ const TaskList: React.FC = () => {
                                 {completedTasks.map((task) => (
                                     <TaskItem key={task._id} task={task} onEdit={() => openEditModal(task)} onDelete={() => openDeleteModal(task)} />
                                 ))}
-                            </CollapsibleSection>
+                            </Collapsible>
                         </div>
                     ) : (
                         <div className="text-center p-8 bg-bg-surface rounded-lg shadow-md border border-border-subtle">
@@ -287,26 +267,23 @@ const TaskList: React.FC = () => {
                 );
             })()}
 
-            {/* Conditionally render the modal */}
             {isCreateModalOpen && (
                 <CreateTaskModal
                     onClose={() => setIsCreateModalOpen(false)}
                     onTaskCreated={handleTaskCreated}
-                    householdMembers={householdMembers} // Pass members
+                    householdMembers={householdMembers}
                 />
             )}
 
-            {/* Conditionally render Edit Modal */}
             {isEditModalOpen && selectedTask && (
                 <EditTaskModal
                     task={selectedTask}
                     onClose={() => setIsEditModalOpen(false)}
                     onTaskUpdated={handleTaskUpdated}
-                    householdMembers={householdMembers} // Pass members
+                    householdMembers={householdMembers}
                 />
             )}
 
-            {/* Conditionally render Delete Modal */}
             {isDeleteModalOpen && selectedTask && (
                 <DeleteTaskModal
                     task={selectedTask}

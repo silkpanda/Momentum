@@ -201,7 +201,7 @@ const MemberList: React.FC = () => {
     const getAssignedTaskCount = (memberFamilyId: string) => {
         return tasks.filter(task =>
             !task.isCompleted &&
-            task.assignedToRefs.some(profile => profile._id === memberFamilyId)
+            task.assignedTo.some(profile => profile._id === memberFamilyId)
         ).length;
     };
 

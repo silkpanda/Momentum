@@ -1,5 +1,5 @@
 // =========================================================
-// silkpanda/momentum/momentum-e07d696d5dc5be6d5d5681cef733d2cb80fb1772/app/components/tasks/EditTaskModal.tsx
+// silkpanda/momentum/app/components/tasks/EditTaskModal.tsx
 // REFACTORED: Add defensive null check for task assignments
 // REFACTORED (v4) to call Embedded Web BFF
 //
@@ -15,27 +15,34 @@ import { ITask } from './TaskList';
 import { IHouseholdMemberProfile } from '../members/MemberList';
 
 interface EditTaskModalProps {
-    task: ITask; // The task being edited
+    task: ITask;
     onClose: () => void;
-    onTaskUpdated: (updatedTask: ITask) => void; // TELA CODICIS: Pass back updated task
+    onTaskUpdated: (updatedTask: ITask) => void;
     householdMembers: IHouseholdMemberProfile[];
 }
 
 const EditTaskModal: React.FC<EditTaskModalProps> = ({
     task, onClose, onTaskUpdated, householdMembers
 }) => {
-    // Pre-fill state from the task prop
-    const [taskName, setTaskName] = useState(task.taskName);
+    const [title, setTitle] = useState(task.title);
     const [description, setDescription] = useState(task.description);
     const [pointsValue, setPointsValue] = useState(task.pointsValue);
 
-    // FIX 1 & 2: Rename state variable to match backend property 'assignedToRefs'
-    // This state holds the array of FamilyMember IDs (the IDs the backend needs)
-    const [assignedToRefs, setAssignedToRefs] = useState<string[]>(
-        // The assignedToProfileIds contains populated FamilyMember objects. 
-        // We map their _id, which is the FamilyMember ID, into the state array.
-        () => (task.assignedToRefs ?? []).map(member => member._id)
-    );
+    // FIX: The API populates assignedTo but may not include _id
+    // Instead, match the assigned members by displayName to the householdMembers list
+    const [assignedTo, setAssignedTo] = useState<string[]>(() => {
+        if (!task.assignedTo || task.assignedTo.length === 0) return [];
+
+        // Match assigned members to household members by displayName
+        const assignedIds: string[] = [];
+        task.assignedTo.forEach(assignedMember => {
+            const match = householdMembers.find(hm => hm.displayName === assignedMember.displayName);
+            if (match) {
+                assignedIds.push(match._id);
+            }
+        });
+        return assignedIds;
+    });
 
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -43,12 +50,16 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (taskName.trim() === '') {
-            setError('Task Name is required.');
+        if (title.trim() === '') {
+            setError('Task Title is required.');
             return;
         }
         if (pointsValue < 1) {
             setError('Points must be at least 1.');
+            return;
+        }
+        if (assignedTo.length === 0) {
+            setError('Please assign the task to at least one member.');
             return;
         }
 
@@ -56,8 +67,6 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
         setError(null);
 
         try {
-            // PATCH to the 'updateTask' endpoint
-            // REFACTORED (v4): Call the Embedded BFF endpoint
             const response = await fetch(`/web-bff/tasks/${task._id}`, {
                 method: 'PATCH',
                 headers: {
@@ -65,11 +74,10 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
                     'Authorization': `Bearer ${token}`,
                 },
                 body: JSON.stringify({
-                    taskName,
+                    title,
                     description,
                     pointsValue,
-                    // FIX 2: Send the correct field name 'assignedToRefs'
-                    assignedToRefs: assignedToRefs,
+                    assignedTo: assignedTo,
                 }),
             });
 
@@ -78,9 +86,8 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
                 throw new Error(data.message || 'Failed to update task.');
             }
 
-            // Call the refresh function passed from the parent
-            onTaskUpdated(data.data.task); // TELA CODICIS: Pass the updated task object back
-            onClose(); // Close the modal on success
+            onTaskUpdated(data.data.task);
+            onClose();
 
         } catch (err: any) {
             setError(err.message);
@@ -89,22 +96,20 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
         }
     };
 
-    // FIX 3: Update toggleAssignment to take the full profile and use the correct FamilyMember ID
     const toggleAssignment = (memberProfile: IHouseholdMemberProfile) => {
-        const memberRefId = memberProfile.familyMemberId._id; // Get the correct FamilyMember ID
+        const memberRefId = memberProfile._id;
 
-        setAssignedToRefs(prevIds => {
+        setAssignedTo(prevIds => {
             if (prevIds.includes(memberRefId)) {
-                return prevIds.filter(id => id !== memberRefId); // Remove ID
+                return prevIds.filter(id => id !== memberRefId);
             } else {
-                return [...prevIds, memberRefId]; // Add ID
+                return [...prevIds, memberRefId];
             }
         });
     };
 
-    // Helper to check if a member is currently assigned, checking against the FamilyMember ID
     const isMemberAssigned = (memberProfile: IHouseholdMemberProfile) => {
-        return assignedToRefs.includes(memberProfile.familyMemberId._id);
+        return assignedTo.includes(memberProfile._id);
     };
 
     return (
@@ -114,7 +119,7 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
         >
             <div
                 className="relative w-full max-w-lg p-6 bg-bg-surface rounded-xl shadow-xl border border-border-subtle"
-                onClick={(e) => e.stopPropagation()} // Prevent closing
+                onClick={(e) => e.stopPropagation()}
             >
                 <button
                     onClick={onClose}
@@ -126,21 +131,21 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
                 <form onSubmit={handleSubmit} className="flex flex-col space-y-4">
                     <h3 className="text-xl font-medium text-text-primary">Edit Task</h3>
 
-                    {/* Task Name Input */}
+                    {/* Task Title Input */}
                     <div className="space-y-1">
-                        <label htmlFor="taskName" className="block text-sm font-medium text-text-secondary">
-                            Task Name
+                        <label htmlFor="title" className="block text-sm font-medium text-text-secondary">
+                            Task Title
                         </label>
                         <div className="relative rounded-md shadow-sm">
                             <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
                                 <Type className="h-5 w-5 text-text-secondary" />
                             </div>
                             <input
-                                id="taskName"
-                                name="taskName"
+                                id="title"
+                                name="title"
                                 type="text"
-                                value={taskName}
-                                onChange={(e) => setTaskName(e.target.value)}
+                                value={title}
+                                onChange={(e) => setTitle(e.target.value)}
                                 className="block w-full rounded-md border border-border-subtle p-3 pl-10 text-text-primary bg-bg-surface"
                             />
                         </div>
@@ -183,31 +188,31 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
                         />
                     </div>
 
-                    {/* Assign Members (Optional) */}
+                    {/* Assign Members (Mandatory) */}
                     <div className="space-y-1">
                         <label className="block text-sm font-medium text-text-secondary">
-                            Assign to (Optional)
+                            Assign to (Mandatory)
                         </label>
                         <div className="flex flex-wrap gap-2 p-2 bg-bg-canvas rounded-lg border border-border-subtle">
                             {householdMembers.length > 0 ? householdMembers.map((member) => (
                                 <button
                                     type="button"
-                                    key={member._id} // Use sub-document _id
+                                    key={member._id}
                                     title={`Assign to ${member.displayName}`}
-                                    onClick={() => toggleAssignment(member)} // FIX: Pass the full member object
+                                    onClick={() => toggleAssignment(member)}
                                     className={`flex items-center space-x-2 p-2 pr-3 rounded-full border transition-all
-                            ${isMemberAssigned(member) // FIX: Check using helper function
+                            ${isMemberAssigned(member)
                                             ? 'bg-action-primary/10 border-action-primary text-action-primary'
                                             : 'bg-bg-surface border-border-subtle text-text-secondary hover:bg-border-subtle'}`}
                                 >
                                     <div
                                         className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white"
-                                        style={{ backgroundColor: member.profileColor || '#808080' }} // Add fallback
+                                        style={{ backgroundColor: member.profileColor || '#808080' }}
                                     >
                                         {member.displayName.charAt(0).toUpperCase()}
                                     </div>
                                     <span className="text-sm font-medium">{member.displayName}</span>
-                                    {isMemberAssigned(member) && ( // FIX: Check using helper function
+                                    {isMemberAssigned(member) && (
                                         <UserCheck className="w-4 h-4" />
                                     )}
                                 </button>

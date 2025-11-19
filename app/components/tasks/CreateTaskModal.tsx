@@ -1,5 +1,5 @@
 // =========================================================
-// silkpanda/momentum/momentum-e07d696d5dc5be6d5d5681cef733d2cb80fb1772/app/components/tasks/CreateTaskModal.tsx
+// silkpanda/momentum/app/components/tasks/CreateTaskModal.tsx
 // REFACTORED for Unified Task Assignment Model (API v3)
 // REFACTORED (v4) to call Embedded Web BFF
 //
@@ -12,56 +12,52 @@ import React, { useState } from 'react';
 import { Award, Check, Loader, Type, X, AlertTriangle, UserCheck } from 'lucide-react';
 import { ITask } from './TaskList';
 import { IHouseholdMemberProfile } from '../members/MemberList';
-import { useSession } from '../layout/SessionContext'; // TELA CODICIS: Import hook
+import { useSession } from '../layout/SessionContext';
 
-// Define the props the modal will accept
 interface CreateTaskModalProps {
     onClose: () => void;
-    onTaskCreated: (newTask: ITask) => void; // TELA CODICIS: Ensure this passes the new task
-    householdMembers: IHouseholdMemberProfile[]; // Accept the list of members
+    onTaskCreated: (newTask: ITask) => void;
+    householdMembers: IHouseholdMemberProfile[];
 }
 
-// Define the state for the form data
 interface TaskFormState {
-    taskName: string;
+    title: string; // FIX: API uses 'title', not 'taskName'
     description: string;
     pointsValue: number;
-    // FIX: Renamed to match backend schema property 'assignedToRefs'.
-    // This array MUST hold the FamilyMember IDs (the ObjectId references).
-    assignedToRefs: string[];
+    assignedTo: string[]; // FIX: API uses 'assignedTo', not 'assignedToRefs'
 }
 
 const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ onClose, onTaskCreated, householdMembers }) => {
     const [formData, setFormData] = useState<TaskFormState>({
-        taskName: '',
+        title: '',
         description: '',
-        pointsValue: 10, // Default points
-        assignedToRefs: [], // FIX: Use new field name
+        pointsValue: 10,
+        assignedTo: [],
     });
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const { token } = useSession(); // TELA CODICIS: Get token from context
+    const { token } = useSession();
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        // Add taskName validation
-        if (formData.taskName.trim() === '') {
-            setError('Task Name is a mandatory field.');
+        if (formData.title.trim() === '') {
+            setError('Task Title is a mandatory field.');
             return;
         }
         if (formData.pointsValue < 1) {
             setError('Points must be at least 1.');
             return;
         }
+        if (formData.assignedTo.length === 0) {
+            setError('Please assign the task to at least one member.');
+            return;
+        }
 
         setIsLoading(true);
         setError(null);
-        // TELA CODICIS: Token is now supplied by the useSession hook
 
         try {
-            // POST to the 'createTask' endpoint
-            // REFACTORED (v4): Call the Embedded BFF endpoint
             const response = await fetch('/web-bff/tasks', {
                 method: 'POST',
                 headers: {
@@ -69,12 +65,10 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ onClose, onTaskCreate
                     'Authorization': `Bearer ${token}`,
                 },
                 body: JSON.stringify({
-                    taskName: formData.taskName,
+                    title: formData.title,
                     description: formData.description,
                     pointsValue: formData.pointsValue,
-                    // FIX: Use the correct backend property name: assignedToRefs. 
-                    // The values are now the correct FamilyMember IDs.
-                    assignedToRefs: formData.assignedToRefs,
+                    assignedTo: formData.assignedTo,
                 }),
             });
 
@@ -83,9 +77,8 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ onClose, onTaskCreate
                 throw new Error(data.message || 'Failed to create task.');
             }
 
-            // Pass the new task (data.data.task) back to the parent list
-            onTaskCreated(data.data.task); // TELA CODICIS: Pass the new task object back
-            onClose(); // Close the modal on success
+            onTaskCreated(data.data.task);
+            onClose();
 
         } catch (err: any) {
             setError(err.message);
@@ -94,40 +87,32 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ onClose, onTaskCreate
         }
     };
 
-    // Helper function to toggle member assignment
-    // CRITICAL FIX: The toggle function must accept and use the actual FamilyMember ID (familyMemberId._id)
     const toggleAssignment = (memberProfile: IHouseholdMemberProfile) => {
-        // The ID the backend needs for the reference array (FamilyMember ID)
-        const memberRefId = memberProfile.familyMemberId._id;
+        // Use the memberProfile sub-document _id (which is the reference in the household)
+        const memberRefId = memberProfile._id;
 
         setFormData(prevData => {
-            const currentAssigned = prevData.assignedToRefs;
+            const currentAssigned = prevData.assignedTo;
             if (currentAssigned.includes(memberRefId)) {
-                // Remove ID
-                return { ...prevData, assignedToRefs: currentAssigned.filter(id => id !== memberRefId) };
+                return { ...prevData, assignedTo: currentAssigned.filter(id => id !== memberRefId) };
             } else {
-                // Add ID
-                return { ...prevData, assignedToRefs: [...currentAssigned, memberRefId] };
+                return { ...prevData, assignedTo: [...currentAssigned, memberRefId] };
             }
         });
     };
 
-    // Helper to check if a member is currently assigned, checking against the FamilyMember ID
     const isMemberAssigned = (memberProfile: IHouseholdMemberProfile) => {
-        return formData.assignedToRefs.includes(memberProfile.familyMemberId._id);
+        return formData.assignedTo.includes(memberProfile._id);
     };
 
-
     return (
-        // Modal Backdrop
         <div
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
             onClick={onClose}
         >
-            {/* Modal Content */}
             <div
                 className="relative w-full max-w-lg p-6 bg-bg-surface rounded-xl shadow-xl border border-border-subtle"
-                onClick={(e) => e.stopPropagation()} // Prevent closing modal when clicking inside
+                onClick={(e) => e.stopPropagation()}
             >
                 <button
                     onClick={onClose}
@@ -143,22 +128,22 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ onClose, onTaskCreate
                         Fill in the details for the new task.
                     </p>
 
-                    {/* Task Name Input */}
+                    {/* Task Title Input */}
                     <div className="space-y-1">
-                        <label htmlFor="taskName" className="block text-sm font-medium text-text-secondary">
-                            Task Name (Mandatory)
+                        <label htmlFor="title" className="block text-sm font-medium text-text-secondary">
+                            Task Title (Mandatory)
                         </label>
                         <div className="relative rounded-md shadow-sm">
                             <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
                                 <Type className="h-5 w-5 text-text-secondary" />
                             </div>
                             <input
-                                id="taskName"
-                                name="taskName"
+                                id="title"
+                                name="title"
                                 type="text"
-                                value={formData.taskName}
+                                value={formData.title}
                                 onChange={(e) => {
-                                    setFormData({ ...formData, taskName: e.target.value });
+                                    setFormData({ ...formData, title: e.target.value });
                                     if (error) setError(null);
                                 }}
                                 placeholder="e.g., 'Empty the dishwasher'"
@@ -204,31 +189,31 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ onClose, onTaskCreate
                         />
                     </div>
 
-                    {/* Assign Members (Optional) */}
+                    {/* Assign Members (Mandatory) */}
                     <div className="space-y-1">
                         <label className="block text-sm font-medium text-text-secondary">
-                            Assign to (Optional)
+                            Assign to (Mandatory)
                         </label>
                         <div className="flex flex-wrap gap-2 p-2 bg-bg-canvas rounded-lg border border-border-subtle">
                             {householdMembers.length > 0 ? householdMembers.map((member) => (
                                 <button
                                     type="button"
-                                    key={member._id} // Use sub-document _id for the React key
+                                    key={member._id}
                                     title={`Assign to ${member.displayName}`}
-                                    onClick={() => toggleAssignment(member)} // Pass the full member profile
+                                    onClick={() => toggleAssignment(member)}
                                     className={`flex items-center space-x-2 p-2 pr-3 rounded-full border transition-all
-                            ${isMemberAssigned(member) // Check if assigned using the helper
+                            ${isMemberAssigned(member)
                                             ? 'bg-action-primary/10 border-action-primary text-action-primary'
                                             : 'bg-bg-surface border-border-subtle text-text-secondary hover:bg-border-subtle'}`}
                                 >
                                     <div
                                         className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white"
-                                        style={{ backgroundColor: member.profileColor || '#808080' }} // Add fallback
+                                        style={{ backgroundColor: member.profileColor || '#808080' }}
                                     >
                                         {member.displayName.charAt(0).toUpperCase()}
                                     </div>
                                     <span className="text-sm font-medium">{member.displayName}</span>
-                                    {isMemberAssigned(member) && ( // Check if assigned
+                                    {isMemberAssigned(member) && (
                                         <UserCheck className="w-4 h-4" />
                                     )}
                                 </button>

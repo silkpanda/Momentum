@@ -39,7 +39,7 @@ export async function GET() {
         // 2. Aggregate and return the combined data
         return NextResponse.json({
             storeItems: itemData.data.storeItems || [],
-            memberProfiles: householdData.data.household.memberProfiles || [],
+            memberProfiles: householdData.data.memberProfiles || [],
         });
 
     } catch (err: any) {
