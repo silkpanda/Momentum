@@ -1,18 +1,9 @@
-// =========================================================
-// silkpanda/momentum/app/web-bff/tasks/route.ts
-// EMBEDDED WEB BFF (v4 Blueprint)
-// Handles creating a task (POST)
-// =========================================================
 import { NextResponse } from 'next/server';
 import { headers } from 'next/headers';
+import { API_BASE_URL } from '@/lib/config';
 
-const API_URL = 'http://localhost:3000/api/v1/tasks';
+const API_URL = `${API_BASE_URL}/tasks`;
 
-/**
- * @desc    Create a new task
- * @route   POST /web-bff/tasks
- * @access  Private
- */
 export async function POST(req: Request) {
     const headersList = headers();
     const authorization = headersList.get('authorization');

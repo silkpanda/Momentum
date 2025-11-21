@@ -1,18 +1,9 @@
-// =========================================================
-// silkpanda/momentum/app/web-bff/store/route.ts
-// EMBEDDED WEB BFF (v4 Blueprint)
-// Handles creating a new store item (POST)
-// =========================================================
 import { NextResponse } from 'next/server';
 import { headers } from 'next/headers';
+import { API_BASE_URL } from '@/lib/config';
 
-const API_URL = 'http://localhost:3000/api/v1/store-items';
+const API_URL = `${API_BASE_URL}/store-items`;
 
-/**
- * @desc    Create a new store item
- * @route   POST /web-bff/store
- * @access  Private
- */
 export async function POST(req: Request) {
     const headersList = headers();
     const authorization = headersList.get('authorization');

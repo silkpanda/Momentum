@@ -1,10 +1,6 @@
-// =========================================================
-// silkpanda/momentum/app/web-bff/store/[id]/route.ts
-// EMBEDDED WEB BFF (v4 Blueprint)
-// Handles updating (PATCH) and deleting (DELETE) a store item
-// =========================================================
 import { NextResponse } from 'next/server';
 import { headers } from 'next/headers';
+import { API_BASE_URL } from '@/lib/config';
 
 /**
  * @desc    Update a store item
@@ -20,7 +16,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
         return NextResponse.json({ message: 'Authorization header is missing' }, { status: 401 });
     }
 
-    const API_URL = `http://localhost:3000/api/v1/store-items/${itemId}`;
+    const API_URL = `${API_BASE_URL}/store-items/${itemId}`;
 
     try {
         const body = await req.json();
@@ -56,7 +52,7 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
         return NextResponse.json({ message: 'Authorization header is missing' }, { status: 401 });
     }
 
-    const API_URL = `http://localhost:3000/api/v1/store-items/${itemId}`;
+    const API_URL = `${API_BASE_URL}/store-items/${itemId}`;
 
     try {
         const apiResponse = await fetch(API_URL, {

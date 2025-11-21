@@ -117,7 +117,6 @@ const QuestItem: React.FC<QuestItemProps> = ({ quest, onUpdate, onDelete }) => {
                     <div className="flex space-x-2 w-full">
                         {isParent && (
                             <>
-                                {/* Edit button disabled: API does not support updating quests
                                 <button
                                     onClick={() => setIsEditModalOpen(true)}
                                     disabled={isLoading}
@@ -126,7 +125,6 @@ const QuestItem: React.FC<QuestItemProps> = ({ quest, onUpdate, onDelete }) => {
                                 >
                                     <Pencil className="w-4 h-4" />
                                 </button>
-                                */}
                                 <button
                                     onClick={() => handleAction('delete')}
                                     disabled={isLoading}

@@ -50,7 +50,7 @@ const EditQuestModal: React.FC<EditQuestModalProps> = ({ quest, onClose, onQuest
 
         try {
             const response = await fetch(`/web-bff/quests/${quest._id}`, {
-                method: 'PATCH',
+                method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`,

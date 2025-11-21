@@ -5,10 +5,9 @@
 // =========================================================
 import { NextResponse } from 'next/server';
 import { headers } from 'next/headers';
+import { API_BASE_URL } from '../../../../lib/config';
 
-const API_BASE_URL = 'http://localhost:3000/api/v1/quests';
-
-export async function PATCH(
+export async function PUT(
     request: Request,
     { params }: { params: { id: string } }
 ) {
@@ -23,8 +22,8 @@ export async function PATCH(
         const body = await request.json();
         const { id } = params;
 
-        const response = await fetch(`${API_BASE_URL}/${id}`, {
-            method: 'PATCH',
+        const response = await fetch(`${API_BASE_URL}/quests/${id}`, {
+            method: 'PUT',
             headers: {
                 'Authorization': authorization,
                 'Content-Type': 'application/json',

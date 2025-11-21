@@ -96,7 +96,7 @@ const LoginForm: React.FC = () => {
 
             setTimeout(() => {
                 // Redirect to the protected dashboard area after login
-                router.push('/dashboard');
+                router.push('/family');
             }, 1500);
 
         } catch (err) {

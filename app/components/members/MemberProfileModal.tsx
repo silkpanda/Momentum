@@ -4,6 +4,7 @@
 // =========================================================
 'use client';
 
+
 import React from 'react';
 import { X, Award, CheckCircle, User } from 'lucide-react';
 import { IHouseholdMemberProfile } from './MemberList';
@@ -29,7 +30,7 @@ const ProfileTaskItem: React.FC<{ task: ITask; isComplete: boolean }> = ({ task,
             </div>
             <div>
                 <p className={`text-sm font-medium ${isComplete ? 'text-text-secondary line-through' : 'text-text-primary'}`}>
-                    {task.taskName}
+                    {task.title}
                 </p>
                 <p className="text-xs text-text-secondary">{task.description || 'No description'}</p>
             </div>
@@ -49,12 +50,12 @@ const MemberProfileModal: React.FC<MemberProfileModalProps> = ({ member, allTask
     // Filter tasks for this specific member
     const incompleteTasks = allTasks.filter(task =>
         !task.isCompleted &&
-        task.assignedToProfileIds.some(profile => profile._id === member.familyMemberId._id)
+        task.assignedTo.some(profile => profile._id === member.familyMemberId._id)
     );
 
     const completedTasks = allTasks.filter(task =>
         task.isCompleted &&
-        task.assignedToProfileIds.some(profile => profile._id === member.familyMemberId._id)
+        task.assignedTo.some(profile => profile._id === member.familyMemberId._id)
     );
 
     return (

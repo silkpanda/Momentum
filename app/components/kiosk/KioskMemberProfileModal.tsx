@@ -1,0 +1,354 @@
+// =========================================================
+// momentum-web/app/components/kiosk/KioskMemberProfileModal.tsx
+// Member Profile View Modal for Kiosk
+// Tabs: Tasks, Points & Store, Profile
+// =========================================================
+'use client';
+
+import React, { useState } from 'react';
+import { useSession } from '../layout/SessionContext';
+import { IHouseholdMemberProfile } from '../members/MemberList';
+import { ITask } from '../tasks/TaskList';
+import { IStoreItem } from '../store/StoreItemList';
+import { X, CheckSquare, Award, User, Loader, Gift, ChevronRight } from 'lucide-react';
+
+interface KioskMemberProfileModalProps {
+    member: IHouseholdMemberProfile;
+    allTasks: ITask[];
+    allItems: IStoreItem[];
+    onClose: () => void;
+}
+
+type TabType = 'tasks' | 'store' | 'profile';
+
+const KioskMemberProfileModal: React.FC<KioskMemberProfileModalProps> = ({
+    member,
+    allTasks,
+    allItems,
+    onClose,
+}) => {
+    const { token } = useSession();
+    const [activeTab, setActiveTab] = useState<TabType>('tasks');
+    const [completingTaskId, setCompletingTaskId] = useState<string | null>(null);
+    const [error, setError] = useState<string | null>(null);
+
+    // Filter tasks for this member
+    const memberTasks = allTasks.filter(task =>
+        !task.isCompleted &&
+        task.assignedTo?.some(assignee => assignee._id === member.familyMemberId._id)
+    );
+
+    // Filter store items by affordability
+    const affordableItems = allItems.filter(item => item.cost <= member.pointsTotal);
+    const futureItems = allItems.filter(item => item.cost > member.pointsTotal);
+
+    // Handle task completion
+    const handleCompleteTask = async (taskId: string) => {
+        if (completingTaskId) return;
+
+        setCompletingTaskId(taskId);
+        setError(null);
+
+        try {
+            const response = await fetch(`/web-bff/tasks/${taskId}/complete`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`,
+                },
+                body: JSON.stringify({ memberId: member.familyMemberId._id }),
+            });
+
+            if (!response.ok) {
+                const data = await response.json();
+                throw new Error(data.message || 'Failed to complete task');
+            }
+
+            // Success - close modal to refresh data
+            onClose();
+        } catch (e: any) {
+            setError(e.message);
+        } finally {
+            setCompletingTaskId(null);
+        }
+    };
+
+    // Handle reward request
+    const handleRequestReward = async (itemId: string) => {
+        // TODO: Implement approval request system
+        alert('Reward approval system coming soon!');
+    };
+
+    // Tab Button Component
+    const TabButton: React.FC<{ tab: TabType; icon: React.ElementType; label: string }> = ({
+        tab,
+        icon: Icon,
+        label,
+    }) => (
+        <button
+            onClick={() => setActiveTab(tab)}
+            className={`flex items-center space-x-2 px-6 py-3 rounded-lg font-medium transition-all ${activeTab === tab
+                    ? 'bg-action-primary text-white shadow-lg'
+                    : 'bg-bg-canvas text-text-secondary hover:bg-border-subtle'
+                }`}
+        >
+            <Icon className="w-5 h-5" />
+            <span>{label}</span>
+        </button>
+    );
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+            <div className="bg-bg-surface rounded-2xl shadow-2xl border border-border-subtle max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+
+                {/* Header */}
+                <div className="flex items-center justify-between p-6 border-b border-border-subtle">
+                    <div className="flex items-center space-x-4">
+                        {/* Avatar */}
+                        <div
+                            className="w-16 h-16 rounded-full flex items-center justify-center text-white font-bold text-2xl shadow-lg"
+                            style={{ backgroundColor: member.profileColor || '#6B7280' }}
+                        >
+                            {member.role === 'Parent' ? (
+                                <User className="w-8 h-8" />
+                            ) : (
+                                member.displayName.charAt(0).toUpperCase()
+                            )}
+                        </div>
+
+                        {/* Name & Points */}
+                        <div>
+                            <h2 className="text-2xl font-bold text-text-primary">
+                                {member.displayName}
+                            </h2>
+                            <p className="text-lg text-action-primary font-semibold">
+                                {member.pointsTotal} Points
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Close Button */}
+                    <button
+                        onClick={onClose}
+                        className="p-2 rounded-lg text-text-secondary hover:text-signal-alert hover:bg-signal-alert/10 transition-all"
+                    >
+                        <X className="w-6 h-6" />
+                    </button>
+                </div>
+
+                {/* Tab Navigation */}
+                <div className="flex items-center space-x-2 px-6 py-4 bg-bg-canvas border-b border-border-subtle">
+                    <TabButton tab="tasks" icon={CheckSquare} label="Tasks" />
+                    <TabButton tab="store" icon={Gift} label="Rewards" />
+                    <TabButton tab="profile" icon={User} label="Profile" />
+                </div>
+
+                {/* Error Display */}
+                {error && (
+                    <div className="mx-6 mt-4 p-3 bg-signal-alert/10 text-signal-alert rounded-lg text-sm">
+                        {error}
+                    </div>
+                )}
+
+                {/* Tab Content */}
+                <div className="flex-1 overflow-y-auto p-6">
+
+                    {/* TASKS TAB */}
+                    {activeTab === 'tasks' && (
+                        <div className="space-y-4">
+                            <h3 className="text-xl font-semibold text-text-primary mb-4">
+                                Assigned Tasks ({memberTasks.length})
+                            </h3>
+
+                            {memberTasks.length === 0 ? (
+                                <div className="text-center py-12">
+                                    <CheckSquare className="w-16 h-16 text-text-secondary mx-auto mb-4 opacity-50" />
+                                    <p className="text-text-secondary text-lg">
+                                        No tasks assigned. Great job! 🎉
+                                    </p>
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    {memberTasks.map((task) => (
+                                        <div
+                                            key={task._id}
+                                            className="flex items-center justify-between p-4 bg-bg-canvas rounded-lg border border-border-subtle hover:border-action-primary transition-all"
+                                        >
+                                            <div className="flex-1">
+                                                <h4 className="text-lg font-medium text-text-primary mb-1">
+                                                    {task.title}
+                                                </h4>
+                                                {task.description && (
+                                                    <p className="text-sm text-text-secondary">
+                                                        {task.description}
+                                                    </p>
+                                                )}
+                                                <p className="text-sm font-semibold text-signal-success mt-2">
+                                                    +{task.pointsValue} Points
+                                                </p>
+                                            </div>
+
+                                            {/* Complete Button */}
+                                            <button
+                                                onClick={() => handleCompleteTask(task._id)}
+                                                disabled={completingTaskId === task._id}
+                                                className="ml-4 px-6 py-3 bg-signal-success text-white rounded-lg font-medium 
+                                                         hover:bg-signal-success/90 disabled:opacity-50 disabled:cursor-not-allowed
+                                                         transition-all shadow-md hover:shadow-lg flex items-center space-x-2"
+                                            >
+                                                {completingTaskId === task._id ? (
+                                                    <>
+                                                        <Loader className="w-5 h-5 animate-spin" />
+                                                        <span>Completing...</span>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <CheckSquare className="w-5 h-5" />
+                                                        <span>Complete</span>
+                                                    </>
+                                                )}
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* STORE TAB */}
+                    {activeTab === 'store' && (
+                        <div className="space-y-6">
+                            {/* Affordable Rewards */}
+                            <div>
+                                <h3 className="text-xl font-semibold text-text-primary mb-4 flex items-center">
+                                    <Gift className="w-6 h-6 mr-2 text-signal-success" />
+                                    Available Now ({affordableItems.length})
+                                </h3>
+
+                                {affordableItems.length === 0 ? (
+                                    <p className="text-text-secondary text-center py-8">
+                                        No rewards available yet. Complete tasks to earn points!
+                                    </p>
+                                ) : (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        {affordableItems.map((item) => (
+                                            <div
+                                                key={item._id}
+                                                className="p-4 bg-bg-canvas rounded-lg border-2 border-signal-success/30 hover:border-signal-success transition-all"
+                                            >
+                                                <h4 className="text-lg font-medium text-text-primary mb-2">
+                                                    {item.itemName}
+                                                </h4>
+                                                {item.description && (
+                                                    <p className="text-sm text-text-secondary mb-3">
+                                                        {item.description}
+                                                    </p>
+                                                )}
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-xl font-bold text-action-primary">
+                                                        {item.cost} Points
+                                                    </span>
+                                                    <button
+                                                        onClick={() => handleRequestReward(item._id)}
+                                                        className="px-4 py-2 bg-signal-success text-white rounded-lg font-medium 
+                                                                 hover:bg-signal-success/90 transition-all flex items-center space-x-1"
+                                                    >
+                                                        <span>Redeem</span>
+                                                        <ChevronRight className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Future Rewards */}
+                            {futureItems.length > 0 && (
+                                <div>
+                                    <h3 className="text-xl font-semibold text-text-primary mb-4 flex items-center">
+                                        <Award className="w-6 h-6 mr-2 text-text-secondary" />
+                                        Save Up For ({futureItems.length})
+                                    </h3>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        {futureItems.map((item) => (
+                                            <div
+                                                key={item._id}
+                                                className="p-4 bg-bg-canvas rounded-lg border border-border-subtle opacity-75"
+                                            >
+                                                <h4 className="text-lg font-medium text-text-primary mb-2">
+                                                    {item.itemName}
+                                                </h4>
+                                                {item.description && (
+                                                    <p className="text-sm text-text-secondary mb-3">
+                                                        {item.description}
+                                                    </p>
+                                                )}
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-xl font-bold text-text-secondary">
+                                                        {item.cost} Points
+                                                    </span>
+                                                    <span className="text-sm text-text-secondary">
+                                                        Need {item.cost - member.pointsTotal} more
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* PROFILE TAB */}
+                    {activeTab === 'profile' && (
+                        <div className="space-y-6">
+                            <h3 className="text-xl font-semibold text-text-primary mb-4">
+                                Profile Information
+                            </h3>
+
+                            <div className="space-y-4">
+                                <div className="p-4 bg-bg-canvas rounded-lg border border-border-subtle">
+                                    <p className="text-sm text-text-secondary mb-1">Display Name</p>
+                                    <p className="text-lg font-medium text-text-primary">
+                                        {member.displayName}
+                                    </p>
+                                </div>
+
+                                <div className="p-4 bg-bg-canvas rounded-lg border border-border-subtle">
+                                    <p className="text-sm text-text-secondary mb-1">Role</p>
+                                    <p className="text-lg font-medium text-text-primary">
+                                        {member.role}
+                                    </p>
+                                </div>
+
+                                <div className="p-4 bg-bg-canvas rounded-lg border border-border-subtle">
+                                    <p className="text-sm text-text-secondary mb-2">Profile Color</p>
+                                    <div className="flex items-center space-x-3">
+                                        <div
+                                            className="w-12 h-12 rounded-lg shadow-md"
+                                            style={{ backgroundColor: member.profileColor || '#6B7280' }}
+                                        />
+                                        <p className="text-sm font-mono text-text-primary">
+                                            {member.profileColor || '#6B7280'}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="p-4 bg-bg-canvas rounded-lg border border-border-subtle">
+                                    <p className="text-sm text-text-secondary mb-1">Total Points Earned</p>
+                                    <p className="text-3xl font-bold text-action-primary">
+                                        {member.pointsTotal}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+export default KioskMemberProfileModal;
