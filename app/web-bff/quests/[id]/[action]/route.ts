@@ -5,6 +5,7 @@
 // =========================================================
 import { NextResponse } from 'next/server';
 import { headers } from 'next/headers';
+import { API_BASE_URL } from '@/lib/config';
 
 export async function POST(req: Request, { params }: { params: { id: string, action: string } }) {
     const headersList = headers();
@@ -15,7 +16,7 @@ export async function POST(req: Request, { params }: { params: { id: string, act
         return NextResponse.json({ message: 'Authorization header is missing' }, { status: 401 });
     }
 
-    const API_URL = `http://localhost:3000/api/v1/quests/${id}/${action}`;
+    const API_URL = `${API_BASE_URL}/quests/${id}/${action}`;
 
     try {
         const body = await req.json();

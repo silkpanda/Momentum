@@ -5,6 +5,7 @@
 // =========================================================
 import { NextResponse } from 'next/server';
 import { headers } from 'next/headers';
+import { API_BASE_URL } from '@/lib/config';
 
 /**
  * @desc    Mark a task as complete
@@ -20,7 +21,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
         return NextResponse.json({ message: 'Authorization header is missing' }, { status: 401 });
     }
 
-    const API_URL = `http://localhost:3000/api/v1/tasks/${taskId}/complete`;
+    const API_URL = `${API_BASE_URL}/tasks/${taskId}/complete`;
 
     try {
         const body = await req.json();

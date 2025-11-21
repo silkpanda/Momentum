@@ -5,9 +5,10 @@
 // =========================================================
 import { NextResponse } from 'next/server';
 import { headers } from 'next/headers';
+import { API_BASE_URL } from '@/lib/config';
 
-const ROUTINES_API_URL = 'http://localhost:3000/api/v1/routines';
-const HOUSEHOLD_API_URL = 'http://localhost:3000/api/v1/households';
+const ROUTINES_API_URL = `${API_BASE_URL}/routines`;
+const HOUSEHOLD_API_URL = `${API_BASE_URL}/households`;
 
 export async function GET() {
     const headersList = headers();

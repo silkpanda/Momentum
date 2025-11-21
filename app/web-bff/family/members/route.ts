@@ -5,6 +5,7 @@
 // =========================================================
 import { NextResponse } from 'next/server';
 import { headers } from 'next/headers';
+import { API_BASE_URL } from '@/lib/config';
 
 /**
  * @desc    Create a new household member
@@ -28,7 +29,7 @@ export async function POST(req: Request) {
         }
 
         // Construct the internal API URL, as required by the household controller
-        const API_URL = `http://localhost:3000/api/v1/households/${householdId}/members`;
+        const API_URL = `${API_BASE_URL}/households/${householdId}/members`;
 
         const apiResponse = await fetch(API_URL, {
             method: 'POST',

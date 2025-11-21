@@ -5,10 +5,11 @@
 // =========================================================
 import { NextResponse } from 'next/server';
 import { headers } from 'next/headers';
+import { API_BASE_URL } from '@/lib/config';
 
 // Internal API URLs
-const HOUSEHOLD_API_URL = 'http://localhost:3000/api/v1/households';
-const TASK_API_URL = 'http://localhost:3000/api/v1/tasks';
+const HOUSEHOLD_API_URL = `${API_BASE_URL}/households`;
+const TASK_API_URL = `${API_BASE_URL}/tasks`;
 
 /**
  * @desc    Get all data for the Member management page

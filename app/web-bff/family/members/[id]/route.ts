@@ -5,6 +5,7 @@
 // =========================================================
 import { NextResponse } from 'next/server';
 import { headers } from 'next/headers';
+import { API_BASE_URL } from '@/lib/config';
 
 /**
  * @desc    Update a member profile
@@ -31,7 +32,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
         }
 
         // 3. Construct the correct internal API URL
-        const API_URL = `http://localhost:3000/api/v1/households/${householdId}/members/${memberProfileId}`;
+        const API_URL = `${API_BASE_URL}/households/${householdId}/members/${memberProfileId}`;
 
         const apiResponse = await fetch(API_URL, {
             method: 'PATCH',
@@ -73,7 +74,7 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
     }
 
     // 2. Construct the correct internal API URL
-    const API_URL = `http://localhost:3000/api/v1/households/${householdId}/members/${memberProfileId}`;
+    const API_URL = `${API_BASE_URL}/households/${householdId}/members/${memberProfileId}`;
 
     try {
         const apiResponse = await fetch(API_URL, {

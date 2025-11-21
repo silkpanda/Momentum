@@ -5,8 +5,9 @@
 // =========================================================
 import { NextResponse } from 'next/server';
 import { headers } from 'next/headers';
+import { API_BASE_URL } from '@/lib/config';
 
-const API_URL = 'http://localhost:3000/api/v1/meals/restaurants';
+const API_URL = `${API_BASE_URL}/meals/restaurants`;
 
 export async function POST(req: Request) {
     const headersList = headers();

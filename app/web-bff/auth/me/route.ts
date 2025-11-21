@@ -5,9 +5,10 @@
 // =========================================================
 import { NextResponse } from 'next/server';
 import { headers } from 'next/headers';
+import { API_BASE_URL } from '@/lib/config';
 
 // This is our internal API's URL.
-const API_URL = 'http://localhost:3000/api/v1/auth/me';
+const API_URL = `${API_BASE_URL}/auth/me`;
 
 /**
  * @desc    Get the authenticated user's data
@@ -44,7 +45,7 @@ export async function GET() {
         const userId = data.data.user._id;
 
         if (householdId) {
-            const householdResponse = await fetch(`http://localhost:3000/api/v1/households/${householdId}`, {
+            const householdResponse = await fetch(`${API_BASE_URL}/households/${householdId}`, {
                 method: 'GET',
                 headers: {
                     'Authorization': authorization,

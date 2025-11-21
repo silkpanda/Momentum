@@ -4,9 +4,10 @@
 // Handles Parent login
 // =========================================================
 import { NextResponse } from 'next/server';
+import { API_BASE_URL } from '@/lib/config';
 
 // This is our internal API's URL.
-const API_URL = 'http://localhost:3000/api/v1/auth/login';
+const API_URL = `${API_BASE_URL}/auth/login`;
 
 /**
  * @desc    Handle Parent Login

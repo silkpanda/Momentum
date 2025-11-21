@@ -5,10 +5,11 @@
 // =========================================================
 import { NextResponse } from 'next/server';
 import { headers } from 'next/headers';
+import { API_BASE_URL } from '@/lib/config';
 
 // Internal API URLs
-const STORE_API_URL = 'http://localhost:3000/api/v1/store-items';
-const HOUSEHOLD_API_URL = 'http://localhost:3000/api/v1/households';
+const STORE_API_URL = `${API_BASE_URL}/store-items`;
+const HOUSEHOLD_API_URL = `${API_BASE_URL}/households`;
 
 /**
  * @desc    Get all data for the Store management page

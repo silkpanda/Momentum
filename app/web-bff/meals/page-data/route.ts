@@ -5,10 +5,11 @@
 // =========================================================
 import { NextResponse } from 'next/server';
 import { headers } from 'next/headers';
+import { API_BASE_URL } from '@/lib/config';
 
-const RECIPES_API_URL = 'http://localhost:3000/api/v1/meals/recipes';
-const RESTAURANTS_API_URL = 'http://localhost:3000/api/v1/meals/restaurants';
-const MEAL_PLANS_API_URL = 'http://localhost:3000/api/v1/meals/plans';
+const RECIPES_API_URL = `${API_BASE_URL}/meals/recipes`;
+const RESTAURANTS_API_URL = `${API_BASE_URL}/meals/restaurants`;
+const MEAL_PLANS_API_URL = `${API_BASE_URL}/meals/plans`;
 
 export async function GET() {
     const headersList = headers();

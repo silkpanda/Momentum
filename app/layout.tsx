@@ -1,6 +1,7 @@
 import './global.css';
 import { ThemeProvider } from './components/layout/ThemeContext';
 import { SessionProvider } from './components/layout/SessionProvider';
+import { SocketProvider } from '../lib/providers/SocketProvider';
 
 export const metadata = {
   title: 'Momentum - Family Task & Reward System',
@@ -16,9 +17,11 @@ export default function RootLayout({
     <html lang="en">
       <body>
         <SessionProvider>
-          <ThemeProvider>
-            {children}
-          </ThemeProvider>
+          <SocketProvider>
+            <ThemeProvider>
+              {children}
+            </ThemeProvider>
+          </SocketProvider>
         </SessionProvider>
       </body>
     </html>

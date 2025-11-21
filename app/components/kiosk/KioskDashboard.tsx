@@ -12,6 +12,8 @@ import { ITask } from '../tasks/TaskList';
 import { IStoreItem } from '../store/StoreItemList';
 import { Loader, AlertTriangle, User, Calendar, UtensilsCrossed, ListTodo } from 'lucide-react';
 import KioskMemberProfileModal from './KioskMemberProfileModal';
+import { useSocketEvent } from '../../../lib/hooks/useSocket';
+import { SOCKET_EVENTS, TaskUpdatedEvent, MemberPointsUpdatedEvent, StoreItemUpdatedEvent, HouseholdUpdatedEvent } from '../../../lib/socket';
 
 // --- Member Avatar Card Component ---
 interface MemberAvatarProps {
@@ -164,6 +166,70 @@ const KioskDashboard: React.FC = () => {
         fetchData();
     }, [fetchData]);
 
+    // ========================================
+    // WebSocket Real-Time Updates
+    // ========================================
+
+    // Listen for task updates
+    useSocketEvent<TaskUpdatedEvent>(SOCKET_EVENTS.TASK_UPDATED, (data) => {
+        console.log('[KioskDashboard] Task updated via WebSocket:', data);
+
+        if (data.type === 'create' && data.task) {
+            // Add new task
+            setTasks(prev => [data.task, ...prev]);
+        } else if (data.type === 'update' && data.task) {
+            // Update existing task
+            setTasks(prev => prev.map(t => t._id === data.task._id ? data.task : t));
+
+            // Update member points if included
+            if (data.memberUpdate) {
+                setMembers(prev => prev.map(m =>
+                    m._id === data.memberUpdate!.memberId
+                        ? { ...m, pointsTotal: data.memberUpdate!.pointsTotal }
+                        : m
+                ));
+            }
+        } else if (data.type === 'delete' && data.taskId) {
+            // Remove deleted task
+            setTasks(prev => prev.filter(t => t._id !== data.taskId));
+        }
+    });
+
+    // Listen for member points updates
+    useSocketEvent<MemberPointsUpdatedEvent>(SOCKET_EVENTS.MEMBER_POINTS_UPDATED, (data) => {
+        console.log('[KioskDashboard] Member points updated via WebSocket:', data);
+
+        setMembers(prev => prev.map(m =>
+            m._id === data.memberId
+                ? { ...m, pointsTotal: data.pointsTotal }
+                : m
+        ));
+    });
+
+    // Listen for store item updates
+    useSocketEvent<StoreItemUpdatedEvent>(SOCKET_EVENTS.STORE_ITEM_UPDATED, (data) => {
+        console.log('[KioskDashboard] Store item updated via WebSocket:', data);
+
+        if (data.type === 'create' && data.storeItem) {
+            setStoreItems(prev => [data.storeItem, ...prev]);
+        } else if (data.type === 'update' && data.storeItem) {
+            setStoreItems(prev => prev.map(item => item._id === data.storeItem._id ? data.storeItem : item));
+        } else if (data.type === 'delete' && data.storeItemId) {
+            setStoreItems(prev => prev.filter(item => item._id !== data.storeItemId));
+        }
+    });
+
+    // Listen for household updates (renames, member add/remove/update)
+    useSocketEvent<HouseholdUpdatedEvent>(SOCKET_EVENTS.HOUSEHOLD_UPDATED, (data) => {
+        console.log('[KioskDashboard] Household updated via WebSocket:', data);
+
+        // Only refresh if it matches our current household
+        if (data.householdId === householdId) {
+            console.log('[KioskDashboard] Refreshing data due to household update');
+            fetchData();
+        }
+    });
+
     // Get task count for a member
     const getTaskCount = (memberFamilyId: string) => {
         return tasks.filter(task =>
@@ -181,7 +247,7 @@ const KioskDashboard: React.FC = () => {
     const handleModalClose = () => {
         setIsModalOpen(false);
         setSelectedMember(null);
-        fetchData(); // Refresh data when modal closes
+        // No need to refresh data - WebSocket updates handle this automatically
     };
 
     if (loading) {
@@ -245,12 +311,12 @@ const KioskDashboard: React.FC = () => {
                             />
                         ))}
                 </div>
-            </section >
+            </section>
 
             {/* Quick Info Grid */}
-            < section className="grid grid-cols-1 md:grid-cols-3 gap-6" >
+            <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {/* Today's Tasks */}
-                < InfoCard icon={ListTodo} title="Today's Tasks" >
+                <InfoCard icon={ListTodo} title="Today's Tasks">
                     <div className="space-y-2">
                         <div className="flex items-center justify-between">
                             <span className="text-text-secondary">Pending</span>
@@ -265,26 +331,26 @@ const KioskDashboard: React.FC = () => {
                             </span>
                         </div>
                     </div>
-                </InfoCard >
+                </InfoCard>
 
                 {/* Calendar (Placeholder) */}
-                < InfoCard icon={Calendar} title="Today's Schedule" >
+                <InfoCard icon={Calendar} title="Today's Schedule">
                     <div className="text-center py-4">
                         <p className="text-text-secondary">
                             Calendar integration coming soon
                         </p>
                     </div>
-                </InfoCard >
+                </InfoCard>
 
                 {/* Meal Plan (Placeholder) */}
-                < InfoCard icon={UtensilsCrossed} title="Today's Meals" >
+                <InfoCard icon={UtensilsCrossed} title="Today's Meals">
                     <div className="text-center py-4">
                         <p className="text-text-secondary">
                             Meal planning coming soon
                         </p>
                     </div>
-                </InfoCard >
-            </section >
+                </InfoCard>
+            </section>
 
             {/* Member Profile Modal */}
             {
@@ -297,7 +363,7 @@ const KioskDashboard: React.FC = () => {
                     />
                 )
             }
-        </div >
+        </div>
     );
 };
 

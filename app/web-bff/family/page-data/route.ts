@@ -5,11 +5,12 @@
 // =========================================================
 import { NextResponse } from 'next/server';
 import { headers } from 'next/headers';
+import { API_BASE_URL } from '@/lib/config';
 
 // Internal API URLs
-const AUTH_ME_URL = 'http://localhost:3000/api/v1/auth/me';
-const TASK_API_URL = 'http://localhost:3000/api/v1/tasks';
-const STORE_API_URL = 'http://localhost:3000/api/v1/store-items';
+const AUTH_ME_URL = `${API_BASE_URL}/auth/me`;
+const TASK_API_URL = `${API_BASE_URL}/tasks`;
+const STORE_API_URL = `${API_BASE_URL}/store-items`;
 
 /**
  * @desc    Get all data for the Family View page
@@ -43,7 +44,7 @@ export async function GET() {
 
         // 2. Make parallel calls to the internal 'momentum-api' with the householdId
         const [householdResponse, taskResponse, storeResponse] = await Promise.all([
-            fetch(`http://localhost:3000/api/v1/households/${householdId}`, {
+            fetch(`${API_BASE_URL}/households/${householdId}`, {
                 headers: { 'Authorization': authorization }
             }),
             fetch(TASK_API_URL, { headers: { 'Authorization': authorization } }),

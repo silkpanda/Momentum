@@ -4,10 +4,10 @@
 // Handles Parent sign-up
 // =========================================================
 import { NextResponse } from 'next/server';
+import { API_BASE_URL } from '@/lib/config';
 
 // This is our internal API's URL.
-// In production, this would be a secure environment variable.
-const API_URL = 'http://localhost:3000/api/v1/auth/signup';
+const API_URL = `${API_BASE_URL}/auth/signup`;
 
 /**
  * @desc    Handle Parent Sign-up
