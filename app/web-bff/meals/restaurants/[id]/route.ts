@@ -6,7 +6,7 @@
 import { NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 
-const API_BASE_URL = 'http://localhost:3000/api/v1/meals/restaurants';
+const API_BASE_URL = 'http://localhost:3001/api/v1/meals/restaurants';
 
 export async function PATCH(
     request: Request,
