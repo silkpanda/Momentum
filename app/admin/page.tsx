@@ -44,7 +44,7 @@ export default function AdminPage() {
                         Only parents can access the Parent View.
                     </p>
                     <button
-                        onClick={() => router.push('/')}
+                        onClick={() => router.push('/family')}
                         className="px-6 py-3 bg-action-primary text-white rounded-lg font-medium hover:bg-action-hover transition-all"
                     >
                         Return to Family View
@@ -72,7 +72,7 @@ export default function AdminPage() {
                     <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-4">
                             <button
-                                onClick={() => router.push('/')}
+                                onClick={() => router.push('/family')}
                                 className="flex items-center space-x-2 text-text-secondary hover:text-action-primary transition-colors"
                             >
                                 <ArrowLeft className="w-5 h-5" />
@@ -113,10 +113,10 @@ export default function AdminPage() {
                         })}
                     </nav>
                 </div>
-            </div>
+            </div >
 
             {/* Tab Content */}
-            <main className="max-w-7xl mx-auto px-6 py-8">
+            < main className="max-w-7xl mx-auto px-6 py-8" >
                 {activeTab === 'tasks' && (
                     <div>
                         <h2 className="text-3xl font-semibold text-text-primary mb-6">
@@ -124,62 +124,73 @@ export default function AdminPage() {
                         </h2>
                         <TaskList />
                     </div>
-                )}
+                )
+                }
 
-                {activeTab === 'store' && (
-                    <div>
-                        <h2 className="text-3xl font-semibold text-text-primary mb-6">
-                            Reward Store
-                        </h2>
-                        <StoreItemList />
-                    </div>
-                )}
+                {
+                    activeTab === 'store' && (
+                        <div>
+                            <h2 className="text-3xl font-semibold text-text-primary mb-6">
+                                Reward Store
+                            </h2>
+                            <StoreItemList />
+                        </div>
+                    )
+                }
 
-                {activeTab === 'members' && (
-                    <div>
-                        <h2 className="text-3xl font-semibold text-text-primary mb-6">
-                            Family Members
-                        </h2>
-                        <MemberList />
-                    </div>
-                )}
+                {
+                    activeTab === 'members' && (
+                        <div>
+                            <h2 className="text-3xl font-semibold text-text-primary mb-6">
+                                Family Members
+                            </h2>
+                            <MemberList />
+                        </div>
+                    )
+                }
 
-                {activeTab === 'meals' && (
-                    <div className="text-center py-12">
-                        <UtensilsCrossed className="w-16 h-16 text-text-secondary mx-auto mb-4 opacity-50" />
-                        <h3 className="text-xl font-semibold text-text-primary mb-2">
-                            Meal Planning
-                        </h3>
-                        <p className="text-text-secondary">
-                            Meal planning features coming soon
-                        </p>
-                    </div>
-                )}
+                {
+                    activeTab === 'meals' && (
+                        <div className="text-center py-12">
+                            <UtensilsCrossed className="w-16 h-16 text-text-secondary mx-auto mb-4 opacity-50" />
+                            <h3 className="text-xl font-semibold text-text-primary mb-2">
+                                Meal Planning
+                            </h3>
+                            <p className="text-text-secondary">
+                                Meal planning features coming soon
+                            </p>
+                        </div>
+                    )
+                }
 
-                {activeTab === 'approvals' && (
-                    <div className="text-center py-12">
-                        <CheckCircle className="w-16 h-16 text-text-secondary mx-auto mb-4 opacity-50" />
-                        <h3 className="text-xl font-semibold text-text-primary mb-2">
-                            Approvals Dashboard
-                        </h3>
-                        <p className="text-text-secondary">
-                            Approval system coming soon
-                        </p>
-                    </div>
-                )}
+                {
+                    activeTab === 'approvals' && (
+                        <div className="text-center py-12">
+                            <CheckCircle className="w-16 h-16 text-text-secondary mx-auto mb-4 opacity-50" />
+                            <h3 className="text-xl font-semibold text-text-primary mb-2">
+                                Approvals Dashboard
+                            </h3>
+                            <p className="text-text-secondary">
+                                Approval system coming soon
+                            </p>
+                        </div>
+                    )
+                }
 
-                {activeTab === 'settings' && (
-                    <div className="text-center py-12">
-                        <Settings className="w-16 h-16 text-text-secondary mx-auto mb-4 opacity-50" />
-                        <h3 className="text-xl font-semibold text-text-primary mb-2">
-                            Household Settings
-                        </h3>
-                        <p className="text-text-secondary">
-                            Settings panel coming soon
-                        </p>
-                    </div>
-                )}
-            </main>
-        </div>
+                {
+                    activeTab === 'settings' && (
+                        <div className="text-center py-12">
+                            <Settings className="w-16 h-16 text-text-secondary mx-auto mb-4 opacity-50" />
+                            <h3 className="text-xl font-semibold text-text-primary mb-2">
+                                Household Settings
+                            </h3>
+                            <p className="text-text-secondary">
+                                Settings panel coming soon
+                            </p>
+                        </div>
+                    )
+                }
+            </main >
+        </div >
     );
 }
