@@ -111,7 +111,7 @@ export function populateTaskAssignments(
                     profileColor: member.profileColor
                 };
             })
-            .filter((assignment): assignment is PopulatedAssignment => assignment !== null);
+            .filter((assignment): assignment is NonNullable<typeof assignment> => assignment !== null);
 
         // Return the task with populated assignedTo
         return {
