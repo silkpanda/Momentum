@@ -218,9 +218,7 @@ const TaskList: React.FC = () => {
                 const assignedIncompleteTasks = incompleteTasks.filter(
                     t => !t.isCompleted && t.assignedTo && t.assignedTo.length > 0
                 );
-                const unassignedIncompleteTasks = incompleteTasks.filter(
-                    t => !t.isCompleted && (!t.assignedTo || t.assignedTo.length === 0)
-                );
+                // Unassigned tasks are intentionally hidden from this view as per requirements
 
                 return (
                     tasks.length > 0 ? (
@@ -233,17 +231,6 @@ const TaskList: React.FC = () => {
                                 emptyMessage="No assigned (incomplete) tasks."
                             >
                                 {assignedIncompleteTasks.map((task) => (
-                                    <TaskItem key={task._id} task={task} onEdit={() => openEditModal(task)} onDelete={() => openDeleteModal(task)} />
-                                ))}
-                            </Collapsible>
-
-                            <Collapsible
-                                Icon={UserX}
-                                title="Unassigned"
-                                count={unassignedIncompleteTasks.length}
-                                emptyMessage="No unassigned tasks."
-                            >
-                                {unassignedIncompleteTasks.map((task) => (
                                     <TaskItem key={task._id} task={task} onEdit={() => openEditModal(task)} onDelete={() => openDeleteModal(task)} />
                                 ))}
                             </Collapsible>

@@ -28,20 +28,24 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
     const [description, setDescription] = useState(task.description);
     const [pointsValue, setPointsValue] = useState(task.pointsValue);
 
-    // FIX: The API populates assignedTo but may not include _id
-    // Instead, match the assigned members by displayName to the householdMembers list
     const [assignedTo, setAssignedTo] = useState<string[]>(() => {
         if (!task.assignedTo || task.assignedTo.length === 0) return [];
 
-        // Match assigned members to household members by displayName
         const assignedIds: string[] = [];
         task.assignedTo.forEach(assignedMember => {
+            if (assignedMember._id) {
+                const match = householdMembers.find(hm => hm._id === assignedMember._id);
+                if (match) {
+                    assignedIds.push(match._id);
+                    return;
+                }
+            }
             const match = householdMembers.find(hm => hm.displayName === assignedMember.displayName);
             if (match) {
                 assignedIds.push(match._id);
             }
         });
-        return assignedIds;
+        return [...new Set(assignedIds)];
     });
 
     const [isLoading, setIsLoading] = useState(false);

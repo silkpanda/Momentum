@@ -20,6 +20,8 @@ import {
 import TaskList from '../components/tasks/TaskList';
 import StoreItemList from '../components/store/StoreItemList';
 import MemberList from '../components/members/MemberList';
+import MealDashboard from '../components/meals/MealDashboard';
+import ThemeSwitcher from '../components/settings/ThemeSwitcher';
 import Loading from '../components/layout/Loading';
 
 type AdminTab = 'tasks' | 'store' | 'members' | 'meals' | 'approvals' | 'settings';
@@ -142,7 +144,7 @@ export default function AdminPage() {
                     activeTab === 'members' && (
                         <div>
                             <h2 className="text-3xl font-semibold text-text-primary mb-6">
-                                Family Members
+                                Family Team
                             </h2>
                             <MemberList />
                         </div>
@@ -151,14 +153,8 @@ export default function AdminPage() {
 
                 {
                     activeTab === 'meals' && (
-                        <div className="text-center py-12">
-                            <UtensilsCrossed className="w-16 h-16 text-text-secondary mx-auto mb-4 opacity-50" />
-                            <h3 className="text-xl font-semibold text-text-primary mb-2">
-                                Meal Planning
-                            </h3>
-                            <p className="text-text-secondary">
-                                Meal planning features coming soon
-                            </p>
+                        <div>
+                            <MealDashboard />
                         </div>
                     )
                 }
@@ -179,14 +175,13 @@ export default function AdminPage() {
 
                 {
                     activeTab === 'settings' && (
-                        <div className="text-center py-12">
-                            <Settings className="w-16 h-16 text-text-secondary mx-auto mb-4 opacity-50" />
-                            <h3 className="text-xl font-semibold text-text-primary mb-2">
-                                Household Settings
-                            </h3>
-                            <p className="text-text-secondary">
-                                Settings panel coming soon
-                            </p>
+                        <div>
+                            <h2 className="text-3xl font-semibold text-text-primary mb-6">
+                                Team Settings
+                            </h2>
+                            <div className="max-w-2xl">
+                                <ThemeSwitcher />
+                            </div>
                         </div>
                     )
                 }

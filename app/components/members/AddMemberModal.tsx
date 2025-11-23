@@ -1,5 +1,5 @@
 // =========================================================
-// silkpanda/momentum/momentum-fac69d659346d6b7b01871d803baa24f6dfaccee/app/components/members/AddMemberModal.tsx
+// silkpanda/momentum/app/components/members/AddMemberModal.tsx
 // REFACTORED for Unified Membership Model (API v3)
 // REFACTORED (v4) to call Embedded Web BFF
 //
@@ -12,7 +12,7 @@ import React, { useState } from 'react';
 import { User, Loader, X, AlertTriangle, Check, Palette, UserPlus } from 'lucide-react';
 import { useSession } from '../layout/SessionContext';
 import { IHouseholdMemberProfile } from './MemberList';
-import { PROFILE_COLORS } from '../../lib/constants'; // TELA CODICIS: Import constant
+import { PROFILE_COLORS } from '../../lib/constants';
 
 interface AddMemberModalProps {
     householdId: string;
@@ -26,6 +26,7 @@ const AddMemberModal: React.FC<AddMemberModalProps> = ({
 }) => {
     const [firstName, setFirstName] = useState('');
     const [selectedColor, setSelectedColor] = useState<string | null>(null);
+    const [role, setRole] = useState<'Parent' | 'Child'>('Child');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const { token } = useSession();
@@ -60,19 +61,19 @@ const AddMemberModal: React.FC<AddMemberModalProps> = ({
                     firstName: firstName,
                     displayName: firstName, // Use firstName as default displayName
                     profileColor: colorToSubmit,
-                    role: 'Child', // Mandate the role as 'Child'
+                    role: role,
                 }),
             });
 
             const data = await response.json();
             if (!response.ok || data.status === 'fail' || data.status === 'error') {
-                throw new Error(data.message || 'Failed to create child profile.');
+                throw new Error(data.message || 'Failed to create profile.');
             }
 
             // The new API controller returns the updated household document.
             // We need to find the newly added member profile.
             const newProfileData = data.data.household.memberProfiles.find(
-                (p: IHouseholdMemberProfile) => p.displayName === firstName && p.role === 'Child'
+                (p: IHouseholdMemberProfile) => p.displayName === firstName && p.role === role
             );
 
             // Pass the new profile back to the list
@@ -109,13 +110,13 @@ const AddMemberModal: React.FC<AddMemberModalProps> = ({
                 <form onSubmit={handleSubmit} className="flex flex-col space-y-4">
                     <h3 className="text-xl font-medium text-text-primary">Add New Family Member</h3>
                     <p className="text-sm text-text-secondary pb-2">
-                        This will create a new 'Child' profile in your household.
+                        Create a new profile for your family team.
                     </p>
 
                     {/* First Name Input */}
                     <div className="space-y-1">
                         <label htmlFor="firstName" className="block text-sm font-medium text-text-secondary">
-                            Child's First Name (this will be their login & display name)
+                            Name (Login & Display Name)
                         </label>
                         <div className="relative rounded-md shadow-sm">
                             <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
@@ -133,6 +134,37 @@ const AddMemberModal: React.FC<AddMemberModalProps> = ({
                                 placeholder="e.g., 'Alex'"
                                 className="block w-full rounded-md border border-border-subtle p-3 pl-10 text-text-primary bg-bg-surface"
                             />
+                        </div>
+                    </div>
+
+                    {/* Role Selector */}
+                    <div className="space-y-1">
+                        <label className="block text-sm font-medium text-text-secondary">
+                            Role
+                        </label>
+                        <div className="flex space-x-4">
+                            <label className="flex items-center space-x-2 cursor-pointer">
+                                <input
+                                    type="radio"
+                                    name="role"
+                                    value="Child"
+                                    checked={role === 'Child'}
+                                    onChange={() => setRole('Child')}
+                                    className="text-action-primary focus:ring-action-primary"
+                                />
+                                <span className="text-text-primary">Child</span>
+                            </label>
+                            <label className="flex items-center space-x-2 cursor-pointer">
+                                <input
+                                    type="radio"
+                                    name="role"
+                                    value="Parent"
+                                    checked={role === 'Parent'}
+                                    onChange={() => setRole('Parent')}
+                                    className="text-action-primary focus:ring-action-primary"
+                                />
+                                <span className="text-text-primary">Parent (Admin)</span>
+                            </label>
                         </div>
                     </div>
 
