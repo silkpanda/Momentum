@@ -6,6 +6,7 @@
 import { NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 import { API_BASE_URL } from '@/lib/config';
+import { populateTaskAssignments } from '../../utils/populateTaskAssignments';
 
 // Internal API URLs
 const TASK_API_URL = `${API_BASE_URL}/tasks`;
@@ -37,10 +38,16 @@ export async function GET() {
         const taskData = await taskResponse.json();
         const householdData = await householdResponse.json();
 
-        // 2. Aggregate and return the combined data
+        // 2. Populate task assignments with member details
+        const memberProfiles = householdData.data.memberProfiles || [];
+        const populatedTasks = taskData.data.tasks
+            ? populateTaskAssignments(taskData.data.tasks, memberProfiles)
+            : [];
+
+        // 3. Aggregate and return the combined data
         return NextResponse.json({
-            tasks: taskData.data.tasks || [],
-            householdMembers: householdData.data.memberProfiles || [],
+            tasks: Array.isArray(populatedTasks) ? populatedTasks : [populatedTasks],
+            householdMembers: memberProfiles,
         });
 
     } catch (err: any) {
